@@ -1,12 +1,152 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>TYMRAK</title>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TYMRAK Invitation Test</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background:#f4f6f8;
+    margin:0;
+    padding:30px;
+}
+.card {
+    max-width:520px;
+    margin:60px auto;
+    background:white;
+    padding:35px;
+    border-radius:14px;
+    box-shadow:0 8px 25px rgba(0,0,0,.08);
+}
+h1 {
+    color:#14213d;
+    margin-bottom:3px;
+}
+.tagline {
+    color:#299764;
+    font-weight:bold;
+    margin-bottom:30px;
+}
+.info {
+    background:#f5f7f9;
+    padding:18px;
+    border-radius:8px;
+    line-height:1.8;
+    margin:20px 0;
+}
+button {
+    width:100%;
+    padding:15px;
+    border:0;
+    border-radius:8px;
+    background:#14213d;
+    color:white;
+    font-size:16px;
+    font-weight:bold;
+    cursor:pointer;
+}
+button:disabled {
+    opacity:.6;
+}
+#result {
+    margin-top:20px;
+    padding:15px;
+    border-radius:8px;
+    display:none;
+}
+.success {
+    display:block !important;
+    background:#e8f7ee;
+    color:#176b36;
+}
+.error {
+    display:block !important;
+    background:#fdeaea;
+    color:#a32020;
+}
+</style>
 </head>
+
 <body>
-  <h1>TYMRAK</h1>
-  <p>TIME. TRACKED RIGHT.</p>
-  <p>TYMRAK server setup is working.</p>
+
+<div class="card">
+
+<h1>TYMRAK</h1>
+<div class="tagline">TIME. TRACKED RIGHT.</div>
+
+<h2>Employee Invitation Test</h2>
+
+<p>This will send a real TYMRAK invitation through Resend.</p>
+
+<div class="info">
+<strong>Employee:</strong> Waleed<br>
+<strong>Username:</strong> waleed.test<br>
+<strong>Email:</strong> w.ammari@outlook.com
+</div>
+
+<button id="sendButton" onclick="sendInvitation()">
+Send Test Invitation
+</button>
+
+<div id="result"></div>
+
+</div>
+
+<script>
+async function sendInvitation() {
+
+    const button = document.getElementById("sendButton");
+    const result = document.getElementById("result");
+
+    button.disabled = true;
+    button.textContent = "Sending...";
+
+    result.style.display = "none";
+    result.className = "";
+
+    try {
+
+        const response = await fetch("/api/send-invitation", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json"
+            },
+            body: JSON.stringify({
+                email: "w.ammari@outlook.com",
+                firstName: "Waleed",
+                username: "waleed.test"
+            })
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+            throw new Error(
+                data.details?.message ||
+                data.error ||
+                "Unable to send invitation."
+            );
+        }
+
+        result.className = "success";
+        result.innerHTML =
+            "<strong>✓ Invitation sent successfully!</strong><br><br>" +
+            "Resend Email ID:<br>" + data.id;
+
+    } catch (error) {
+
+        result.className = "error";
+        result.innerHTML =
+            "<strong>Invitation failed.</strong><br><br>" +
+            error.message;
+    }
+
+    button.disabled = false;
+    button.textContent = "Send Test Invitation";
+}
+</script>
+
 </body>
 </html>
