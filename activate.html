@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Activate TYMRAK Account</title>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 30px 20px;
+}
+
+.card {
+    max-width: 500px;
+    margin: 60px auto;
+    background: white;
+    padding: 36px;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+}
+
+h1 {
+    color: #14213d;
+    margin-bottom: 4px;
+}
+
+.tagline {
+    color: #299764;
+    font-weight: bold;
+    margin-bottom: 30px;
+}
+
+h2 {
+    color: #14213d;
+}
+
+label {
+    display: block;
+    margin-top: 18px;
+    margin-bottom: 7px;
+    font-weight: bold;
+}
+
+input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 13px;
+    border: 1px solid #ccd2d8;
+    border-radius: 7px;
+    font-size: 16px;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    margin-top: 25px;
+    background: #14213d;
+    color: white;
+    border: 0;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: .6;
+}
+
+.message {
+    display: none;
+    margin-top: 20px;
+    padding: 14px;
+    border-radius: 8px;
+}
+
+.success {
+    display: block;
+    background: #e8f7ee;
+    color: #176b36;
+}
+
+.error {
+    display: block;
+    background: #fdeaea;
+    color: #a32020;
+}
+
+.password-note {
+    font-size: 13px;
+    color: #666;
+    margin-top: 7px;
+}
+</style>
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>TYMRAK</h1>
+<div class="tagline">TIME. TRACKED RIGHT.</div>
+
+<h2>Activate Your Account</h2>
+
+<p>Create your password to finish setting up your TYMRAK account.</p>
+
+<form id="activationForm">
+
+<label for="password">New Password</label>
+<input
+    id="password"
+    type="password"
+    minlength="8"
+    required
+    autocomplete="new-password"
+>
+
+<div class="password-note">
+Password must contain at least 8 characters.
+</div>
+
+<label for="confirmPassword">Confirm Password</label>
+<input
+    id="confirmPassword"
+    type="password"
+    minlength="8"
+    required
+    autocomplete="new-password"
+>
+
+<button id="activateButton" type="submit">
+Activate My Account
+</button>
+
+</form>
+
+<div id="message" class="message"></div>
+
+</div>
+
+<script type="module">
+
+const SUPABASE_URL = "https://tsosredghislnehfyypi.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+import { createClient } from
+"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+const supabase = createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
+
+const form = document.getElementById("activationForm");
+const button = document.getElementById("activateButton");
+const message = document.getElementById("message");
+
+form.addEventListener("submit", async (event) => {
+
+    event.preventDefault();
+
+    const password =
+        document.getElementById("password").value;
+
+    const confirmPassword =
+        document.getElementById("confirmPassword").value;
+
+    message.className = "message";
+    message.style.display = "none";
+
+    if (password.length < 8) {
+
+        message.className = "message error";
+        message.textContent =
+            "Password must contain at least 8 characters.";
+
+        return;
+    }
+
+    if (password !== confirmPassword) {
+
+        message.className = "message error";
+        message.textContent =
+            "The passwords do not match.";
+
+        return;
+    }
+
+    button.disabled = true;
+    button.textContent = "Activating...";
+
+    try {
+
+        const { data: sessionData } =
+            await supabase.auth.getSession();
+
+        if (!sessionData.session) {
+            throw new Error(
+                "This activation link is invalid or has expired. Please request a new invitation."
+            );
+        }
+
+        const { error } =
+            await supabase.auth.updateUser({
+                password: password
+            });
+
+        if (error) {
+            throw error;
+        }
+
+        message.className = "message success";
+
+        message.innerHTML =
+            "<strong>✓ Account activated successfully!</strong><br><br>" +
+            "Your TYMRAK account is ready.";
+
+        form.style.display = "none";
+
+    } catch (error) {
+
+        message.className = "message error";
+        message.textContent =
+            error.message ||
+            "Unable to activate your account.";
+
+        button.disabled = false;
+        button.textContent = "Activate My Account";
+    }
+
+});
+
+</script>
+
+</body>
+</html>
