@@ -188,41 +188,67 @@ async function prepareActivation() {
         */
 
         if (code) {
+const { error } =
+    await supabase.auth.updateUser({
+        password: password
+    });
 
-            const { error } =
-                await supabase.auth.exchangeCodeForSession(code);
+if (error) {
+    throw error;
+}
 
-            if (error) {
-                throw error;
-            }
+/*
+Get the authenticated employee session.
+*/
 
-            /*
-            Remove the one-time authorization code
-            from the browser address bar.
-            */
+const { data: sessionData, error: sessionError } =
+    await supabase.auth.getSession();
 
-            window.history.replaceState(
-                {},
-                document.title,
-                window.location.pathname
-            );
+if (sessionError || !sessionData.session) {
+    throw new Error(
+        "Your password was created, but the activation session could not be verified."
+    );
+}
+
+/*
+Tell the secure TYMRAK server endpoint
+that activation has been completed.
+*/
+
+const activationResponse = await fetch(
+    "/api/complete-activation",
+    {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            Authorization:
+                `Bearer ${sessionData.session.access_token}`
         }
+    }
+);
 
-        /*
-        Confirm that we now have an authenticated
-        Supabase session.
-        */
+const activationResult =
+    await activationResponse.json();
 
-        const { data, error } =
-            await supabase.auth.getSession();
+if (!activationResponse.ok) {
+    throw new Error(
+        activationResult.error ||
+        "Your password was created, but the employee activation status could not be updated."
+    );
+}
 
-        if (error) {
-            throw error;
-        }
+/*
+Activation is now complete.
+*/
 
-        if (!data.session) {
+form.style.display = "none";
 
-            form.style.display = "none";
+message.className = "message success";
+message.style.display = "block";
+
+message.innerHTML =
+    "<strong>✓ Account activated successfully!</strong><br><br>" +
+    "Your TYMRAK account is ready.";
 
             message.className = "message error";
             message.textContent =
