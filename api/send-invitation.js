@@ -4,91 +4,111 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, firstName, username } = req.body || {};
+    const { email, firstName, lastName, username } = req.body || {};
 
-    if (!email) {
-      return res.status(400).json({ error: "Email address is required" });
+    if (!email || !firstName || !username) {
+      return res.status(400).json({
+        error: "Email, first name, and username are required"
+      });
     }
 
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${process.env.RESEND_API_KEY}`,
-        "Content-Type": "application/json"
-      },
-      body: JSON.stringify({
-        from: "TYMRAK <invite@tymrak.com>",
-        to: [email],
-        subject: "Welcome to TYMRAK – Activate Your Account",
-        html: `
-          <div style="font-family:Arial,sans-serif;max-width:600px;margin:auto;padding:32px;">
-            <h1 style="color:#14213d;margin-bottom:5px;">TYMRAK</h1>
+    const supabaseUrl = process.env.SUPABASE_URL;
+    const secretKey = process.env.SUPABASE_SECRET_KEY;
 
-            <p style="color:#39a96b;font-weight:bold;">
-              TIME. TRACKED RIGHT.
-            </p>
+    if (!supabaseUrl || !secretKey) {
+      return res.status(500).json({
+        error: "Supabase environment variables are not configured"
+      });
+    }
 
-            <hr style="border:none;border-top:1px solid #ddd;margin:25px 0;">
+    /*
+     * Create the Supabase Auth invitation.
+     * Supabase generates and emails the secure one-time invitation link.
+     */
+    const inviteResponse = await fetch(
+      `${supabaseUrl}/auth/v1/invite`,
+      {
+        method: "POST",
+        headers: {
+          apikey: secretKey,
+          Authorization: `Bearer ${secretKey}`,
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          data: {
+            first_name: firstName,
+            last_name: lastName || "",
+            username: username
+          },
+          redirect_to: "https://tymrak.vercel.app/activate.html"
+        })
+      }
+    );
 
-            <h2>Welcome to TYMRAK</h2>
+    const inviteData = await inviteResponse.json();
 
-            <p>Hi ${firstName || "there"},</p>
+    if (!inviteResponse.ok) {
+      console.error("Supabase invitation error:", inviteData);
 
-            <p>
-              Your employer has invited you to use TYMRAK
-              for time tracking and employee services.
-            </p>
+      return res.status(inviteResponse.status).json({
+        error:
+          inviteData.msg ||
+          inviteData.message ||
+          "Unable to create employee invitation"
+      });
+    }
 
-            <p>
-              <strong>Your username:</strong>
-              ${username || "test.employee"}
-            </p>
+    /*
+     * Create/update the employee record.
+     * The secret key is used only inside this server-side function.
+     */
+    const employeeResponse = await fetch(
+      `${supabaseUrl}/rest/v1/employees?email=eq.${encodeURIComponent(
+        email.trim().toLowerCase()
+      )}`,
+      {
+        method: "POST",
+        headers: {
+          apikey: secretKey,
+          Authorization: `Bearer ${secretKey}`,
+          "Content-Type": "application/json",
+          Prefer: "resolution=merge-duplicates,return=representation"
+        },
+        body: JSON.stringify({
+          auth_user_id: inviteData.id,
+          first_name: firstName,
+          last_name: lastName || "",
+          email: email.trim().toLowerCase(),
+          username: username,
+          invitation_status: "Invitation Sent",
+          invited_at: new Date().toISOString(),
+          is_active: true
+        })
+      }
+    );
 
-            <p style="margin:30px 0;">
-              <a href="https://tymrak.com"
-                 style="
-                   background:#14213d;
-                   color:white;
-                   padding:14px 24px;
-                   text-decoration:none;
-                   border-radius:6px;
-                   font-weight:bold;">
-                 Activate My Account
-              </a>
-            </p>
+    if (!employeeResponse.ok) {
+      const employeeError = await employeeResponse.text();
 
-            <p style="font-size:13px;color:#666;">
-              If you were not expecting this invitation,
-              please disregard this email.
-            </p>
+      console.error(
+        "Employee record error:",
+        employeeError
+      );
 
-            <p style="margin-top:30px;">
-              TYMRAK<br>
-              TIME. TRACKED RIGHT.
-            </p>
-          </div>
-        `
-      })
-    });
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      console.error("Resend error:", data);
-      return res.status(response.status).json({
-        error: "Email could not be sent",
-        details: data
+      return res.status(500).json({
+        error:
+          "Authentication invitation was created, but the employee record could not be updated."
       });
     }
 
     return res.status(200).json({
       success: true,
-      message: "TYMRAK invitation sent successfully",
-      id: data.id
+      message: "TYMRAK activation invitation sent successfully"
     });
 
   } catch (error) {
-    console.error(error);
+    console.error("TYMRAK invitation error:", error);
 
     return res.status(500).json({
       error: "Server error"
