@@ -28,7 +28,9 @@ export default async function handler(req, res) {
      * Create the Supabase Auth invitation.
      */
     const inviteResponse = await fetch(
-      `${supabaseUrl}/auth/v1/invite`,
+    `${supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(
+  "https://tymrak.vercel.app/activate.html"
+)}`,
       {
         method: "POST",
         headers: {
@@ -43,8 +45,7 @@ export default async function handler(req, res) {
             last_name: lastName || "",
             username: username
           },
-          redirect_to:
-            "https://tymrak.vercel.app/activate.html"
+          
         })
       }
     );
