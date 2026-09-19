@@ -153,12 +153,104 @@ import { createClient } from
 
 const supabase = createClient(
     SUPABASE_URL,
-    SUPABASE_PUBLISHABLE_KEY
+    SUPABASE_PUBLISHABLE_KEY,
+    {
+        auth: {
+            detectSessionInUrl: true,
+            persistSession: true
+        }
+    }
 );
 
 const form = document.getElementById("activationForm");
 const button = document.getElementById("activateButton");
 const message = document.getElementById("message");
+
+let activationReady = false;
+
+
+/*
+-----------------------------------------
+Prepare Supabase invitation session
+-----------------------------------------
+*/
+
+async function prepareActivation() {
+
+    try {
+
+        const params = new URLSearchParams(window.location.search);
+        const code = params.get("code");
+
+        /*
+        Supabase PKCE invitation links may return ?code=...
+        Exchange that code for a valid authenticated session.
+        */
+
+        if (code) {
+
+            const { error } =
+                await supabase.auth.exchangeCodeForSession(code);
+
+            if (error) {
+                throw error;
+            }
+
+            /*
+            Remove the one-time authorization code
+            from the browser address bar.
+            */
+
+            window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname
+            );
+        }
+
+        /*
+        Confirm that we now have an authenticated
+        Supabase session.
+        */
+
+        const { data, error } =
+            await supabase.auth.getSession();
+
+        if (error) {
+            throw error;
+        }
+
+        if (!data.session) {
+
+            form.style.display = "none";
+
+            message.className = "message error";
+            message.textContent =
+                "This activation link is invalid or has expired. Please request a new invitation.";
+
+            return;
+        }
+
+        activationReady = true;
+
+    } catch (error) {
+
+        console.error("Activation session error:", error);
+
+        form.style.display = "none";
+
+        message.className = "message error";
+        message.textContent =
+            "This activation link is invalid or has expired. Please request a new invitation.";
+    }
+}
+
+
+/*
+-----------------------------------------
+Password activation
+-----------------------------------------
+*/
 
 form.addEventListener("submit", async (event) => {
 
@@ -172,6 +264,15 @@ form.addEventListener("submit", async (event) => {
 
     message.className = "message";
     message.style.display = "none";
+
+    if (!activationReady) {
+
+        message.className = "message error";
+        message.textContent =
+            "Your activation session is not ready. Please reopen the invitation link.";
+
+        return;
+    }
 
     if (password.length < 8) {
 
@@ -196,15 +297,6 @@ form.addEventListener("submit", async (event) => {
 
     try {
 
-        const { data: sessionData } =
-            await supabase.auth.getSession();
-
-        if (!sessionData.session) {
-            throw new Error(
-                "This activation link is invalid or has expired. Please request a new invitation."
-            );
-        }
-
         const { error } =
             await supabase.auth.updateUser({
                 password: password
@@ -224,6 +316,8 @@ form.addEventListener("submit", async (event) => {
 
     } catch (error) {
 
+        console.error("Password activation error:", error);
+
         message.className = "message error";
         message.textContent =
             error.message ||
@@ -234,6 +328,13 @@ form.addEventListener("submit", async (event) => {
     }
 
 });
+
+
+/*
+Start invitation processing when the page loads.
+*/
+
+prepareActivation();
 
 </script>
 
