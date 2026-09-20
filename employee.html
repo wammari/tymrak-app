@@ -1,0 +1,311 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>TYMRAK Employee Portal</title>
+
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    color: #14213d;
+}
+
+.header {
+    background: white;
+    padding: 20px 30px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.06);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.logo {
+    font-size: 28px;
+    font-weight: bold;
+}
+
+.tagline {
+    color: #299764;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.logout {
+    background: white;
+    border: 1px solid #14213d;
+    color: #14213d;
+    padding: 10px 18px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.container {
+    max-width: 900px;
+    margin: 40px auto;
+    padding: 0 20px;
+}
+
+.welcome {
+    background: white;
+    padding: 30px;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.06);
+}
+
+.welcome h1 {
+    margin-top: 0;
+}
+
+.status {
+    display: inline-block;
+    margin-top: 8px;
+    padding: 7px 12px;
+    border-radius: 20px;
+    background: #e8f7ee;
+    color: #176b36;
+    font-weight: bold;
+    font-size: 14px;
+}
+
+.details {
+    margin-top: 25px;
+    border-top: 1px solid #eee;
+    padding-top: 20px;
+}
+
+.details p {
+    margin: 10px 0;
+}
+
+.loading {
+    color: #666;
+}
+
+.error {
+    background: #fdeaea;
+    color: #a32020;
+    padding: 14px;
+    border-radius: 8px;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<header class="header">
+
+<div>
+    <div class="logo">TYMRAK</div>
+    <div class="tagline">TIME. TRACKED RIGHT.</div>
+</div>
+
+<button
+    id="logoutButton"
+    class="logout"
+>
+Sign Out
+</button>
+
+</header>
+
+
+<main class="container">
+
+<div
+    id="content"
+    class="welcome"
+>
+
+<p class="loading">
+Loading your TYMRAK account...
+</p>
+
+</div>
+
+</main>
+
+
+<script type="module">
+
+const SUPABASE_URL =
+    "https://tsosredghislnehfyypi.supabase.co";
+
+const SUPABASE_PUBLISHABLE_KEY =
+    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+
+import { createClient } from
+"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+
+const supabase = createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
+
+
+const content =
+    document.getElementById("content");
+
+const logoutButton =
+    document.getElementById("logoutButton");
+
+
+async function loadEmployee() {
+
+    try {
+
+        /*
+        Verify the employee has a valid
+        authenticated Supabase session.
+        */
+
+        const {
+            data: sessionData,
+            error: sessionError
+        } =
+            await supabase.auth.getSession();
+
+
+        if (
+            sessionError ||
+            !sessionData.session
+        ) {
+
+            window.location.href =
+                "/login.html";
+
+            return;
+        }
+
+
+        const user =
+            sessionData.session.user;
+
+
+        /*
+        Load this employee's TYMRAK record.
+
+        Our RLS policy allows employees to
+        read only their own employee record.
+        */
+
+        const {
+            data: employee,
+            error: employeeError
+        } =
+            await supabase
+                .from("employees")
+                .select(
+                    "first_name,last_name,email,username,position,department,employment_status,invitation_status"
+                )
+                .eq(
+                    "auth_user_id",
+                    user.id
+                )
+                .single();
+
+
+        if (employeeError) {
+            throw employeeError;
+        }
+
+
+        const fullName =
+            `${employee.first_name} ${employee.last_name || ""}`
+                .trim();
+
+
+        content.innerHTML = `
+            <h1>Welcome, ${escapeHTML(fullName)}</h1>
+
+            <div class="status">
+                ${escapeHTML(employee.employment_status)}
+            </div>
+
+            <div class="details">
+
+                <p>
+                    <strong>Username:</strong>
+                    ${escapeHTML(employee.username)}
+                </p>
+
+                <p>
+                    <strong>Email:</strong>
+                    ${escapeHTML(employee.email)}
+                </p>
+
+                <p>
+                    <strong>Position:</strong>
+                    ${escapeHTML(employee.position || "Not assigned")}
+                </p>
+
+                <p>
+                    <strong>Department:</strong>
+                    ${escapeHTML(employee.department || "Not assigned")}
+                </p>
+
+                <p>
+                    <strong>Account:</strong>
+                    ${escapeHTML(employee.invitation_status)}
+                </p>
+
+            </div>
+        `;
+
+
+    } catch (error) {
+
+        console.error(
+            "Employee portal error:",
+            error
+        );
+
+
+        content.innerHTML = `
+            <div class="error">
+                Unable to load your TYMRAK employee account.
+            </div>
+        `;
+    }
+}
+
+
+function escapeHTML(value) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+logoutButton.addEventListener(
+    "click",
+    async () => {
+
+        await supabase.auth.signOut();
+
+        window.location.href =
+            "/login.html";
+    }
+);
+
+
+loadEmployee();
+
+</script>
+
+</body>
+</html>
