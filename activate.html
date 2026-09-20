@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -69,6 +70,7 @@ button {
 
 button:disabled {
     opacity: .6;
+    cursor: not-allowed;
 }
 
 .message {
@@ -96,6 +98,7 @@ button:disabled {
     margin-top: 7px;
 }
 </style>
+
 </head>
 
 <body>
@@ -103,15 +106,23 @@ button:disabled {
 <div class="card">
 
 <h1>TYMRAK</h1>
-<div class="tagline">TIME. TRACKED RIGHT.</div>
+
+<div class="tagline">
+TIME. TRACKED RIGHT.
+</div>
 
 <h2>Activate Your Account</h2>
 
-<p>Create your password to finish setting up your TYMRAK account.</p>
+<p>
+Create your password to finish setting up your TYMRAK account.
+</p>
 
 <form id="activationForm">
 
-<label for="password">New Password</label>
+<label for="password">
+New Password
+</label>
+
 <input
     id="password"
     type="password"
@@ -124,7 +135,10 @@ button:disabled {
 Password must contain at least 8 characters.
 </div>
 
-<label for="confirmPassword">Confirm Password</label>
+<label for="confirmPassword">
+Confirm Password
+</label>
+
 <input
     id="confirmPassword"
     type="password"
@@ -133,23 +147,44 @@ Password must contain at least 8 characters.
     autocomplete="new-password"
 >
 
-<button id="activateButton" type="submit">
+<button
+    id="activateButton"
+    type="submit"
+>
 Activate My Account
 </button>
 
 </form>
 
-<div id="message" class="message"></div>
+<div
+    id="message"
+    class="message"
+></div>
 
 </div>
 
+
 <script type="module">
 
-const SUPABASE_URL = "https://tsosredghislnehfyypi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+/*
+=================================================
+TYMRAK SUPABASE CONFIGURATION
+=================================================
+Replace ONLY the two values below.
+
+NEVER place SUPABASE_SECRET_KEY in this file.
+*/
+
+const SUPABASE_URL =
+    "https://tsosredghislnehfyypi.supabase.co";
+
+const SUPABASE_PUBLISHABLE_KEY =
+    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
 
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
 
 const supabase = createClient(
     SUPABASE_URL,
@@ -157,207 +192,363 @@ const supabase = createClient(
     {
         auth: {
             detectSessionInUrl: true,
-            persistSession: true
+            persistSession: trueƒ
         }
     }
 );
 
-const form = document.getElementById("activationForm");
-const button = document.getElementById("activateButton");
-const message = document.getElementById("message");
+
+const form =
+    document.getElementById("activationForm");
+
+const button =
+    document.getElementById("activateButton");
+
+const message =
+    document.getElementById("message");
+
 
 let activationReady = false;
 
 
 /*
------------------------------------------
-Prepare Supabase invitation session
------------------------------------------
+=================================================
+MESSAGE DISPLAY
+=================================================
+*/
+
+function showMessage(type, text) {
+
+    message.className =
+        "message " + type;
+
+    message.style.display =
+        "block";
+
+    message.innerHTML =
+        text;
+}
+
+
+/*
+=================================================
+PREPARE INVITATION SESSION
+=================================================
 */
 
 async function prepareActivation() {
 
     try {
 
-        const params = new URLSearchParams(window.location.search);
-        const code = params.get("code");
+        const params =
+            new URLSearchParams(
+                window.location.search
+            );
+
+        const code =
+            params.get("code");
+
 
         /*
-        Supabase PKCE invitation links may return ?code=...
-        Exchange that code for a valid authenticated session.
+        Supabase invitation links may contain
+        a one-time authorization code.
+
+        Exchange that code for an authenticated
+        employee session.
         */
 
         if (code) {
-const { error } =
-    await supabase.auth.updateUser({
-        password: password
-    });
 
-if (error) {
-    throw error;
-}
+            const { error } =
+                await supabase.auth
+                    .exchangeCodeForSession(code);
 
-/*
-Get the authenticated employee session.
-*/
+            if (error) {
+                throw error;
+            }
 
-const { data: sessionData, error: sessionError } =
-    await supabase.auth.getSession();
 
-if (sessionError || !sessionData.session) {
-    throw new Error(
-        "Your password was created, but the activation session could not be verified."
-    );
-}
+            /*
+            Remove the one-time code from
+            the browser address bar.
+            */
 
-/*
-Tell the secure TYMRAK server endpoint
-that activation has been completed.
-*/
-
-const activationResponse = await fetch(
-    "/api/complete-activation",
-    {
-        method: "POST",
-        headers: {
-            "Content-Type": "application/json",
-            Authorization:
-                `Bearer ${sessionData.session.access_token}`
-        }
-    }
-);
-
-const activationResult =
-    await activationResponse.json();
-
-if (!activationResponse.ok) {
-    throw new Error(
-        activationResult.error ||
-        "Your password was created, but the employee activation status could not be updated."
-    );
-}
-
-/*
-Activation is now complete.
-*/
-
-form.style.display = "none";
-
-message.className = "message success";
-message.style.display = "block";
-
-message.innerHTML =
-    "<strong>✓ Account activated successfully!</strong><br><br>" +
-    "Your TYMRAK account is ready.";
-
-            message.className = "message error";
-            message.textContent =
-                "This activation link is invalid or has expired. Please request a new invitation.";
-
-            return;
+            window.history.replaceState(
+                {},
+                document.title,
+                window.location.pathname
+            );
         }
 
-        activationReady = true;
 
-    } catch (error) {
+        /*
+        Confirm that we have an authenticated
+        Supabase session.
+        */
 
-        console.error("Activation session error:", error);
+        const {
+            data,
+            error
+        } =
+            await supabase.auth.getSession();
 
-        form.style.display = "none";
-
-        message.className = "message error";
-        message.textContent =
-            "This activation link is invalid or has expired. Please request a new invitation.";
-    }
-}
-
-
-/*
------------------------------------------
-Password activation
------------------------------------------
-*/
-
-form.addEventListener("submit", async (event) => {
-
-    event.preventDefault();
-
-    const password =
-        document.getElementById("password").value;
-
-    const confirmPassword =
-        document.getElementById("confirmPassword").value;
-
-    message.className = "message";
-    message.style.display = "none";
-
-    if (!activationReady) {
-
-        message.className = "message error";
-        message.textContent =
-            "Your activation session is not ready. Please reopen the invitation link.";
-
-        return;
-    }
-
-    if (password.length < 8) {
-
-        message.className = "message error";
-        message.textContent =
-            "Password must contain at least 8 characters.";
-
-        return;
-    }
-
-    if (password !== confirmPassword) {
-
-        message.className = "message error";
-        message.textContent =
-            "The passwords do not match.";
-
-        return;
-    }
-
-    button.disabled = true;
-    button.textContent = "Activating...";
-
-    try {
-
-        const { error } =
-            await supabase.auth.updateUser({
-                password: password
-            });
 
         if (error) {
             throw error;
         }
 
-        message.className = "message success";
 
-        message.innerHTML =
-            "<strong>✓ Account activated successfully!</strong><br><br>" +
-            "Your TYMRAK account is ready.";
+        if (!data.session) {
 
-        form.style.display = "none";
+            form.style.display =
+                "none";
+
+            showMessage(
+                "error",
+                "This activation link is invalid or has expired. Please request a new invitation."
+            );
+
+            return;
+        }
+
+
+        activationReady = true;
+
 
     } catch (error) {
 
-        console.error("Password activation error:", error);
+        console.error(
+            "Activation session error:",
+            error
+        );
 
-        message.className = "message error";
-        message.textContent =
-            error.message ||
-            "Unable to activate your account.";
 
-        button.disabled = false;
-        button.textContent = "Activate My Account";
+        form.style.display =
+            "none";
+
+
+        showMessage(
+            "error",
+            "This activation link is invalid or has expired. Please request a new invitation."
+        );
     }
-
-});
+}
 
 
 /*
-Start invitation processing when the page loads.
+=================================================
+ACTIVATE EMPLOYEE ACCOUNT
+=================================================
+*/
+
+form.addEventListener(
+    "submit",
+    async (event) => {
+
+        event.preventDefault();
+
+
+        const password =
+            document.getElementById(
+                "password"
+            ).value;
+
+
+        const confirmPassword =
+            document.getElementById(
+                "confirmPassword"
+            ).value;
+
+
+        message.style.display =
+            "none";
+
+
+        /*
+        STEP 1
+        Confirm invitation session.
+        */
+
+        if (!activationReady) {
+
+            showMessage(
+                "error",
+                "Your activation session is not ready. Please reopen the invitation link."
+            );
+
+            return;
+        }
+
+
+        /*
+        STEP 2
+        Validate password.
+        */
+
+        if (password.length < 8) {
+
+            showMessage(
+                "error",
+                "Password must contain at least 8 characters."
+            );
+
+            return;
+        }
+
+
+        if (password !== confirmPassword) {
+
+            showMessage(
+                "error",
+                "The passwords do not match."
+            );
+
+            return;
+        }
+
+
+        button.disabled =
+            true;
+
+        button.textContent =
+            "Activating...";
+
+
+        try {
+
+            /*
+            STEP 3
+            Save password in Supabase Auth.
+            */
+
+            const {
+                error: passwordError
+            } =
+                await supabase.auth.updateUser({
+                    password: password
+                });
+
+
+            if (passwordError) {
+                throw passwordError;
+            }
+
+
+            /*
+            STEP 4
+            Get authenticated employee session.
+            */
+
+            const {
+                data: sessionData,
+                error: sessionError
+            } =
+                await supabase.auth.getSession();
+
+
+            if (
+                sessionError ||
+                !sessionData.session
+            ) {
+
+                throw new Error(
+                    "Your password was created, but the activation session could not be verified."
+                );
+            }
+
+
+            /*
+            STEP 5
+            Tell the secure TYMRAK server that
+            employee activation is complete.
+            */
+
+            const activationResponse =
+                await fetch(
+                    "/api/complete-activation",
+                    {
+                        method: "POST",
+
+                        headers: {
+                            "Content-Type":
+                                "application/json",
+
+                            Authorization:
+                                `Bearer ${sessionData.session.access_token}`
+                        }
+                    }
+                );
+
+
+            let activationResult = {};
+
+
+            try {
+
+                activationResult =
+                    await activationResponse.json();
+
+            } catch {
+
+                activationResult = {};
+            }
+
+
+            if (!activationResponse.ok) {
+
+                throw new Error(
+                    activationResult.error ||
+                    "Your password was created, but TYMRAK could not complete the employee activation."
+                );
+            }
+
+
+            /*
+            STEP 6
+            Activation completed successfully.
+            */
+
+            form.style.display =
+                "none";
+
+
+            showMessage(
+                "success",
+                "<strong>✓ Account activated successfully!</strong><br><br>" +
+                "Your TYMRAK account is ready."
+            );
+
+
+        } catch (error) {
+
+            console.error(
+                "Account activation error:",
+                error
+            );
+
+
+            showMessage(
+                "error",
+                error.message ||
+                "Unable to activate your account."
+            );
+
+
+            button.disabled =
+                false;
+
+
+            button.textContent =
+                "Activate My Account";
+        }
+    }
+);
+
+
+/*
+=================================================
+START ACTIVATION PAGE
+=================================================
 */
 
 prepareActivation();
