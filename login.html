@@ -1,0 +1,335 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>TYMRAK Login</title>
+
+<style>
+
+body {
+    font-family: Arial, sans-serif;
+    background: #f4f6f8;
+    margin: 0;
+    padding: 30px 20px;
+}
+
+.card {
+    max-width: 440px;
+    margin: 70px auto;
+    background: white;
+    padding: 38px;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+}
+
+h1 {
+    color: #14213d;
+    margin-bottom: 4px;
+    font-size: 36px;
+}
+
+.tagline {
+    color: #299764;
+    font-weight: bold;
+    margin-bottom: 38px;
+}
+
+h2 {
+    color: #14213d;
+    margin-bottom: 8px;
+}
+
+.subtitle {
+    color: #555;
+    margin-bottom: 28px;
+}
+
+label {
+    display: block;
+    margin-top: 18px;
+    margin-bottom: 7px;
+    font-weight: bold;
+}
+
+input {
+    box-sizing: border-box;
+    width: 100%;
+    padding: 14px;
+    border: 1px solid #ccd2d8;
+    border-radius: 7px;
+    font-size: 16px;
+}
+
+input:focus {
+    outline: 2px solid #299764;
+    border-color: #299764;
+}
+
+button {
+    width: 100%;
+    padding: 15px;
+    margin-top: 26px;
+    background: #14213d;
+    color: white;
+    border: 0;
+    border-radius: 8px;
+    font-size: 16px;
+    font-weight: bold;
+    cursor: pointer;
+}
+
+button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.message {
+    display: none;
+    margin-top: 20px;
+    padding: 14px;
+    border-radius: 8px;
+}
+
+.error {
+    display: block;
+    background: #fdeaea;
+    color: #a32020;
+}
+
+.success {
+    display: block;
+    background: #e8f7ee;
+    color: #176b36;
+}
+
+.forgot {
+    text-align: right;
+    margin-top: 12px;
+    font-size: 14px;
+}
+
+.forgot a {
+    color: #299764;
+    text-decoration: none;
+}
+
+</style>
+
+</head>
+
+<body>
+
+<div class="card">
+
+<h1>TYMRAK</h1>
+
+<div class="tagline">
+TIME. TRACKED RIGHT.
+</div>
+
+<h2>Employee Login</h2>
+
+<div class="subtitle">
+Sign in to your TYMRAK account.
+</div>
+
+<form id="loginForm">
+
+<label for="email">
+Email
+</label>
+
+<input
+    id="email"
+    type="email"
+    autocomplete="email"
+    required
+>
+
+<label for="password">
+Password
+</label>
+
+<input
+    id="password"
+    type="password"
+    autocomplete="current-password"
+    required
+>
+
+<div class="forgot">
+    <a href="#" id="forgotPassword">
+        Forgot password?
+    </a>
+</div>
+
+<button
+    id="loginButton"
+    type="submit"
+>
+Sign In
+</button>
+
+</form>
+
+<div
+    id="message"
+    class="message"
+></div>
+
+</div>
+
+
+<script type="module">
+
+const SUPABASE_URL =
+    "https://tsosredghislnehfyypi.supabase.co";
+
+const SUPABASE_PUBLISHABLE_KEY =
+    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+
+import { createClient } from
+"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+
+
+const supabase = createClient(
+    SUPABASE_URL,
+    SUPABASE_PUBLISHABLE_KEY
+);
+
+
+const form =
+    document.getElementById("loginForm");
+
+const button =
+    document.getElementById("loginButton");
+
+const message =
+    document.getElementById("message");
+
+
+function showMessage(type, text) {
+
+    message.className =
+        "message " + type;
+
+    message.style.display =
+        "block";
+
+    message.textContent =
+        text;
+}
+
+
+form.addEventListener(
+    "submit",
+    async (event) => {
+
+        event.preventDefault();
+
+        message.style.display = "none";
+
+        const email =
+            document.getElementById("email")
+                .value
+                .trim()
+                .toLowerCase();
+
+        const password =
+            document.getElementById("password")
+                .value;
+
+
+        button.disabled = true;
+        button.textContent = "Signing In...";
+
+
+        try {
+
+            const {
+                data,
+                error
+            } =
+                await supabase.auth
+                    .signInWithPassword({
+                        email,
+                        password
+                    });
+
+
+            if (error) {
+                throw error;
+            }
+
+
+            if (!data.session) {
+
+                throw new Error(
+                    "TYMRAK could not create your login session."
+                );
+            }
+
+
+            showMessage(
+                "success",
+                "✓ Login successful."
+            );
+
+
+            /*
+            Employee portal will be created next.
+            */
+
+            setTimeout(() => {
+
+                window.location.href =
+                    "/employee.html";
+
+            }, 600);
+
+
+        } catch (error) {
+
+            console.error(
+                "Login error:",
+                error
+            );
+
+
+            showMessage(
+                "error",
+                error.message ||
+                "Unable to sign in."
+            );
+
+
+            button.disabled = false;
+            button.textContent = "Sign In";
+        }
+    }
+);
+
+
+document.getElementById(
+    "forgotPassword"
+).addEventListener(
+    "click",
+    (event) => {
+
+        event.preventDefault();
+
+        showMessage(
+            "error",
+            "Password reset will be available shortly."
+        );
+    }
+);
+
+</script>
+
+</body>
+</html>
