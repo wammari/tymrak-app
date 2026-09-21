@@ -9,6 +9,10 @@
 
 <style>
 
+* {
+    box-sizing: border-box;
+}
+
 body {
     font-family: Arial, sans-serif;
     background: #f4f6f8;
@@ -18,7 +22,7 @@ body {
 
 .header {
     background: white;
-    padding: 20px 30px;
+    padding: 18px 30px;
     box-shadow: 0 2px 10px rgba(0,0,0,.06);
     display: flex;
     justify-content: space-between;
@@ -48,51 +52,166 @@ body {
 
 .container {
     max-width: 900px;
-    margin: 40px auto;
+    margin: 35px auto;
     padding: 0 20px;
 }
 
-.welcome {
+.card {
     background: white;
     padding: 30px;
     border-radius: 14px;
     box-shadow: 0 8px 30px rgba(0,0,0,.06);
+    margin-bottom: 24px;
 }
 
-.welcome h1 {
-    margin-top: 0;
+.welcome {
+    margin: 0 0 6px;
+}
+
+.employee-info {
+    color: #667085;
+    margin-bottom: 25px;
+}
+
+.clock-area {
+    text-align: center;
+    padding: 20px 0;
+}
+
+.live-time {
+    font-size: 54px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: #14213d;
+}
+
+.live-date {
+    margin-top: 8px;
+    color: #667085;
+    font-size: 17px;
+}
+
+.status-label {
+    margin-top: 25px;
+    color: #667085;
+    font-size: 14px;
 }
 
 .status {
     display: inline-block;
     margin-top: 8px;
-    padding: 7px 12px;
-    border-radius: 20px;
+    padding: 9px 16px;
+    border-radius: 22px;
+    font-weight: bold;
+}
+
+.status-off {
+    background: #eef1f4;
+    color: #475467;
+}
+
+.status-working {
     background: #e8f7ee;
     color: #176b36;
+}
+
+.punch-button {
+    display: block;
+    width: 260px;
+    max-width: 100%;
+    margin: 28px auto 5px;
+    padding: 17px;
+    border: 0;
+    border-radius: 9px;
+    color: white;
+    font-size: 18px;
     font-weight: bold;
-    font-size: 14px;
+    cursor: pointer;
 }
 
-.details {
-    margin-top: 25px;
-    border-top: 1px solid #eee;
-    padding-top: 20px;
+.clock-in {
+    background: #299764;
 }
 
-.details p {
-    margin: 10px 0;
+.clock-out {
+    background: #14213d;
 }
 
-.loading {
-    color: #666;
+.punch-button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.message {
+    display: none;
+    margin: 20px auto 0;
+    max-width: 500px;
+    padding: 13px;
+    border-radius: 8px;
+    text-align: center;
+}
+
+.success {
+    display: block;
+    background: #e8f7ee;
+    color: #176b36;
 }
 
 .error {
+    display: block;
     background: #fdeaea;
     color: #a32020;
-    padding: 14px;
-    border-radius: 8px;
+}
+
+h2 {
+    margin-top: 0;
+}
+
+.punch-list {
+    margin-top: 20px;
+}
+
+.punch-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 20px;
+    padding: 15px 0;
+    border-bottom: 1px solid #eee;
+}
+
+.punch-row:last-child {
+    border-bottom: 0;
+}
+
+.punch-type {
+    font-weight: bold;
+}
+
+.punch-time {
+    color: #475467;
+}
+
+.empty {
+    color: #667085;
+}
+
+.loading {
+    color: #667085;
+}
+
+@media (max-width: 600px) {
+
+    .header {
+        padding: 16px 20px;
+    }
+
+    .live-time {
+        font-size: 43px;
+    }
+
+    .card {
+        padding: 24px 20px;
+    }
 }
 
 </style>
@@ -108,11 +227,8 @@ body {
     <div class="tagline">TIME. TRACKED RIGHT.</div>
 </div>
 
-<button
-    id="logoutButton"
-    class="logout"
->
-Sign Out
+<button id="logoutButton" class="logout">
+    Sign Out
 </button>
 
 </header>
@@ -120,16 +236,58 @@ Sign Out
 
 <main class="container">
 
-<div
-    id="content"
-    class="welcome"
->
+<section class="card">
 
-<p class="loading">
-Loading your TYMRAK account...
-</p>
+<h1 id="welcome" class="welcome">
+    Loading...
+</h1>
+
+<div id="employeeInfo" class="employee-info"></div>
+
+<div class="clock-area">
+
+    <div id="liveTime" class="live-time">
+        --:--:--
+    </div>
+
+    <div id="liveDate" class="live-date"></div>
+
+    <div class="status-label">
+        CURRENT STATUS
+    </div>
+
+    <div id="workStatus" class="status status-off">
+        Loading...
+    </div>
+
+    <button
+        id="punchButton"
+        class="punch-button clock-in"
+        disabled
+    >
+        Loading...
+    </button>
+
+    <div id="message" class="message"></div>
 
 </div>
+
+</section>
+
+
+<section class="card">
+
+<h2>Today's Punches</h2>
+
+<div id="punchList" class="punch-list">
+
+    <p class="loading">
+        Loading punches...
+    </p>
+
+</div>
+
+</section>
 
 </main>
 
@@ -140,8 +298,7 @@ const SUPABASE_URL =
     "https://tsosredghislnehfyypi.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
-
+   "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
 
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -153,27 +310,286 @@ const supabase = createClient(
 );
 
 
-const content =
-    document.getElementById("content");
+const welcome =
+    document.getElementById("welcome");
+
+const employeeInfo =
+    document.getElementById("employeeInfo");
+
+const liveTime =
+    document.getElementById("liveTime");
+
+const liveDate =
+    document.getElementById("liveDate");
+
+const workStatus =
+    document.getElementById("workStatus");
+
+const punchButton =
+    document.getElementById("punchButton");
+
+const punchList =
+    document.getElementById("punchList");
+
+const message =
+    document.getElementById("message");
 
 const logoutButton =
     document.getElementById("logoutButton");
+
+
+let employee = null;
+
+let currentStatus =
+    "not_clocked_in";
+
+
+function escapeHTML(value) {
+
+    return String(value)
+        .replaceAll("&", "&amp;")
+        .replaceAll("<", "&lt;")
+        .replaceAll(">", "&gt;")
+        .replaceAll('"', "&quot;")
+        .replaceAll("'", "&#039;");
+}
+
+
+function showMessage(type, text) {
+
+    message.className =
+        "message " + type;
+
+    message.textContent =
+        text;
+}
+
+
+function clearMessage() {
+
+    message.style.display =
+        "none";
+}
+
+
+function updateClock() {
+
+    const now =
+        new Date();
+
+    liveTime.textContent =
+        now.toLocaleTimeString(
+            [],
+            {
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit"
+            }
+        );
+
+    liveDate.textContent =
+        now.toLocaleDateString(
+            [],
+            {
+                weekday: "long",
+                year: "numeric",
+                month: "long",
+                day: "numeric"
+            }
+        );
+}
+
+
+function updateStatusDisplay() {
+
+    if (
+        currentStatus === "working"
+    ) {
+
+        workStatus.textContent =
+            "Working";
+
+        workStatus.className =
+            "status status-working";
+
+        punchButton.textContent =
+            "Clock Out";
+
+        punchButton.className =
+            "punch-button clock-out";
+
+        punchButton.disabled =
+            false;
+
+    } else {
+
+        workStatus.textContent =
+            "Not Clocked In";
+
+        workStatus.className =
+            "status status-off";
+
+        punchButton.textContent =
+            "Clock In";
+
+        punchButton.className =
+            "punch-button clock-in";
+
+        punchButton.disabled =
+            false;
+    }
+}
+
+
+function getTodayStartISO() {
+
+    const start =
+        new Date();
+
+    start.setHours(
+        0,
+        0,
+        0,
+        0
+    );
+
+    return start.toISOString();
+}
+
+
+function formatPunchType(type) {
+
+    const labels = {
+        clock_in: "Clock In",
+        clock_out: "Clock Out",
+        break_start: "Break Start",
+        break_end: "Break End"
+    };
+
+    return labels[type] || type;
+}
+
+
+function formatPunchTime(timestamp) {
+
+    return new Date(
+        timestamp
+    ).toLocaleTimeString(
+        [],
+        {
+            hour: "2-digit",
+            minute: "2-digit",
+            second: "2-digit"
+        }
+    );
+}
+
+
+async function loadTodaysPunches() {
+
+    const {
+        data,
+        error
+    } =
+        await supabase
+            .from("punches")
+            .select(
+                "id,punch_type,punched_at"
+            )
+            .eq(
+                "employee_id",
+                employee.id
+            )
+            .gte(
+                "punched_at",
+                getTodayStartISO()
+            )
+            .order(
+                "punched_at",
+                {
+                    ascending: true
+                }
+            );
+
+
+    if (error) {
+        throw error;
+    }
+
+
+    if (!data || data.length === 0) {
+
+        currentStatus =
+            "not_clocked_in";
+
+        punchList.innerHTML =
+            `<p class="empty">No punches recorded today.</p>`;
+
+        updateStatusDisplay();
+
+        return;
+    }
+
+
+    const lastPunch =
+        data[data.length - 1];
+
+
+    if (
+        lastPunch.punch_type ===
+        "clock_in"
+    ) {
+
+        currentStatus =
+            "working";
+
+    } else {
+
+        currentStatus =
+            "not_clocked_in";
+    }
+
+
+    punchList.innerHTML =
+        data.map(
+            punch => `
+                <div class="punch-row">
+
+                    <div class="punch-type">
+                        ${escapeHTML(
+                            formatPunchType(
+                                punch.punch_type
+                            )
+                        )}
+                    </div>
+
+                    <div class="punch-time">
+                        ${escapeHTML(
+                            formatPunchTime(
+                                punch.punched_at
+                            )
+                        )}
+                    </div>
+
+                </div>
+            `
+        ).join("");
+
+
+    updateStatusDisplay();
+}
 
 
 async function loadEmployee() {
 
     try {
 
-        /*
-        Verify the employee has a valid
-        authenticated Supabase session.
-        */
-
         const {
             data: sessionData,
             error: sessionError
         } =
-            await supabase.auth.getSession();
+            await supabase.auth
+                .getSession();
 
 
         if (
@@ -192,21 +608,14 @@ async function loadEmployee() {
             sessionData.session.user;
 
 
-        /*
-        Load this employee's TYMRAK record.
-
-        Our RLS policy allows employees to
-        read only their own employee record.
-        */
-
         const {
-            data: employee,
+            data: employeeData,
             error: employeeError
         } =
             await supabase
                 .from("employees")
                 .select(
-                    "first_name,last_name,email,username,position,department,employment_status,invitation_status"
+                    "id,first_name,last_name,email,username,position,department,employment_status,invitation_status,is_active"
                 )
                 .eq(
                     "auth_user_id",
@@ -220,47 +629,53 @@ async function loadEmployee() {
         }
 
 
+        if (
+            !employeeData.is_active ||
+            employeeData.invitation_status !==
+                "Account Activated"
+        ) {
+
+            throw new Error(
+                "This employee account is not active."
+            );
+        }
+
+
+        employee =
+            employeeData;
+
+
         const fullName =
             `${employee.first_name} ${employee.last_name || ""}`
                 .trim();
 
 
-        content.innerHTML = `
-            <h1>Welcome, ${escapeHTML(fullName)}</h1>
+        welcome.textContent =
+            `Welcome, ${fullName}`;
 
-            <div class="status">
-                ${escapeHTML(employee.employment_status)}
-            </div>
 
-            <div class="details">
+        const details = [];
 
-                <p>
-                    <strong>Username:</strong>
-                    ${escapeHTML(employee.username)}
-                </p>
+        if (employee.position) {
+            details.push(
+                employee.position
+            );
+        }
 
-                <p>
-                    <strong>Email:</strong>
-                    ${escapeHTML(employee.email)}
-                </p>
+        if (employee.department) {
+            details.push(
+                employee.department
+            );
+        }
 
-                <p>
-                    <strong>Position:</strong>
-                    ${escapeHTML(employee.position || "Not assigned")}
-                </p>
 
-                <p>
-                    <strong>Department:</strong>
-                    ${escapeHTML(employee.department || "Not assigned")}
-                </p>
+        employeeInfo.textContent =
+            details.length
+                ? details.join(" • ")
+                : employee.username;
 
-                <p>
-                    <strong>Account:</strong>
-                    ${escapeHTML(employee.invitation_status)}
-                </p>
 
-            </div>
-        `;
+        await loadTodaysPunches();
 
 
     } catch (error) {
@@ -271,35 +686,131 @@ async function loadEmployee() {
         );
 
 
-        content.innerHTML = `
-            <div class="error">
-                Unable to load your TYMRAK employee account.
-            </div>
-        `;
+        welcome.textContent =
+            "Unable to load TYMRAK";
+
+
+        employeeInfo.textContent =
+            "";
+
+
+        punchButton.disabled =
+            true;
+
+
+        punchList.innerHTML =
+            `<div class="error">
+                Unable to load your employee account.
+            </div>`;
     }
 }
 
 
-function escapeHTML(value) {
+async function recordPunch() {
 
-    return String(value)
-        .replaceAll("&", "&amp;")
-        .replaceAll("<", "&lt;")
-        .replaceAll(">", "&gt;")
-        .replaceAll('"', "&quot;")
-        .replaceAll("'", "&#039;");
+    if (!employee) {
+        return;
+    }
+
+
+    clearMessage();
+
+
+    const punchType =
+        currentStatus === "working"
+            ? "clock_out"
+            : "clock_in";
+
+
+    punchButton.disabled =
+        true;
+
+
+    punchButton.textContent =
+        punchType === "clock_in"
+            ? "Clocking In..."
+            : "Clocking Out...";
+
+
+    try {
+
+        const {
+            error
+        } =
+            await supabase
+                .from("punches")
+                .insert({
+                    employee_id:
+                        employee.id,
+
+                    punch_type:
+                        punchType,
+
+                    source:
+                        "employee"
+                });
+
+
+        if (error) {
+            throw error;
+        }
+
+
+        showMessage(
+            "success",
+            punchType === "clock_in"
+                ? "✓ Clocked in successfully."
+                : "✓ Clocked out successfully."
+        );
+
+
+        await loadTodaysPunches();
+
+
+    } catch (error) {
+
+        console.error(
+            "Punch error:",
+            error
+        );
+
+
+        showMessage(
+            "error",
+            error.message ||
+            "Unable to record your punch."
+        );
+
+
+        updateStatusDisplay();
+    }
 }
+
+
+punchButton.addEventListener(
+    "click",
+    recordPunch
+);
 
 
 logoutButton.addEventListener(
     "click",
     async () => {
 
-        await supabase.auth.signOut();
+        await supabase.auth
+            .signOut();
 
         window.location.href =
             "/login.html";
     }
+);
+
+
+updateClock();
+
+setInterval(
+    updateClock,
+    1000
 );
 
 
