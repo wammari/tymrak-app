@@ -430,53 +430,7 @@ h2 {
 </div>
 
 </section>
-<section class="card">
 
-    <div class="timecard-header">
-        <div>
-            <h2>My Timecard</h2>
-            <div class="timecard-subtitle">
-                Current Pay Period
-            </div>
-        </div>
-
-        <div id="timecardStatus" class="timecard-status">
-            Pending
-        </div>
-    </div>
-
-    <div class="timecard-table-wrapper">
-
-        <table class="timecard-table">
-
-            <thead>
-                <tr>
-                    <th>Approved</th>
-                    <th>Date</th>
-                    <th>Clock In</th>
-                    <th>Clock Out</th>
-                    <th>Location</th>
-                    <th>Daily Total</th>
-                    <th>Regular</th>
-                    <th>Overtime</th>
-                </tr>
-            </thead>
-
-            <tbody id="timecardBody">
-
-                <tr>
-                    <td colspan="8" class="loading">
-                        Loading timecard...
-                    </td>
-                </tr>
-
-            </tbody>
-
-        </table>
-
-    </div>
-
-</section>
 </main>
 
 <script type="module">
@@ -515,8 +469,7 @@ const buttonArea =
 
 const punchList =
     document.getElementById("punchList");
-    const timecardBody =
-    document.getElementById("timecardBody");
+  
 const workedTime =
     document.getElementById("workedTime");
 
@@ -820,18 +773,26 @@ function calculateDailySummary(punches) {
             breakStartedAt = null;
             workStartedAt = time;
 
-        } else if (punch.punch_type === "clock_out") {
+        } else if (
+            punch.punch_type === "clock_out"
+        ) {
 
             if (workStartedAt !== null) {
 
                 workedMilliseconds +=
-                    Math.max(0, time - workStartedAt);
+                    Math.max(
+                        0,
+                        time - workStartedAt
+                    );
             }
 
             if (breakStartedAt !== null) {
 
                 breakMilliseconds +=
-                    Math.max(0, time - breakStartedAt);
+                    Math.max(
+                        0,
+                        time - breakStartedAt
+                    );
             }
 
             workStartedAt = null;
@@ -839,27 +800,28 @@ function calculateDailySummary(punches) {
         }
     }
 
-    // Continue counting if the employee is
-    // currently working or currently on break.
     const now = Date.now();
 
     if (workStartedAt !== null) {
 
         workedMilliseconds +=
-            Math.max(0, now - workStartedAt);
+            Math.max(
+                0,
+                now - workStartedAt
+            );
     }
 
     if (breakStartedAt !== null) {
 
         breakMilliseconds +=
-            Math.max(0, now - breakStartedAt);
+            Math.max(
+                0,
+                now - breakStartedAt
+            );
     }
 
-    // Shift Span includes only time within
-    // clock-in/clock-out sessions.
-    // Gaps between separate shifts are excluded.
-   const spanMilliseconds =
-    workedMilliseconds;
+    const paidMilliseconds =
+        workedMilliseconds;
 
     workedTime.textContent =
         formatDuration(
@@ -873,179 +835,38 @@ function calculateDailySummary(punches) {
 
     totalSpan.textContent =
         formatDuration(
-            spanMilliseconds / 1000
+            paidMilliseconds / 1000
         );
 }
+
+
 function determineStatus(lastPunch) {
-    function renderTimecard(punches) {
 
-    if (!punches || punches.length === 0) {
+    if (!lastPunch) {
 
-        timecardBody.innerHTML = `
-            <tr>
-                <td colspan="8" class="empty">
-                    No time recorded for this period.
-                </td>
-            </tr>
-        `;
-
-        return;
+        return "not_clocked_in";
     }
 
-    let firstClockIn = null;
-    let lastClockOut = null;
+    switch (lastPunch.punch_type) {
 
-    let workedMilliseconds = 0;
-    let breakMilliseconds = 0;
+        case "clock_in":
+        case "break_end":
 
-    let workStartedAt = null;
-    let breakStartedAt = null;
+            return "working";
 
-    for (const punch of punches) {
+        case "break_start":
 
-        const time =
-            new Date(punch.punched_at).getTime();
+            return "on_break";
 
-        if (punch.punch_type === "clock_in") {
+        case "clock_out":
 
-            if (firstClockIn === null) {
-                firstClockIn = time;
-            }
+            return "not_clocked_in";
 
-            workStartedAt = time;
+        default:
 
-        } else if (
-            punch.punch_type === "break_start" &&
-            workStartedAt !== null
-        ) {
-
-            workedMilliseconds +=
-                Math.max(0, time - workStartedAt);
-
-            workStartedAt = null;
-            breakStartedAt = time;
-
-        } else if (
-            punch.punch_type === "break_end" &&
-            breakStartedAt !== null
-        ) {
-
-            breakMilliseconds +=
-                Math.max(0, time - breakStartedAt);
-
-            breakStartedAt = null;
-            workStartedAt = time;
-
-        } else if (punch.punch_type === "clock_out") {
-
-            if (workStartedAt !== null) {
-
-                workedMilliseconds +=
-                    Math.max(0, time - workStartedAt);
-            }
-
-            if (breakStartedAt !== null) {
-
-                breakMilliseconds +=
-                    Math.max(0, time - breakStartedAt);
-            }
-
-            lastClockOut = time;
-
-            workStartedAt = null;
-            breakStartedAt = null;
-        }
+            return "not_clocked_in";
     }
-
-    const now = Date.now();
-
-    if (workStartedAt !== null) {
-
-        workedMilliseconds +=
-            Math.max(0, now - workStartedAt);
-    }
-
-    if (breakStartedAt !== null) {
-
-        breakMilliseconds +=
-            Math.max(0, now - breakStartedAt);
-    }
-
-   const dailyTotalMilliseconds =
-    workedMilliseconds;
-
-    const date =
-        new Date(punches[0].punched_at);
-
-    const dateText =
-        date.toLocaleDateString(
-            [],
-            {
-                month: "short",
-                day: "numeric",
-                year: "numeric"
-            }
-        );
-
-    const clockInText =
-        firstClockIn !== null
-            ? new Date(firstClockIn).toLocaleTimeString(
-                [],
-                {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                }
-            )
-            : "—";
-
-    const clockOutText =
-        lastClockOut !== null
-            ? new Date(lastClockOut).toLocaleTimeString(
-                [],
-                {
-                    hour: "2-digit",
-                    minute: "2-digit"
-                }
-            )
-            : "—";
-
-    const dailyTotal =
-        formatDuration(
-            dailyTotalMilliseconds / 1000
-        );
-
-    const regular =
-        formatDuration(
-            workedMilliseconds / 1000
-        );
-
-    timecardBody.innerHTML = `
-        <tr>
-
-            <td>
-                <span class="approval-pending">
-                    Pending
-                </span>
-            </td>
-
-            <td>${escapeHTML(dateText)}</td>
-
-            <td>${escapeHTML(clockInText)}</td>
-
-            <td>${escapeHTML(clockOutText)}</td>
-
-            <td>—</td>
-
-            <td>${escapeHTML(dailyTotal)}</td>
-
-            <td>${escapeHTML(regular)}</td>
-
-            <td>00:00</td>
-
-        </tr>
-    `;
 }
-
     if (!lastPunch) {
 
         return "not_clocked_in";
@@ -1124,14 +945,14 @@ todayPunches = data || [];
                 No punches recorded today.
             </p>`;
 calculateDailySummary([]);
-        renderTimecard([]);
+
         updateStatusDisplay();
 
         return;
     }
 
 calculateDailySummary(data);
-    renderTimecard(data);
+   
     const lastPunch =
         data[data.length - 1];
 
