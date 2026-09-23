@@ -332,7 +332,7 @@ h2 {
     </div>
 
     <div class="summary-item">
-        <div class="summary-label">Shift Span</div>
+       <div class="summary-label">Hours Worked</div>
         <div id="totalSpan" class="summary-value">00:00:00</div>
     </div>
 
@@ -625,23 +625,18 @@ function formatDuration(totalSeconds) {
             Math.floor(totalSeconds)
         );
 
+    const totalMinutes =
+        Math.floor(totalSeconds / 60);
+
     const hours =
-        Math.floor(
-            totalSeconds / 3600
-        );
+        Math.floor(totalMinutes / 60);
 
     const minutes =
-        Math.floor(
-            (totalSeconds % 3600) / 60
-        );
-
-    const seconds =
-        totalSeconds % 60;
+        totalMinutes % 60;
 
     return [
         hours,
-        minutes,
-        seconds
+        minutes
     ]
         .map(
             value =>
