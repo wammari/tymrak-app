@@ -332,7 +332,7 @@ h2 {
     </div>
 
     <div class="summary-item">
-        <div class="summary-label">Total Span</div>
+        <div class="summary-label">Shift Span</div>
         <div id="totalSpan" class="summary-value">00:00:00</div>
     </div>
 
@@ -659,137 +659,88 @@ function calculateDailySummary(punches) {
     let workStartedAt = null;
     let breakStartedAt = null;
 
-    let firstClockIn = null;
-    let lastRelevantTime = null;
-
-
     for (const punch of punches) {
 
         const time =
-            new Date(
-                punch.punched_at
-            ).getTime();
+            new Date(punch.punched_at).getTime();
 
-
-        if (
-            punch.punch_type === "clock_in"
-        ) {
+        if (punch.punch_type === "clock_in") {
 
             workStartedAt = time;
+            breakStartedAt = null;
 
-            if (firstClockIn === null) {
-                firstClockIn = time;
-            }
-
-            lastRelevantTime = time;
-        }
-
-
-        else if (
+        } else if (
             punch.punch_type === "break_start" &&
             workStartedAt !== null
         ) {
 
             workedMilliseconds +=
-                time - workStartedAt;
+                Math.max(0, time - workStartedAt);
 
             workStartedAt = null;
-
             breakStartedAt = time;
 
-            lastRelevantTime = time;
-        }
-
-
-        else if (
+        } else if (
             punch.punch_type === "break_end" &&
             breakStartedAt !== null
         ) {
 
             breakMilliseconds +=
-                time - breakStartedAt;
+                Math.max(0, time - breakStartedAt);
 
             breakStartedAt = null;
-
             workStartedAt = time;
 
-            lastRelevantTime = time;
-        }
-
-
-        else if (
-            punch.punch_type === "clock_out"
-        ) {
+        } else if (punch.punch_type === "clock_out") {
 
             if (workStartedAt !== null) {
 
                 workedMilliseconds +=
-                    time - workStartedAt;
+                    Math.max(0, time - workStartedAt);
             }
-
 
             if (breakStartedAt !== null) {
 
                 breakMilliseconds +=
-                    time - breakStartedAt;
+                    Math.max(0, time - breakStartedAt);
             }
-
 
             workStartedAt = null;
             breakStartedAt = null;
-
-            lastRelevantTime = time;
         }
     }
 
-
-    const now =
-        Date.now();
-
+    // Continue counting if the employee is
+    // currently working or currently on break.
+    const now = Date.now();
 
     if (workStartedAt !== null) {
 
         workedMilliseconds +=
-            now - workStartedAt;
-
-        lastRelevantTime = now;
+            Math.max(0, now - workStartedAt);
     }
-
 
     if (breakStartedAt !== null) {
 
         breakMilliseconds +=
-            now - breakStartedAt;
-
-        lastRelevantTime = now;
+            Math.max(0, now - breakStartedAt);
     }
 
-
-    let spanMilliseconds = 0;
-
-
-    if (
-        firstClockIn !== null &&
-        lastRelevantTime !== null
-    ) {
-
-        spanMilliseconds =
-            lastRelevantTime -
-            firstClockIn;
-    }
-
+    // Shift Span includes only time within
+    // clock-in/clock-out sessions.
+    // Gaps between separate shifts are excluded.
+    const spanMilliseconds =
+        workedMilliseconds + breakMilliseconds;
 
     workedTime.textContent =
         formatDuration(
             workedMilliseconds / 1000
         );
 
-
     breakTime.textContent =
         formatDuration(
             breakMilliseconds / 1000
         );
-
 
     totalSpan.textContent =
         formatDuration(
