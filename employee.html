@@ -461,12 +461,11 @@ function updateClock() {
                 day: "numeric"
             }
         );
-}
 
-if (todayPunches.length > 0) {
-    calculateDailySummary(todayPunches);
-}
-}    
+    if (todayPunches.length > 0) {
+        calculateDailySummary(todayPunches);
+    }
+}  
 function createButton(
     text,
     className,
