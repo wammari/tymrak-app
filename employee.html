@@ -82,7 +82,6 @@ body {
     font-size: 54px;
     font-weight: bold;
     letter-spacing: 1px;
-    color: #14213d;
 }
 
 .live-date {
@@ -115,16 +114,26 @@ body {
     color: #176b36;
 }
 
+.status-break {
+    background: #fff3d6;
+    color: #8a5a00;
+}
+
+.button-area {
+    display: flex;
+    justify-content: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 28px;
+}
+
 .punch-button {
-    display: block;
-    width: 260px;
-    max-width: 100%;
-    margin: 28px auto 5px;
-    padding: 17px;
+    min-width: 200px;
+    padding: 17px 24px;
     border: 0;
     border-radius: 9px;
     color: white;
-    font-size: 18px;
+    font-size: 17px;
     font-weight: bold;
     cursor: pointer;
 }
@@ -135,6 +144,14 @@ body {
 
 .clock-out {
     background: #14213d;
+}
+
+.break-start {
+    background: #b7791f;
+}
+
+.break-end {
+    background: #299764;
 }
 
 .punch-button:disabled {
@@ -167,10 +184,6 @@ h2 {
     margin-top: 0;
 }
 
-.punch-list {
-    margin-top: 20px;
-}
-
 .punch-row {
     display: flex;
     justify-content: space-between;
@@ -191,10 +204,7 @@ h2 {
     color: #475467;
 }
 
-.empty {
-    color: #667085;
-}
-
+.empty,
 .loading {
     color: #667085;
 }
@@ -211,6 +221,10 @@ h2 {
 
     .card {
         padding: 24px 20px;
+    }
+
+    .punch-button {
+        width: 100%;
     }
 }
 
@@ -232,7 +246,6 @@ h2 {
 </button>
 
 </header>
-
 
 <main class="container">
 
@@ -260,13 +273,7 @@ h2 {
         Loading...
     </div>
 
-    <button
-        id="punchButton"
-        class="punch-button clock-in"
-        disabled
-    >
-        Loading...
-    </button>
+    <div id="buttonArea" class="button-area"></div>
 
     <div id="message" class="message"></div>
 
@@ -274,23 +281,17 @@ h2 {
 
 </section>
 
-
 <section class="card">
 
 <h2>Today's Punches</h2>
 
-<div id="punchList" class="punch-list">
-
-    <p class="loading">
-        Loading punches...
-    </p>
-
+<div id="punchList">
+    <p class="loading">Loading punches...</p>
 </div>
 
 </section>
 
 </main>
-
 
 <script type="module">
 
@@ -298,17 +299,15 @@ const SUPABASE_URL =
     "https://tsosredghislnehfyypi.supabase.co";
 
 const SUPABASE_PUBLISHABLE_KEY =
-   "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
 
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-
 
 const supabase = createClient(
     SUPABASE_URL,
     SUPABASE_PUBLISHABLE_KEY
 );
-
 
 const welcome =
     document.getElementById("welcome");
@@ -325,8 +324,8 @@ const liveDate =
 const workStatus =
     document.getElementById("workStatus");
 
-const punchButton =
-    document.getElementById("punchButton");
+const buttonArea =
+    document.getElementById("buttonArea");
 
 const punchList =
     document.getElementById("punchList");
@@ -336,7 +335,6 @@ const message =
 
 const logoutButton =
     document.getElementById("logoutButton");
-
 
 let employee = null;
 
@@ -374,8 +372,7 @@ function clearMessage() {
 
 function updateClock() {
 
-    const now =
-        new Date();
+    const now = new Date();
 
     liveTime.textContent =
         now.toLocaleTimeString(
@@ -400,7 +397,37 @@ function updateClock() {
 }
 
 
+function createButton(
+    text,
+    className,
+    punchType
+) {
+
+    const button =
+        document.createElement("button");
+
+    button.className =
+        "punch-button " + className;
+
+    button.textContent =
+        text;
+
+    button.addEventListener(
+        "click",
+        () => recordPunch(
+            punchType,
+            button
+        )
+    );
+
+    return button;
+}
+
+
 function updateStatusDisplay() {
+
+    buttonArea.innerHTML = "";
+
 
     if (
         currentStatus === "working"
@@ -412,32 +439,65 @@ function updateStatusDisplay() {
         workStatus.className =
             "status status-working";
 
-        punchButton.textContent =
-            "Clock Out";
 
-        punchButton.className =
-            "punch-button clock-out";
+        buttonArea.appendChild(
+            createButton(
+                "Start Break",
+                "break-start",
+                "break_start"
+            )
+        );
 
-        punchButton.disabled =
-            false;
 
-    } else {
+        buttonArea.appendChild(
+            createButton(
+                "Clock Out",
+                "clock-out",
+                "clock_out"
+            )
+        );
+
+        return;
+    }
+
+
+    if (
+        currentStatus === "on_break"
+    ) {
 
         workStatus.textContent =
-            "Not Clocked In";
+            "On Break";
 
         workStatus.className =
-            "status status-off";
+            "status status-break";
 
-        punchButton.textContent =
-            "Clock In";
 
-        punchButton.className =
-            "punch-button clock-in";
+        buttonArea.appendChild(
+            createButton(
+                "End Break",
+                "break-end",
+                "break_end"
+            )
+        );
 
-        punchButton.disabled =
-            false;
+        return;
     }
+
+
+    workStatus.textContent =
+        "Not Clocked In";
+
+    workStatus.className =
+        "status status-off";
+
+
+    buttonArea.appendChild(
+        createButton(
+            "Clock In",
+            "clock-in",
+            "clock_in"
+        )
+    );
 }
 
 
@@ -460,10 +520,18 @@ function getTodayStartISO() {
 function formatPunchType(type) {
 
     const labels = {
-        clock_in: "Clock In",
-        clock_out: "Clock Out",
-        break_start: "Break Start",
-        break_end: "Break End"
+
+        clock_in:
+            "Clock In",
+
+        clock_out:
+            "Clock Out",
+
+        break_start:
+            "Break Start",
+
+        break_end:
+            "Break End"
     };
 
     return labels[type] || type;
@@ -482,6 +550,41 @@ function formatPunchTime(timestamp) {
             second: "2-digit"
         }
     );
+}
+
+
+function determineStatus(lastPunch) {
+
+    if (!lastPunch) {
+
+        return "not_clocked_in";
+    }
+
+
+    switch (
+        lastPunch.punch_type
+    ) {
+
+        case "clock_in":
+        case "break_end":
+
+            return "working";
+
+
+        case "break_start":
+
+            return "on_break";
+
+
+        case "clock_out":
+
+            return "not_clocked_in";
+
+
+        default:
+
+            return "not_clocked_in";
+    }
 }
 
 
@@ -517,13 +620,18 @@ async function loadTodaysPunches() {
     }
 
 
-    if (!data || data.length === 0) {
+    if (
+        !data ||
+        data.length === 0
+    ) {
 
         currentStatus =
             "not_clocked_in";
 
         punchList.innerHTML =
-            `<p class="empty">No punches recorded today.</p>`;
+            `<p class="empty">
+                No punches recorded today.
+            </p>`;
 
         updateStatusDisplay();
 
@@ -535,19 +643,10 @@ async function loadTodaysPunches() {
         data[data.length - 1];
 
 
-    if (
-        lastPunch.punch_type ===
-        "clock_in"
-    ) {
-
-        currentStatus =
-            "working";
-
-    } else {
-
-        currentStatus =
-            "not_clocked_in";
-    }
+    currentStatus =
+        determineStatus(
+            lastPunch
+        );
 
 
     punchList.innerHTML =
@@ -656,13 +755,17 @@ async function loadEmployee() {
 
         const details = [];
 
+
         if (employee.position) {
+
             details.push(
                 employee.position
             );
         }
 
+
         if (employee.department) {
+
             details.push(
                 employee.department
             );
@@ -694,8 +797,8 @@ async function loadEmployee() {
             "";
 
 
-        punchButton.disabled =
-            true;
+        buttonArea.innerHTML =
+            "";
 
 
         punchList.innerHTML =
@@ -706,7 +809,10 @@ async function loadEmployee() {
 }
 
 
-async function recordPunch() {
+async function recordPunch(
+    punchType,
+    button
+) {
 
     if (!employee) {
         return;
@@ -716,20 +822,25 @@ async function recordPunch() {
     clearMessage();
 
 
-    const punchType =
-        currentStatus === "working"
-            ? "clock_out"
-            : "clock_in";
+    const allButtons =
+        buttonArea.querySelectorAll(
+            "button"
+        );
 
 
-    punchButton.disabled =
-        true;
+    allButtons.forEach(
+        item => {
+            item.disabled = true;
+        }
+    );
 
 
-    punchButton.textContent =
-        punchType === "clock_in"
-            ? "Clocking In..."
-            : "Clocking Out...";
+    const originalText =
+        button.textContent;
+
+
+    button.textContent =
+        "Recording...";
 
 
     try {
@@ -740,6 +851,7 @@ async function recordPunch() {
             await supabase
                 .from("punches")
                 .insert({
+
                     employee_id:
                         employee.id,
 
@@ -756,11 +868,25 @@ async function recordPunch() {
         }
 
 
+        const successMessages = {
+
+            clock_in:
+                "✓ Clocked in successfully.",
+
+            break_start:
+                "✓ Break started.",
+
+            break_end:
+                "✓ Break ended.",
+
+            clock_out:
+                "✓ Clocked out successfully."
+        };
+
+
         showMessage(
             "success",
-            punchType === "clock_in"
-                ? "✓ Clocked in successfully."
-                : "✓ Clocked out successfully."
+            successMessages[punchType]
         );
 
 
@@ -782,15 +908,13 @@ async function recordPunch() {
         );
 
 
+        button.textContent =
+            originalText;
+
+
         updateStatusDisplay();
     }
 }
-
-
-punchButton.addEventListener(
-    "click",
-    recordPunch
-);
 
 
 logoutButton.addEventListener(
