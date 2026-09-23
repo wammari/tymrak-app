@@ -406,6 +406,8 @@ let employee = null;
 let currentStatus =
     "not_clocked_in";
 
+let todayPunches = [];
+
 
 function escapeHTML(value) {
 
@@ -461,7 +463,10 @@ function updateClock() {
         );
 }
 
-
+if (todayPunches.length > 0) {
+    calculateDailySummary(todayPunches);
+}
+}    
 function createButton(
     text,
     className,
@@ -808,7 +813,7 @@ async function loadTodaysPunches() {
         throw error;
     }
 
-
+todayPunches = data || [];
     if (
         !data ||
         data.length === 0
