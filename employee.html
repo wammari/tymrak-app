@@ -39,7 +39,11 @@ body {
     font-size: 13px;
     font-weight: bold;
 }
-
+.header-actions {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
 .logout {
     background: white;
     border: 1px solid #14213d;
@@ -358,9 +362,21 @@ h2 {
     <div class="tagline">TIME. TRACKED RIGHT.</div>
 </div>
 
-<button id="logoutButton" class="logout">
-    Sign Out
-</button>
+<div class="header-actions">
+
+    <button
+        id="timecardButton"
+        class="logout">
+        My Timecard
+    </button>
+
+    <button
+        id="logoutButton"
+        class="logout">
+        Sign Out
+    </button>
+
+</div>
 
 </header>
 
@@ -480,7 +496,8 @@ const totalSpan =
     document.getElementById("totalSpan");
 const message =
     document.getElementById("message");
-
+const timecardButton =
+    document.getElementById("timecardButton");
 const logoutButton =
     document.getElementById("logoutButton");
 
@@ -1204,7 +1221,13 @@ async function recordPunch(
     }
 }
 
-
+timecardButton.addEventListener(
+    "click",
+    () => {
+        window.location.href =
+            "/timecard.html";
+    }
+);
 logoutButton.addEventListener(
     "click",
     async () => {
