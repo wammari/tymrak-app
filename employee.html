@@ -219,7 +219,89 @@ h2 {
         padding: 16px;
     }
 }
-.punch-row {
+.timecard-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 15px;
+    margin-bottom: 22px;
+}
+
+.timecard-header h2 {
+    margin-bottom: 4px;
+}
+
+.timecard-subtitle {
+    color: #667085;
+    font-size: 14px;
+}
+
+.timecard-status {
+    background: #fff3d6;
+    color: #8a5a00;
+    padding: 7px 13px;
+    border-radius: 20px;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.timecard-table-wrapper {
+    width: 100%;
+    overflow-x: auto;
+}
+
+.timecard-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 14px;
+}
+
+.timecard-table th {
+    text-align: left;
+    color: #667085;
+    font-size: 12px;
+    font-weight: bold;
+    padding: 12px 10px;
+    border-bottom: 2px solid #e4e7ec;
+    white-space: nowrap;
+}
+
+.timecard-table td {
+    padding: 14px 10px;
+    border-bottom: 1px solid #eaecf0;
+    white-space: nowrap;
+}
+
+.timecard-table tbody tr:last-child td {
+    border-bottom: 0;
+}
+
+.approval-pending {
+    color: #8a5a00;
+    font-weight: bold;
+}
+
+.approval-approved {
+    color: #176b36;
+    font-weight: bold;
+}
+
+@media (max-width: 600px) {
+
+    .timecard-header {
+        align-items: flex-start;
+    }
+
+    .timecard-table {
+        min-width: 760px;
+    }
+
+    .timecard-table-wrapper {
+        overflow-x: auto;
+        -webkit-overflow-scrolling: touch;
+    }
+}
+    .punch-row {
     display: flex;
     justify-content: space-between;
     gap: 20px;
@@ -332,7 +414,7 @@ h2 {
     </div>
 
     <div class="summary-item">
-       <div class="summary-label">Hours Worked</div>
+       <div class="summary-label">Total Paid Hours</div>
         <div id="totalSpan" class="summary-value">00:00:00</div>
     </div>
 
@@ -348,7 +430,53 @@ h2 {
 </div>
 
 </section>
+<section class="card">
 
+    <div class="timecard-header">
+        <div>
+            <h2>My Timecard</h2>
+            <div class="timecard-subtitle">
+                Current Pay Period
+            </div>
+        </div>
+
+        <div id="timecardStatus" class="timecard-status">
+            Pending
+        </div>
+    </div>
+
+    <div class="timecard-table-wrapper">
+
+        <table class="timecard-table">
+
+            <thead>
+                <tr>
+                    <th>Approved</th>
+                    <th>Date</th>
+                    <th>Clock In</th>
+                    <th>Clock Out</th>
+                    <th>Location</th>
+                    <th>Daily Total</th>
+                    <th>Regular</th>
+                    <th>Overtime</th>
+                </tr>
+            </thead>
+
+            <tbody id="timecardBody">
+
+                <tr>
+                    <td colspan="8" class="loading">
+                        Loading timecard...
+                    </td>
+                </tr>
+
+            </tbody>
+
+        </table>
+
+    </div>
+
+</section>
 </main>
 
 <script type="module">
@@ -387,6 +515,8 @@ const buttonArea =
 
 const punchList =
     document.getElementById("punchList");
+    const timecardBody =
+    document.getElementById("timecardBody");
 const workedTime =
     document.getElementById("workedTime");
 
@@ -728,8 +858,8 @@ function calculateDailySummary(punches) {
     // Shift Span includes only time within
     // clock-in/clock-out sessions.
     // Gaps between separate shifts are excluded.
-    const spanMilliseconds =
-        workedMilliseconds + breakMilliseconds;
+   const spanMilliseconds =
+    workedMilliseconds;
 
     workedTime.textContent =
         formatDuration(
@@ -747,6 +877,174 @@ function calculateDailySummary(punches) {
         );
 }
 function determineStatus(lastPunch) {
+    function renderTimecard(punches) {
+
+    if (!punches || punches.length === 0) {
+
+        timecardBody.innerHTML = `
+            <tr>
+                <td colspan="8" class="empty">
+                    No time recorded for this period.
+                </td>
+            </tr>
+        `;
+
+        return;
+    }
+
+    let firstClockIn = null;
+    let lastClockOut = null;
+
+    let workedMilliseconds = 0;
+    let breakMilliseconds = 0;
+
+    let workStartedAt = null;
+    let breakStartedAt = null;
+
+    for (const punch of punches) {
+
+        const time =
+            new Date(punch.punched_at).getTime();
+
+        if (punch.punch_type === "clock_in") {
+
+            if (firstClockIn === null) {
+                firstClockIn = time;
+            }
+
+            workStartedAt = time;
+
+        } else if (
+            punch.punch_type === "break_start" &&
+            workStartedAt !== null
+        ) {
+
+            workedMilliseconds +=
+                Math.max(0, time - workStartedAt);
+
+            workStartedAt = null;
+            breakStartedAt = time;
+
+        } else if (
+            punch.punch_type === "break_end" &&
+            breakStartedAt !== null
+        ) {
+
+            breakMilliseconds +=
+                Math.max(0, time - breakStartedAt);
+
+            breakStartedAt = null;
+            workStartedAt = time;
+
+        } else if (punch.punch_type === "clock_out") {
+
+            if (workStartedAt !== null) {
+
+                workedMilliseconds +=
+                    Math.max(0, time - workStartedAt);
+            }
+
+            if (breakStartedAt !== null) {
+
+                breakMilliseconds +=
+                    Math.max(0, time - breakStartedAt);
+            }
+
+            lastClockOut = time;
+
+            workStartedAt = null;
+            breakStartedAt = null;
+        }
+    }
+
+    const now = Date.now();
+
+    if (workStartedAt !== null) {
+
+        workedMilliseconds +=
+            Math.max(0, now - workStartedAt);
+    }
+
+    if (breakStartedAt !== null) {
+
+        breakMilliseconds +=
+            Math.max(0, now - breakStartedAt);
+    }
+
+   const dailyTotalMilliseconds =
+    workedMilliseconds;
+
+    const date =
+        new Date(punches[0].punched_at);
+
+    const dateText =
+        date.toLocaleDateString(
+            [],
+            {
+                month: "short",
+                day: "numeric",
+                year: "numeric"
+            }
+        );
+
+    const clockInText =
+        firstClockIn !== null
+            ? new Date(firstClockIn).toLocaleTimeString(
+                [],
+                {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }
+            )
+            : "—";
+
+    const clockOutText =
+        lastClockOut !== null
+            ? new Date(lastClockOut).toLocaleTimeString(
+                [],
+                {
+                    hour: "2-digit",
+                    minute: "2-digit"
+                }
+            )
+            : "—";
+
+    const dailyTotal =
+        formatDuration(
+            dailyTotalMilliseconds / 1000
+        );
+
+    const regular =
+        formatDuration(
+            workedMilliseconds / 1000
+        );
+
+    timecardBody.innerHTML = `
+        <tr>
+
+            <td>
+                <span class="approval-pending">
+                    Pending
+                </span>
+            </td>
+
+            <td>${escapeHTML(dateText)}</td>
+
+            <td>${escapeHTML(clockInText)}</td>
+
+            <td>${escapeHTML(clockOutText)}</td>
+
+            <td>—</td>
+
+            <td>${escapeHTML(dailyTotal)}</td>
+
+            <td>${escapeHTML(regular)}</td>
+
+            <td>00:00</td>
+
+        </tr>
+    `;
+}
 
     if (!lastPunch) {
 
@@ -826,12 +1124,14 @@ todayPunches = data || [];
                 No punches recorded today.
             </p>`;
 calculateDailySummary([]);
+        renderTimecard([]);
         updateStatusDisplay();
 
         return;
     }
 
 calculateDailySummary(data);
+    renderTimecard(data);
     const lastPunch =
         data[data.length - 1];
 
