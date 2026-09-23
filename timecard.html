@@ -520,84 +520,150 @@ function calculateDay(punches) {
     let breakStartedAt = null;
 
     let workedMilliseconds = 0;
+    let breakMilliseconds = 0;
 
-    for (const punch of punches) {
+    const sortedPunches =
+        [...punches].sort(
+            (a, b) =>
+                new Date(a.punched_at) -
+                new Date(b.punched_at)
+        );
+
+
+    for (const punch of sortedPunches) {
 
         const time =
             new Date(
                 punch.punched_at
             ).getTime();
 
-        if (
-            punch.punch_type ===
-            "clock_in"
-        ) {
 
-            if (
-                firstClockIn === null
-            ) {
+        if (punch.punch_type === "clock_in") {
+
+            if (firstClockIn === null) {
                 firstClockIn =
                     punch.punched_at;
             }
 
-            workStartedAt = time;
-            breakStartedAt = null;
+            /*
+                Start a new work session only
+                if one is not already open.
+            */
 
-        } else if (
-            punch.punch_type ===
-                "break_start" &&
-            workStartedAt !== null
-        ) {
-
-            workedMilliseconds +=
-                Math.max(
-                    0,
-                    time - workStartedAt
-                );
-
-            workStartedAt = null;
-            breakStartedAt = time;
-
-        } else if (
-            punch.punch_type ===
-                "break_end" &&
-            breakStartedAt !== null
-        ) {
+            if (workStartedAt === null) {
+                workStartedAt = time;
+            }
 
             breakStartedAt = null;
-            workStartedAt = time;
+
 
         } else if (
-            punch.punch_type ===
-            "clock_out"
+            punch.punch_type === "break_start"
         ) {
 
-            if (
-                workStartedAt !== null
-            ) {
+            if (workStartedAt !== null) {
 
                 workedMilliseconds +=
                     Math.max(
                         0,
                         time - workStartedAt
                     );
+
+                workStartedAt = null;
+            }
+
+            if (breakStartedAt === null) {
+                breakStartedAt = time;
+            }
+
+
+        } else if (
+            punch.punch_type === "break_end"
+        ) {
+
+            if (breakStartedAt !== null) {
+
+                breakMilliseconds +=
+                    Math.max(
+                        0,
+                        time - breakStartedAt
+                    );
+
+                breakStartedAt = null;
+            }
+
+            if (workStartedAt === null) {
+                workStartedAt = time;
+            }
+
+
+        } else if (
+            punch.punch_type === "clock_out"
+        ) {
+
+            if (workStartedAt !== null) {
+
+                workedMilliseconds +=
+                    Math.max(
+                        0,
+                        time - workStartedAt
+                    );
+
+                workStartedAt = null;
+            }
+
+            /*
+                If someone clocks out while
+                on break, close the break too.
+            */
+
+            if (breakStartedAt !== null) {
+
+                breakMilliseconds +=
+                    Math.max(
+                        0,
+                        time - breakStartedAt
+                    );
+
+                breakStartedAt = null;
             }
 
             lastClockOut =
                 punch.punched_at;
-
-            workStartedAt = null;
-            breakStartedAt = null;
         }
     }
 
 
     /*
-        If employee is currently working,
-        keep today's total live.
+        For today's open shift, continue
+        counting until the current time.
+
+        Historical incomplete shifts will
+        later be flagged as Missing Punch.
     */
 
+    const today =
+        new Date();
+
+    const punchDate =
+        sortedPunches.length > 0
+            ? new Date(
+                sortedPunches[0].punched_at
+            )
+            : null;
+
+    const isToday =
+        punchDate &&
+        punchDate.getFullYear() ===
+            today.getFullYear() &&
+        punchDate.getMonth() ===
+            today.getMonth() &&
+        punchDate.getDate() ===
+            today.getDate();
+
+
     if (
+        isToday &&
         workStartedAt !== null
     ) {
 
@@ -610,13 +676,27 @@ function calculateDay(punches) {
     }
 
 
+    if (
+        isToday &&
+        breakStartedAt !== null
+    ) {
+
+        breakMilliseconds +=
+            Math.max(
+                0,
+                Date.now() -
+                breakStartedAt
+            );
+    }
+
+
     return {
         firstClockIn,
         lastClockOut,
-        workedMilliseconds
+        workedMilliseconds,
+        breakMilliseconds
     };
 }
-
 
 function renderTimecard(punches) {
 
