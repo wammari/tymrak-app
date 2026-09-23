@@ -847,28 +847,6 @@ function determineStatus(lastPunch) {
         return "not_clocked_in";
     }
 
-    switch (lastPunch.punch_type) {
-
-        case "clock_in":
-        case "break_end":
-
-            return "working";
-
-        case "break_start":
-
-            return "on_break";
-
-        case "clock_out":
-
-            return "not_clocked_in";
-
-        default:
-
-            return "not_clocked_in";
-    }
-}
-
-
     switch (
         lastPunch.punch_type
     ) {
