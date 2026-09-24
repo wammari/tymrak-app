@@ -877,7 +877,10 @@ function calculateDay(punches) {
     };
 }
 
-function renderTimecard(punches) {
+function renderTimecard(
+    punches,
+    period
+) {
 
     if (
         !punches ||
@@ -1392,9 +1395,10 @@ calculationStart.setHours(
         }
 
 
-        renderTimecard(
-            punches || []
-        );
+     renderTimecard(
+    punches || [],
+    period
+);
 
 
     } catch (error) {
