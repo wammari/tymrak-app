@@ -949,10 +949,22 @@ const overtimeByDate =
         )
     );
 
-    const rows =
-        Object.keys(groups)
-            .sort()
-            .map(dateKey => {
+const rows =
+    Object.keys(groups)
+        .sort()
+        .filter(dateKey => {
+
+            const date =
+                new Date(
+                    dateKey + "T12:00:00"
+                );
+
+            return (
+                date >= period.start &&
+                date <= period.end
+            );
+        })
+        .map(dateKey => {
 
                 const dayPunches =
                     groups[dateKey];
@@ -961,7 +973,24 @@ const overtimeByDate =
                     calculateDay(
                         dayPunches
                     );
+const overtimeRecord =
+    overtimeByDate[dateKey];
 
+
+const regular =
+    formatDuration(
+        overtimeRecord
+            ? overtimeRecord.regularMilliseconds
+            : result.workedMilliseconds
+    );
+
+
+const overtime =
+    formatDuration(
+        overtimeRecord
+            ? overtimeRecord.overtimeMilliseconds
+            : 0
+    );
                 const displayDate =
                     new Date(
                         dateKey +
@@ -1087,17 +1116,17 @@ const overtimeByDate =
                             —
                         </td>
 
-                        <td>
-                            ${escapeHTML(total)}
-                        </td>
+                       <td>
+    ${escapeHTML(total)}
+</td>
 
-                        <td>
-                            ${escapeHTML(total)}
-                        </td>
+<td>
+    ${escapeHTML(regular)}
+</td>
 
-                        <td>
-                            00:00
-                        </td>
+<td>
+    ${escapeHTML(overtime)}
+</td>
 
                     </tr>
 
