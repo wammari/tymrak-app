@@ -1048,7 +1048,102 @@ async function loadTimecard() {
                 "Employee account is not active."
             );
         }
+/*
+    Load the overtime rule that applies
+    to the employee's jurisdiction.
+*/
 
+if (!employeeData.province) {
+    throw new Error(
+        "Employee province/jurisdiction is not assigned."
+    );
+}
+
+
+const today =
+    new Date()
+        .toISOString()
+        .split("T")[0];
+
+
+const {
+    data: overtimeRule,
+    error: overtimeRuleError
+} =
+    await supabase
+        .from("overtime_rules")
+        .select(`
+            id,
+            province_code,
+            province_name,
+            rule_name,
+            weekly_threshold_hours,
+            daily_threshold_hours,
+            alternate_daily_threshold_hours,
+            overtime_multiplier,
+            double_time_threshold_hours,
+            double_time_multiplier,
+            holiday_week_threshold_hours,
+            daily_overtime_enabled,
+            weekly_overtime_enabled,
+            requires_schedule_rule,
+            calculation_method,
+            holiday_rule,
+            holiday_reduction_hours,
+            supports_averaging,
+            week_start_day,
+            effective_from,
+            effective_to
+        `)
+        .eq(
+            "province_code",
+            employeeData.province
+        )
+        .eq(
+            "is_active",
+            true
+        )
+        .eq(
+            "is_default",
+            true
+        )
+        .eq(
+            "is_special_rule",
+            false
+        )
+        .lte(
+            "effective_from",
+            today
+        )
+        .or(
+            `effective_to.is.null,effective_to.gte.${today}`
+        )
+        .order(
+            "effective_from",
+            {
+                ascending: false
+            }
+        )
+        .limit(1)
+        .maybeSingle();
+
+
+if (overtimeRuleError) {
+    throw overtimeRuleError;
+}
+
+
+if (!overtimeRule) {
+    throw new Error(
+        `No overtime rule found for ${employeeData.province}.`
+    );
+}
+
+
+console.log(
+    "TYMRAK Overtime Rule:",
+    overtimeRule
+);
 
         employee =
             employeeData;
