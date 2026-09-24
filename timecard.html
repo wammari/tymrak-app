@@ -1318,7 +1318,45 @@ console.log(
             formatDate(period.start) +
             " – " +
             formatDate(period.end);
+/*
+    Extend the punch retrieval range
+    back to the beginning of the workweek.
 
+    This allows weekly overtime to be
+    calculated correctly when a pay
+    period begins in the middle of a week.
+*/
+
+const calculationStart =
+    new Date(period.start);
+
+
+const weekStartDay =
+    Number(
+        currentOvertimeRule?.week_start_day ?? 0
+    );
+
+
+const daysSinceWeekStart =
+    (
+        calculationStart.getDay() -
+        weekStartDay +
+        7
+    ) % 7;
+
+
+calculationStart.setDate(
+    calculationStart.getDate() -
+    daysSinceWeekStart
+);
+
+
+calculationStart.setHours(
+    0,
+    0,
+    0,
+    0
+);
 
         const {
             data: punches,
@@ -1333,10 +1371,10 @@ console.log(
                     "employee_id",
                     employee.id
                 )
-                .gte(
-                    "punched_at",
-                    period.start.toISOString()
-                )
+               .gte(
+    "punched_at",
+    calculationStart.toISOString()
+)
                 .lte(
                     "punched_at",
                     period.end.toISOString()
