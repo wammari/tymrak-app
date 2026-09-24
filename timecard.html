@@ -796,16 +796,83 @@ function renderTimecard(punches) {
 
 
                 /*
-                    Overtime will later use
-                    the manager's configured
-                    weekly overtime rule.
-
-                    For now all worked time
-                    displays as Regular.
+                    Build the individual
+                    punch details for this day.
                 */
 
+                const punchDetails =
+                    [...dayPunches]
+                        .sort(
+                            (a, b) =>
+                                new Date(a.punched_at) -
+                                new Date(b.punched_at)
+                        )
+                        .map(punch => {
+
+                            let punchLabel =
+                                punch.punch_type;
+
+                            if (
+                                punch.punch_type ===
+                                "clock_in"
+                            ) {
+                                punchLabel =
+                                    "Clock In";
+                            }
+
+                            if (
+                                punch.punch_type ===
+                                "clock_out"
+                            ) {
+                                punchLabel =
+                                    "Clock Out";
+                            }
+
+                            if (
+                                punch.punch_type ===
+                                "break_start"
+                            ) {
+                                punchLabel =
+                                    "Break Start";
+                            }
+
+                            if (
+                                punch.punch_type ===
+                                "break_end"
+                            ) {
+                                punchLabel =
+                                    "Break End";
+                            }
+
+
+                            return `
+                                <div class="punch-detail-item">
+
+                                    <span class="punch-type">
+                                        ${escapeHTML(
+                                            punchLabel
+                                        )}
+                                    </span>
+
+                                    <span>
+                                        ${escapeHTML(
+                                            formatTime(
+                                                punch.punched_at
+                                            )
+                                        )}
+                                    </span>
+
+                                </div>
+                            `;
+                        })
+                        .join("");
+
+
                 return `
-                    <tr>
+
+                    <tr
+                        class="timecard-row"
+                        data-date="${escapeHTML(dateKey)}">
 
                         <td>
                             <span class="pending">
@@ -854,6 +921,29 @@ function renderTimecard(punches) {
                         </td>
 
                     </tr>
+
+
+                    <tr
+                        class="punch-detail-row"
+                        data-detail-date="${escapeHTML(dateKey)}">
+
+                        <td
+                            colspan="8"
+                            class="punch-detail-cell">
+
+                            <div class="punch-details">
+
+                                <div class="punch-details-title">
+                                    Punch Details
+                                </div>
+
+                                ${punchDetails}
+
+                            </div>
+
+                        </td>
+
+                    </tr>
                 `;
             })
             .join("");
@@ -861,6 +951,41 @@ function renderTimecard(punches) {
 
     timecardBody.innerHTML =
         rows;
+
+
+    /*
+        Open or close the punch details
+        when the employee clicks a day.
+    */
+
+    const timecardRows =
+        timecardBody.querySelectorAll(
+            ".timecard-row"
+        );
+
+
+    timecardRows.forEach(row => {
+
+        row.addEventListener(
+            "click",
+            () => {
+
+                const dateKey =
+                    row.dataset.date;
+
+                const detailRow =
+                    timecardBody.querySelector(
+                        `[data-detail-date="${dateKey}"]`
+                    );
+
+                if (detailRow) {
+                    detailRow.classList.toggle(
+                        "open"
+                    );
+                }
+            }
+        );
+    });
 }
 
 
