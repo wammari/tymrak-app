@@ -1023,9 +1023,9 @@ async function loadTimecard() {
         } =
             await supabase
                 .from("employees")
-                .select(
-                    "id,first_name,last_name,username,position,department,invitation_status,is_active"
-                )
+               .select(
+    "id,first_name,last_name,username,position,department,province,invitation_status,is_active"
+)
                 .eq(
                     "auth_user_id",
                     user.id
