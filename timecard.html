@@ -905,7 +905,49 @@ function renderTimecard(
         groupPunchesByDate(
             punches
         );
+/*
+    Build daily records for the full
+    calculation range.
 
+    Some days may be before the visible
+    pay period but are required for
+    weekly overtime calculations.
+*/
+
+const dailyRecords =
+    Object.keys(groups)
+        .sort()
+        .map(dateKey => {
+
+            const result =
+                calculateDay(
+                    groups[dateKey]
+                );
+
+            return {
+                dateKey,
+                workedMilliseconds:
+                    result.workedMilliseconds
+            };
+        });
+
+
+const overtimeRecords =
+    calculateWeeklyOvertime(
+        dailyRecords,
+        currentOvertimeRule
+    );
+
+
+const overtimeByDate =
+    Object.fromEntries(
+        overtimeRecords.map(
+            record => [
+                record.dateKey,
+                record
+            ]
+        )
+    );
 
     const rows =
         Object.keys(groups)
