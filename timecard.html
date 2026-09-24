@@ -558,7 +558,137 @@ function groupPunchesByDate(punches) {
 
     return groups;
 }
+function calculateWeeklyOvertime(
+    dailyRecords,
+    overtimeRule
+) {
 
+    if (
+        !overtimeRule ||
+        !overtimeRule.weekly_overtime_enabled ||
+        !overtimeRule.weekly_threshold_hours
+    ) {
+        return dailyRecords;
+    }
+
+
+    const weeklyThresholdMilliseconds =
+        Number(
+            overtimeRule.weekly_threshold_hours
+        ) *
+        60 *
+        60 *
+        1000;
+
+
+    const weekStartDay =
+        Number(
+            overtimeRule.week_start_day ?? 0
+        );
+
+
+    let currentWeekKey = null;
+    let accumulatedWeeklyMilliseconds = 0;
+
+
+    return dailyRecords.map(record => {
+
+        const date =
+            new Date(
+                record.dateKey +
+                "T12:00:00"
+            );
+
+
+        /*
+            Determine the beginning
+            of this employee's workweek.
+
+            0 = Sunday
+            1 = Monday
+            ...
+            6 = Saturday
+        */
+
+        const daysSinceWeekStart =
+            (
+                date.getDay() -
+                weekStartDay +
+                7
+            ) % 7;
+
+
+        const weekStart =
+            new Date(date);
+
+
+        weekStart.setDate(
+            date.getDate() -
+            daysSinceWeekStart
+        );
+
+
+        const weekKey =
+            weekStart.getFullYear() +
+            "-" +
+            String(
+                weekStart.getMonth() + 1
+            ).padStart(2, "0") +
+            "-" +
+            String(
+                weekStart.getDate()
+            ).padStart(2, "0");
+
+
+        if (weekKey !== currentWeekKey) {
+
+            currentWeekKey =
+                weekKey;
+
+            accumulatedWeeklyMilliseconds =
+                0;
+        }
+
+
+        const workedMilliseconds =
+            record.workedMilliseconds;
+
+
+        const remainingRegularMilliseconds =
+            Math.max(
+                0,
+                weeklyThresholdMilliseconds -
+                accumulatedWeeklyMilliseconds
+            );
+
+
+        const regularMilliseconds =
+            Math.min(
+                workedMilliseconds,
+                remainingRegularMilliseconds
+            );
+
+
+        const overtimeMilliseconds =
+            Math.max(
+                0,
+                workedMilliseconds -
+                regularMilliseconds
+            );
+
+
+        accumulatedWeeklyMilliseconds +=
+            workedMilliseconds;
+
+
+        return {
+            ...record,
+            regularMilliseconds,
+            overtimeMilliseconds,
+            weekKey
+        };
+    });
+}
 
 function calculateDay(punches) {
 
