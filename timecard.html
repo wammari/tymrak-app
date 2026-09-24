@@ -234,12 +234,7 @@ tbody tr:last-child td {
     background: #f8fafc;
 }
 </style>
-    .overtime-rule-display {
-    margin-top: 6px;
-    font-size: 13px;
-    color: #64748b;
-    font-weight: 500;
-}
+ 
 </head>
 
 <body>
@@ -303,11 +298,7 @@ tbody tr:last-child td {
                 class="period-value">
                 Loading...
             </div>
-<div
-    id="overtimeRuleDisplay"
-    class="overtime-rule-display">
-    Loading overtime rule...
-</div>
+
             
         </div>
 
@@ -384,8 +375,6 @@ const employeeInfo =
 const periodValue =
     document.getElementById("periodValue");
 
-const overtimeRuleDisplay =
-    document.getElementById("overtimeRuleDisplay");
 
 const timecardBody =
     document.getElementById("timecardBody");
@@ -1153,37 +1142,7 @@ if (!overtimeRule) {
     );
 }
 
-let overtimeDescription = "";
 
-if (
-    overtimeRule.daily_overtime_enabled &&
-    overtimeRule.daily_threshold_hours
-) {
-
-    overtimeDescription =
-        `OT after ${overtimeRule.daily_threshold_hours} hrs/day`;
-
-    if (
-        overtimeRule.weekly_overtime_enabled &&
-        overtimeRule.weekly_threshold_hours
-    ) {
-
-        overtimeDescription +=
-            ` or ${overtimeRule.weekly_threshold_hours} hrs/week`;
-    }
-
-} else if (
-    overtimeRule.weekly_overtime_enabled &&
-    overtimeRule.weekly_threshold_hours
-) {
-
-    overtimeDescription =
-        `OT after ${overtimeRule.weekly_threshold_hours} hrs/week`;
-}
-
-
-overtimeRuleDisplay.textContent =
-    `${overtimeRule.province_name} · ${overtimeDescription}`;
 console.log(
     "TYMRAK Overtime Rule:",
     overtimeRule
