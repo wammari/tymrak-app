@@ -14,11 +14,18 @@ export default async function handler(req, res) {
     province
 } = req.body || {};
 
-    if (!email || !firstName || !username) {
-      return res.status(400).json({
-        error: "Email, first name, and username are required"
-      });
-    }
+if (
+  !email ||
+  !firstName ||
+  !lastName ||
+  !username ||
+  !province
+) {
+  return res.status(400).json({
+    error:
+      "Email, first name, last name, username, and province are required"
+  });
+}
 
     const supabaseUrl = process.env.SUPABASE_URL;
     const secretKey = process.env.SUPABASE_SECRET_KEY;
