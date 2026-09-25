@@ -97,23 +97,42 @@ export default async function handler(req, res) {
       });
     }
 
-    const employeeData =
-      await employeeResponse.json();
+const employeeData =
+  await employeeResponse.json();
 
-    if (
-      !Array.isArray(employeeData) ||
-      employeeData.length === 0
-    ) {
-      return res.status(404).json({
-        error:
-          "No TYMRAK employee record was found for this account."
-      });
-    }
+if (
+  !Array.isArray(employeeData) ||
+  employeeData.length === 0
+) {
+  return res.status(404).json({
+    error:
+      "No TYMRAK employee record was found for this account."
+  });
+}
 
-    return res.status(200).json({
-      success: true,
-      message: "TYMRAK account activated successfully"
-    });
+const updatedEmployee =
+  employeeData[0];
+
+if (
+  updatedEmployee.invitation_status !==
+    "Account Activated" ||
+  !updatedEmployee.activated_at
+) {
+  console.error(
+    "Activation verification failed:",
+    updatedEmployee
+  );
+
+  return res.status(500).json({
+    error:
+      "TYMRAK could not verify the employee activation update."
+  });
+}
+
+return res.status(200).json({
+  success: true,
+  message: "TYMRAK account activated successfully"
+});
 
   } catch (error) {
     console.error(
