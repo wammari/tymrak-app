@@ -4,7 +4,15 @@ export default async function handler(req, res) {
   }
 
   try {
-    const { email, firstName, lastName, username } = req.body || {};
+    const {
+    email,
+    firstName,
+    lastName,
+    username,
+    position,
+    department,
+    province
+} = req.body || {};
 
     if (!email || !firstName || !username) {
       return res.status(400).json({
@@ -121,15 +129,18 @@ export default async function handler(req, res) {
       await lookupResponse.json();
 
     const employeeData = {
-      auth_user_id: authUserId,
-      first_name: firstName,
-      last_name: lastName || "",
-      email: normalizedEmail,
-      username: username,
-      invitation_status: "Invitation Sent",
-      invited_at: new Date().toISOString(),
-      is_active: true
-    };
+    auth_user_id: authUserId,
+    first_name: firstName,
+    last_name: lastName || "",
+    email: normalizedEmail,
+    username: username,
+    position: position || null,
+    department: department || null,
+    province: province || null,
+    invitation_status: "Invitation Sent",
+    invited_at: new Date().toISOString(),
+    is_active: true
+};
 
     /*
      * STEP 3
