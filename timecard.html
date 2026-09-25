@@ -689,7 +689,258 @@ function calculateWeeklyOvertime(
         };
     });
 }
+function calculateGreaterDailyOrWeeklyOvertime(
+    dailyRecords,
+    overtimeRule
+) {
 
+    if (
+        !overtimeRule ||
+        !overtimeRule.daily_threshold_hours ||
+        !overtimeRule.weekly_threshold_hours
+    ) {
+        return dailyRecords;
+    }
+
+
+    const dailyThresholdMilliseconds =
+        Number(
+            overtimeRule.daily_threshold_hours
+        ) *
+        60 *
+        60 *
+        1000;
+
+
+    const weeklyThresholdMilliseconds =
+        Number(
+            overtimeRule.weekly_threshold_hours
+        ) *
+        60 *
+        60 *
+        1000;
+
+
+    const weekStartDay =
+        Number(
+            overtimeRule.week_start_day ?? 0
+        );
+
+
+    /*
+        Group the daily records
+        into workweeks.
+    */
+
+    const weeks = {};
+
+
+    for (const record of dailyRecords) {
+
+        const date =
+            new Date(
+                record.dateKey +
+                "T12:00:00"
+            );
+
+
+        const daysSinceWeekStart =
+            (
+                date.getDay() -
+                weekStartDay +
+                7
+            ) % 7;
+
+
+        const weekStart =
+            new Date(date);
+
+
+        weekStart.setDate(
+            date.getDate() -
+            daysSinceWeekStart
+        );
+
+
+        const weekKey =
+            weekStart.getFullYear() +
+            "-" +
+            String(
+                weekStart.getMonth() + 1
+            ).padStart(2, "0") +
+            "-" +
+            String(
+                weekStart.getDate()
+            ).padStart(2, "0");
+
+
+        if (!weeks[weekKey]) {
+            weeks[weekKey] = [];
+        }
+
+
+        weeks[weekKey].push({
+            ...record,
+            weekKey
+        });
+    }
+
+
+    const calculatedRecords = [];
+
+
+    for (
+        const [weekKey, weekRecords]
+        of Object.entries(weeks)
+    ) {
+
+        weekRecords.sort(
+            (a, b) =>
+                a.dateKey.localeCompare(
+                    b.dateKey
+                )
+        );
+
+
+        /*
+            Calculate total daily overtime
+            for this workweek.
+        */
+
+        const totalDailyOvertime =
+            weekRecords.reduce(
+                (total, record) => {
+
+                    return total +
+                        Math.max(
+                            0,
+                            record.workedMilliseconds -
+                            dailyThresholdMilliseconds
+                        );
+                },
+                0
+            );
+
+
+        /*
+            Calculate total weekly overtime
+            for this workweek.
+        */
+
+        const totalWeeklyWorked =
+            weekRecords.reduce(
+                (total, record) =>
+                    total +
+                    record.workedMilliseconds,
+                0
+            );
+
+
+        const totalWeeklyOvertime =
+            Math.max(
+                0,
+                totalWeeklyWorked -
+                weeklyThresholdMilliseconds
+            );
+
+
+        /*
+            Alberta-style rule:
+            use whichever overtime total
+            is greater for the workweek.
+        */
+
+        const useDailyMethod =
+            totalDailyOvertime >
+            totalWeeklyOvertime;
+
+
+        if (useDailyMethod) {
+
+            for (const record of weekRecords) {
+
+                const overtimeMilliseconds =
+                    Math.max(
+                        0,
+                        record.workedMilliseconds -
+                        dailyThresholdMilliseconds
+                    );
+
+
+                const regularMilliseconds =
+                    record.workedMilliseconds -
+                    overtimeMilliseconds;
+
+
+                calculatedRecords.push({
+                    ...record,
+                    regularMilliseconds,
+                    overtimeMilliseconds,
+                    weekKey
+                });
+            }
+
+        } else {
+
+            /*
+                Weekly calculation won.
+
+                Allocate regular hours first,
+                then overtime after the weekly
+                threshold is reached.
+            */
+
+            let accumulatedWeeklyMilliseconds =
+                0;
+
+
+            for (const record of weekRecords) {
+
+                const remainingRegularMilliseconds =
+                    Math.max(
+                        0,
+                        weeklyThresholdMilliseconds -
+                        accumulatedWeeklyMilliseconds
+                    );
+
+
+                const regularMilliseconds =
+                    Math.min(
+                        record.workedMilliseconds,
+                        remainingRegularMilliseconds
+                    );
+
+
+                const overtimeMilliseconds =
+                    Math.max(
+                        0,
+                        record.workedMilliseconds -
+                        regularMilliseconds
+                    );
+
+
+                accumulatedWeeklyMilliseconds +=
+                    record.workedMilliseconds;
+
+
+                calculatedRecords.push({
+                    ...record,
+                    regularMilliseconds,
+                    overtimeMilliseconds,
+                    weekKey
+                });
+            }
+        }
+    }
+
+
+    return calculatedRecords.sort(
+        (a, b) =>
+            a.dateKey.localeCompare(
+                b.dateKey
+            )
+    );
+}
 function calculateDay(punches) {
 
     let firstClockIn = null;
