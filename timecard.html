@@ -1183,11 +1183,33 @@ const dailyRecords =
         });
 
 
-const overtimeRecords =
-    calculateWeeklyOvertime(
-        dailyRecords,
-        currentOvertimeRule
-    );
+let overtimeRecords;
+
+
+if (
+    currentOvertimeRule?.calculation_method ===
+    "greater_daily_or_weekly"
+) {
+
+    overtimeRecords =
+        calculateGreaterDailyOrWeeklyOvertime(
+            dailyRecords,
+            currentOvertimeRule
+        );
+
+} else {
+
+    /*
+        Default calculation:
+        weekly overtime only.
+    */
+
+    overtimeRecords =
+        calculateWeeklyOvertime(
+            dailyRecords,
+            currentOvertimeRule
+        );
+}
 
 
 const overtimeByDate =
