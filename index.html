@@ -221,7 +221,36 @@ async function sendInvitation() {
 
     const button = document.getElementById("sendButton");
     const result = document.getElementById("result");
+const firstName =
+    document.getElementById("firstName").value.trim();
 
+const lastName =
+    document.getElementById("lastName").value.trim();
+
+const username =
+    document.getElementById("username").value.trim();
+
+const email =
+    document.getElementById("email").value.trim();
+
+const province =
+    document.getElementById("province").value;
+
+
+if (
+    !firstName ||
+    !lastName ||
+    !username ||
+    !email ||
+    !province
+) {
+    result.style.display = "block";
+    result.className = "error";
+    result.textContent =
+        "Please complete all required fields.";
+
+    return;
+}
     button.disabled = true;
     button.textContent = "Sending...";
 
