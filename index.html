@@ -111,7 +111,6 @@ button:disabled {
     <label for="firstName">
         First Name
     </label>
-
     <input
         type="text"
         id="firstName"
@@ -119,10 +118,19 @@ button:disabled {
         required
     >
 
+    <label for="lastName">
+        Last Name
+    </label>
+    <input
+        type="text"
+        id="lastName"
+        placeholder="Last name"
+        required
+    >
+
     <label for="username">
         Username
     </label>
-
     <input
         type="text"
         id="username"
@@ -133,13 +141,53 @@ button:disabled {
     <label for="email">
         Email
     </label>
-
     <input
         type="email"
         id="email"
         placeholder="employee@email.com"
         required
     >
+
+    <label for="position">
+        Position
+    </label>
+    <input
+        type="text"
+        id="position"
+        placeholder="Position"
+    >
+
+    <label for="department">
+        Department
+    </label>
+    <input
+        type="text"
+        id="department"
+        placeholder="Department"
+    >
+
+    <label for="province">
+        Province / Jurisdiction
+    </label>
+    <select id="province" required>
+        <option value="">
+            Select province or jurisdiction
+        </option>
+        <option value="AB">Alberta</option>
+        <option value="BC">British Columbia</option>
+        <option value="MB">Manitoba</option>
+        <option value="NB">New Brunswick</option>
+        <option value="NL">Newfoundland and Labrador</option>
+        <option value="NS">Nova Scotia</option>
+        <option value="ON">Ontario</option>
+        <option value="PE">Prince Edward Island</option>
+        <option value="QC">Quebec</option>
+        <option value="SK">Saskatchewan</option>
+        <option value="NT">Northwest Territories</option>
+        <option value="NU">Nunavut</option>
+        <option value="YT">Yukon</option>
+        <option value="FED">Federal</option>
+    </select>
 
 </div>
 
