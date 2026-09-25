@@ -81,13 +81,46 @@ button:disabled {
 <p>This will send a real TYMRAK invitation through Resend.</p>
 
 <div class="info">
-<strong>Employee:</strong> Waleed<br>
-<strong>Username:</strong> waleed.test<br>
-<strong>Email:</strong> w.ammari@outlook.com
+
+    <label for="firstName">
+        First Name
+    </label>
+
+    <input
+        type="text"
+        id="firstName"
+        placeholder="First name"
+        required
+    >
+
+    <label for="username">
+        Username
+    </label>
+
+    <input
+        type="text"
+        id="username"
+        placeholder="username"
+        required
+    >
+
+    <label for="email">
+        Email
+    </label>
+
+    <input
+        type="email"
+        id="email"
+        placeholder="employee@email.com"
+        required
+    >
+
 </div>
 
-<button id="sendButton" onclick="sendInvitation()">
-Send Test Invitation
+<button
+    id="sendButton"
+    onclick="sendInvitation()">
+    Send Invitation
 </button>
 
 <div id="result"></div>
@@ -113,11 +146,25 @@ async function sendInvitation() {
             headers: {
                 "Content-Type": "application/json"
             },
-            body: JSON.stringify({
-                email: "w.ammari@outlook.com",
-                firstName: "Waleed",
-                username: "waleed.test"
-            })
+           body: JSON.stringify({
+    email:
+        document
+            .getElementById("email")
+            .value
+            .trim(),
+
+    firstName:
+        document
+            .getElementById("firstName")
+            .value
+            .trim(),
+
+    username:
+        document
+            .getElementById("username")
+            .value
+            .trim()
+})
         });
 
         const data = await response.json();
