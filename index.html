@@ -235,7 +235,7 @@ async function sendInvitation() {
             headers: {
                 "Content-Type": "application/json"
             },
-           body: JSON.stringify({
+ body: JSON.stringify({
     email:
         document
             .getElementById("email")
@@ -248,11 +248,34 @@ async function sendInvitation() {
             .value
             .trim(),
 
+    lastName:
+        document
+            .getElementById("lastName")
+            .value
+            .trim(),
+
     username:
         document
             .getElementById("username")
             .value
-            .trim()
+            .trim(),
+
+    position:
+        document
+            .getElementById("position")
+            .value
+            .trim(),
+
+    department:
+        document
+            .getElementById("department")
+            .value
+            .trim(),
+
+    province:
+        document
+            .getElementById("province")
+            .value
 })
         });
 
