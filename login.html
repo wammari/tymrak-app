@@ -318,14 +318,62 @@ document.getElementById(
     "forgotPassword"
 ).addEventListener(
     "click",
-    (event) => {
+    async (event) => {
 
         event.preventDefault();
 
-        showMessage(
-            "error",
-            "Password reset will be available shortly."
-        );
+        const email =
+            document
+                .getElementById("email")
+                .value
+                .trim();
+
+        if (!email) {
+
+            showMessage(
+                "error",
+                "Please enter your email address first."
+            );
+
+            return;
+        }
+
+        try {
+
+            const {
+                error
+            } =
+                await supabase.auth
+                    .resetPasswordForEmail(
+                        email,
+                        {
+                            redirectTo:
+                                "https://tymrak.vercel.app/reset-password.html"
+                        }
+                    );
+
+            if (error) {
+                throw error;
+            }
+
+            showMessage(
+                "success",
+                "Password reset instructions have been sent to your email."
+            );
+
+        } catch (error) {
+
+            console.error(
+                "Password reset error:",
+                error
+            );
+
+            showMessage(
+                "error",
+                error.message ||
+                "Unable to send password reset instructions."
+            );
+        }
     }
 );
 
