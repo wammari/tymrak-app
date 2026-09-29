@@ -358,7 +358,7 @@ const SUPABASE_PUBLISHABLE_KEY =
     "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
 
     let currentOvertimeRule = null;
-
+let employeeTimeZone = "America/Toronto";
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
@@ -457,8 +457,6 @@ function getCurrentPayPeriod() {
         end
     };
 }
-
-
 function formatDate(date) {
 
     return date.toLocaleDateString(
@@ -466,11 +464,28 @@ function formatDate(date) {
         {
             month: "short",
             day: "numeric",
-            year: "numeric"
+            year: "numeric",
+            timeZone: employeeTimeZone
         }
     );
 }
+function formatTime(timestamp) {
 
+    if (!timestamp) {
+        return "—";
+    }
+
+    return new Date(
+        timestamp
+    ).toLocaleTimeString(
+        [],
+        {
+            hour: "2-digit",
+            minute: "2-digit",
+            timeZone: employeeTimeZone
+        }
+    );
+}
 
 function formatTime(timestamp) {
 
@@ -484,7 +499,9 @@ function formatTime(timestamp) {
         [],
         {
             hour: "2-digit",
-            minute: "2-digit"
+            minute: "2-digit",
+            timeZone:
+                getEmployeeTimeZone()
         }
     );
 }
@@ -526,28 +543,45 @@ function escapeHTML(value) {
         .replaceAll("'", "&#039;");
 }
 
-
 function groupPunchesByDate(punches) {
 
     const groups = {};
 
+    const dateFormatter =
+        new Intl.DateTimeFormat(
+            "en-CA",
+            {
+                timeZone: employeeTimeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }
+        );
+
     for (const punch of punches) {
 
-        const date =
-            new Date(
-                punch.punched_at
+        const parts =
+            dateFormatter.formatToParts(
+                new Date(punch.punched_at)
             );
 
+        const year =
+            parts.find(
+                part => part.type === "year"
+            ).value;
+
+        const month =
+            parts.find(
+                part => part.type === "month"
+            ).value;
+
+        const day =
+            parts.find(
+                part => part.type === "day"
+            ).value;
+
         const key =
-            date.getFullYear() +
-            "-" +
-            String(
-                date.getMonth() + 1
-            ).padStart(2, "0") +
-            "-" +
-            String(
-                date.getDate()
-            ).padStart(2, "0");
+            `${year}-${month}-${day}`;
 
         if (!groups[key]) {
             groups[key] = [];
@@ -1517,7 +1551,25 @@ async function loadTimecard() {
         if (employeeError) {
             throw employeeError;
         }
+const provinceTimeZones = {
+    AB: "America/Edmonton",
+    BC: "America/Vancouver",
+    SK: "America/Regina",
+    MB: "America/Winnipeg",
+    ON: "America/Toronto",
+    QC: "America/Toronto",
+    NB: "America/Moncton",
+    NS: "America/Halifax",
+    PE: "America/Halifax",
+    NL: "America/St_Johns",
+    NT: "America/Yellowknife",
+    NU: "America/Iqaluit",
+    YT: "America/Whitehorse"
+};
 
+employeeTimeZone =
+    provinceTimeZones[employeeData.province] ||
+    "America/Toronto";
 
         if (
             !employeeData.is_active ||
