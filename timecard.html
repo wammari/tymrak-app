@@ -400,56 +400,56 @@ let employee = null;
 
 function getCurrentPayPeriod() {
 
-    const now =
-        new Date();
+const now =
+    getDatePartsInEmployeeTimeZone();
 
-    const year =
-        now.getFullYear();
+const year =
+    now.year;
 
-    const month =
-        now.getMonth();
+const month =
+    now.month - 1;
 
-    const day =
-        now.getDate();
+const day =
+    now.day;
 
     let start;
     let end;
 
     if (day <= 15) {
 
-        start =
-            new Date(
-                year,
-                month,
-                1,
-                0, 0, 0, 0
-            );
+   start =
+    createDateInEmployeeTimeZone(
+        year,
+        month,
+        1,
+        0, 0, 0, 0
+    );
 
-        end =
-            new Date(
-                year,
-                month,
-                15,
-                23, 59, 59, 999
-            );
+end =
+    createDateInEmployeeTimeZone(
+        year,
+        month,
+        15,
+        23, 59, 59, 999
+    );
 
     } else {
 
-        start =
-            new Date(
-                year,
-                month,
-                16,
-                0, 0, 0, 0
-            );
+    start =
+    createDateInEmployeeTimeZone(
+        year,
+        month,
+        16,
+        0, 0, 0, 0
+    );
 
-        end =
-            new Date(
-                year,
-                month + 1,
-                0,
-                23, 59, 59, 999
-            );
+end =
+    createDateInEmployeeTimeZone(
+        year,
+        month + 1,
+        0,
+        23, 59, 59, 999
+    );
     }
 
     return {
@@ -487,8 +487,111 @@ function formatTime(timestamp) {
     );
 }
 
+function getDatePartsInEmployeeTimeZone(date = new Date()) {
 
+    const formatter =
+        new Intl.DateTimeFormat(
+            "en-CA",
+            {
+                timeZone: employeeTimeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit"
+            }
+        );
 
+    const parts =
+        formatter.formatToParts(date);
+
+    return {
+        year: Number(
+            parts.find(
+                part => part.type === "year"
+            ).value
+        ),
+        month: Number(
+            parts.find(
+                part => part.type === "month"
+            ).value
+        ),
+        day: Number(
+            parts.find(
+                part => part.type === "day"
+            ).value
+        )
+    };
+}
+function createDateInEmployeeTimeZone(
+    year,
+    month,
+    day,
+    hour = 0,
+    minute = 0,
+    second = 0,
+    millisecond = 0
+) {
+
+    const utcGuess =
+        new Date(
+            Date.UTC(
+                year,
+                month,
+                day,
+                hour,
+                minute,
+                second,
+                millisecond
+            )
+        );
+
+    const formatter =
+        new Intl.DateTimeFormat(
+            "en-US",
+            {
+                timeZone: employeeTimeZone,
+                year: "numeric",
+                month: "2-digit",
+                day: "2-digit",
+                hour: "2-digit",
+                minute: "2-digit",
+                second: "2-digit",
+                hourCycle: "h23"
+            }
+        );
+
+    const parts =
+        Object.fromEntries(
+            formatter
+                .formatToParts(utcGuess)
+                .filter(
+                    part =>
+                        part.type !== "literal"
+                )
+                .map(
+                    part => [
+                        part.type,
+                        part.value
+                    ]
+                )
+        );
+
+    const asUTC =
+        Date.UTC(
+            Number(parts.year),
+            Number(parts.month) - 1,
+            Number(parts.day),
+            Number(parts.hour),
+            Number(parts.minute),
+            Number(parts.second)
+        );
+
+    const offset =
+        asUTC - utcGuess.getTime();
+
+    return new Date(
+        utcGuess.getTime() - offset
+    );
+}
 function formatDuration(milliseconds) {
 
     const totalMinutes =
@@ -1088,25 +1191,25 @@ function calculateDay(punches) {
         later be flagged as Missing Punch.
     */
 
-    const today =
-        new Date();
+   const todayParts =
+    getDatePartsInEmployeeTimeZone(
+        new Date()
+    );
 
-    const punchDate =
-        sortedPunches.length > 0
-            ? new Date(
+const punchParts =
+    sortedPunches.length > 0
+        ? getDatePartsInEmployeeTimeZone(
+            new Date(
                 sortedPunches[0].punched_at
             )
-            : null;
+        )
+        : null;
 
-    const isToday =
-        punchDate &&
-        punchDate.getFullYear() ===
-            today.getFullYear() &&
-        punchDate.getMonth() ===
-            today.getMonth() &&
-        punchDate.getDate() ===
-            today.getDate();
-
+const isToday =
+    punchParts &&
+    punchParts.year === todayParts.year &&
+    punchParts.month === todayParts.month &&
+    punchParts.day === todayParts.day;
 
     if (
         isToday &&
@@ -1241,19 +1344,37 @@ const overtimeByDate =
 const rows =
     Object.keys(groups)
         .sort()
-        .filter(dateKey => {
+       .filter(dateKey => {
 
-            const date =
-                new Date(
-                    dateKey + "T12:00:00"
-                );
+    const startParts =
+        getDatePartsInEmployeeTimeZone(
+            period.start
+        );
 
-            return (
-                date >= period.start &&
-                date <= period.end
-            );
-        })
-        .map(dateKey => {
+    const endParts =
+        getDatePartsInEmployeeTimeZone(
+            period.end
+        );
+
+    const startKey =
+        `${startParts.year}-${String(
+            startParts.month
+        ).padStart(2, "0")}-${String(
+            startParts.day
+        ).padStart(2, "0")}`;
+
+    const endKey =
+        `${endParts.year}-${String(
+            endParts.month
+        ).padStart(2, "0")}-${String(
+            endParts.day
+        ).padStart(2, "0")}`;
+
+    return (
+        dateKey >= startKey &&
+        dateKey <= endKey
+    );
+})        .map(dateKey => {
 
                 const dayPunches =
                     groups[dateKey];
@@ -1575,10 +1696,17 @@ if (!employeeData.province) {
 }
 
 
+const todayParts =
+    getDatePartsInEmployeeTimeZone(
+        new Date()
+    );
+
 const today =
-    new Date()
-        .toISOString()
-        .split("T")[0];
+    `${todayParts.year}-${String(
+        todayParts.month
+    ).padStart(2, "0")}-${String(
+        todayParts.day
+    ).padStart(2, "0")}`;
 
 
 const {
@@ -1708,37 +1836,45 @@ console.log(
     period begins in the middle of a week.
 */
 
-const calculationStart =
-    new Date(period.start);
+const periodStartParts =
+    getDatePartsInEmployeeTimeZone(
+        period.start
+    );
 
+const periodStartNoon =
+    new Date(
+        Date.UTC(
+            periodStartParts.year,
+            periodStartParts.month - 1,
+            periodStartParts.day,
+            12, 0, 0, 0
+        )
+    );
 
 const weekStartDay =
     Number(
         currentOvertimeRule?.week_start_day ?? 0
     );
 
-
 const daysSinceWeekStart =
     (
-        calculationStart.getDay() -
+        periodStartNoon.getUTCDay() -
         weekStartDay +
         7
     ) % 7;
 
-
-calculationStart.setDate(
-    calculationStart.getDate() -
+periodStartNoon.setUTCDate(
+    periodStartNoon.getUTCDate() -
     daysSinceWeekStart
 );
 
-
-calculationStart.setHours(
-    0,
-    0,
-    0,
-    0
-);
-
+const calculationStart =
+    createDateInEmployeeTimeZone(
+        periodStartNoon.getUTCFullYear(),
+        periodStartNoon.getUTCMonth(),
+        periodStartNoon.getUTCDate(),
+        0, 0, 0, 0
+    );
         const {
             data: punches,
             error: punchesError
