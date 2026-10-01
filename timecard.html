@@ -95,6 +95,30 @@ body {
     font-weight: bold;
 }
 
+.period-navigation {
+    display: flex;
+    gap: 8px;
+    margin-top: 10px;
+}
+
+.period-button {
+    background: white;
+    border: 1px solid #d0d5dd;
+    color: #14213d;
+    padding: 7px 12px;
+    min-height: 44px;
+    border-radius: 7px;
+    cursor: pointer;
+    font-size: 13px;
+    font-weight: bold;
+}
+
+.period-button:disabled {
+    color: #98a2b3;
+    background: #f2f4f7;
+    cursor: not-allowed;
+}
+
 .status {
     display: inline-block;
     background: #fff3d6;
@@ -289,7 +313,9 @@ tbody tr:last-child td {
 
         <div>
 
-            <div class="period-label">
+            <div
+                id="periodLabel"
+                class="period-label">
                 CURRENT PAY PERIOD
             </div>
 
@@ -299,7 +325,23 @@ tbody tr:last-child td {
                 Loading...
             </div>
 
-            
+            <div class="period-navigation">
+                <button
+                    id="previousPeriodButton"
+                    class="period-button"
+                    type="button"
+                    disabled>
+                    Previous
+                </button>
+
+                <button
+                    id="nextPeriodButton"
+                    class="period-button"
+                    type="button"
+                    disabled>
+                    Next
+                </button>
+            </div>
         </div>
 
         <div
@@ -376,6 +418,15 @@ const employeeInfo =
 const periodValue =
     document.getElementById("periodValue");
 
+const periodLabel =
+    document.getElementById("periodLabel");
+
+const previousPeriodButton =
+    document.getElementById("previousPeriodButton");
+
+const nextPeriodButton =
+    document.getElementById("nextPeriodButton");
+
 
 const timecardBody =
     document.getElementById("timecardBody");
@@ -388,6 +439,8 @@ const logoutButton =
 
 
 let employee = null;
+let currentPayPeriod = null;
+let selectedPayPeriod = null;
 
 
 /*
@@ -398,24 +451,39 @@ let employee = null;
     16th - last day
 */
 
-function getCurrentPayPeriod() {
+function getCurrentPayPeriod(date = new Date()) {
 
-const now =
-    getDatePartsInEmployeeTimeZone();
+    const now =
+        getDatePartsInEmployeeTimeZone(date);
 
-const year =
-    now.year;
+    return getPayPeriod(
+        now.year,
+        now.month - 1,
+        now.day <= 15 ? 1 : 2
+    );
+}
 
-const month =
-    now.month - 1;
+function getPayPeriod(
+    year,
+    month,
+    half
+) {
 
-const day =
-    now.day;
+    const normalizedMonth =
+        new Date(
+            Date.UTC(year, month, 1)
+        );
+
+    year =
+        normalizedMonth.getUTCFullYear();
+
+    month =
+        normalizedMonth.getUTCMonth();
 
     let start;
     let end;
 
-    if (day <= 15) {
+    if (half === 1) {
 
    start =
     createDateInEmployeeTimeZone(
@@ -454,8 +522,128 @@ end =
 
     return {
         start,
-        end
+        end,
+        year,
+        month,
+        half,
+        key:
+            `${year}-${String(
+                month + 1
+            ).padStart(2, "0")}-${half}`
     };
+}
+
+function getPreviousPayPeriod(period) {
+
+    return period.half === 2
+        ? getPayPeriod(
+            period.year,
+            period.month,
+            1
+        )
+        : getPayPeriod(
+            period.year,
+            period.month - 1,
+            2
+        );
+}
+
+function getNextPayPeriod(period) {
+
+    return period.half === 1
+        ? getPayPeriod(
+            period.year,
+            period.month,
+            2
+        )
+        : getPayPeriod(
+            period.year,
+            period.month + 1,
+            1
+        );
+}
+
+function canNavigateToPayPeriod(
+    period,
+    maximumPeriod = currentPayPeriod
+) {
+
+    return (
+        maximumPeriod &&
+        period.key <= maximumPeriod.key
+    );
+}
+
+function getPayPeriodDateKeys(period) {
+
+    const start =
+        getDatePartsInEmployeeTimeZone(
+            period.start
+        );
+
+    const end =
+        getDatePartsInEmployeeTimeZone(
+            period.end
+        );
+
+    const toDateKey = parts =>
+        `${parts.year}-${String(
+            parts.month
+        ).padStart(2, "0")}-${String(
+            parts.day
+        ).padStart(2, "0")}`;
+
+    return {
+        startKey: toDateKey(start),
+        endKey: toDateKey(end)
+    };
+}
+
+function selectOvertimeRuleForPeriod(
+    overtimeRules,
+    startKey,
+    endKey
+) {
+
+    const matchingRules =
+        overtimeRules.filter(rule =>
+            rule.effective_from <= endKey &&
+            (
+                !rule.effective_to ||
+                rule.effective_to >= startKey
+            )
+        );
+
+    const coveringRules =
+        matchingRules.filter(rule =>
+            rule.effective_from <= startKey &&
+            (
+                !rule.effective_to ||
+                rule.effective_to >= endKey
+            )
+        );
+
+    if (matchingRules.length === 0) {
+        throw new Error(
+            "No overtime rule applies to this pay period."
+        );
+    }
+
+    if (
+        matchingRules.length !== 1 ||
+        coveringRules.length !== 1
+    ) {
+        const error = new Error(
+            "This pay period crosses an overtime-rule effective-date boundary and cannot be calculated as a single timecard."
+        );
+
+        error.code =
+            "OVERTIME_RULE_BOUNDARY";
+
+        throw error;
+    }
+
+    return coveringRules[0];
 }
 function formatDate(date) {
 
@@ -1607,6 +1795,229 @@ const overtime =
     });
 }
 
+function updatePeriodNavigation() {
+
+    const isCurrentPeriod =
+        selectedPayPeriod.key ===
+        currentPayPeriod.key;
+
+    periodLabel.textContent =
+        isCurrentPeriod
+            ? "CURRENT PAY PERIOD"
+            : "PAY PERIOD";
+
+    previousPeriodButton.disabled = false;
+    nextPeriodButton.disabled =
+        !canNavigateToPayPeriod(
+            getNextPayPeriod(
+                selectedPayPeriod
+            )
+    );
+}
+
+async function loadOvertimeRuleForPeriod(period) {
+
+    const {
+        startKey,
+        endKey
+    } =
+        getPayPeriodDateKeys(period);
+
+    const {
+        data: overtimeRules,
+        error: overtimeRuleError
+    } =
+        await supabase
+            .from("overtime_rules")
+            .select(`
+                id,
+                province_code,
+                province_name,
+                rule_name,
+                weekly_threshold_hours,
+                daily_threshold_hours,
+                alternate_daily_threshold_hours,
+                overtime_multiplier,
+                double_time_threshold_hours,
+                double_time_multiplier,
+                holiday_week_threshold_hours,
+                daily_overtime_enabled,
+                weekly_overtime_enabled,
+                requires_schedule_rule,
+                calculation_method,
+                holiday_rule,
+                holiday_reduction_hours,
+                supports_averaging,
+                week_start_day,
+                effective_from,
+                effective_to
+            `)
+            .eq(
+                "province_code",
+                employee.province
+            )
+            .eq(
+                "is_active",
+                true
+            )
+            .eq(
+                "is_default",
+                true
+            )
+            .eq(
+                "is_special_rule",
+                false
+            )
+            .lte(
+                "effective_from",
+                endKey
+            )
+            .or(
+                `effective_to.is.null,effective_to.gte.${startKey}`
+            )
+            .order(
+                "effective_from",
+                {
+                    ascending: false
+                }
+            );
+
+    if (overtimeRuleError) {
+        throw overtimeRuleError;
+    }
+
+    currentOvertimeRule =
+        selectOvertimeRuleForPeriod(
+            overtimeRules || [],
+            startKey,
+            endKey
+        );
+}
+
+async function loadPayPeriod(period) {
+
+    selectedPayPeriod = period;
+
+    periodValue.textContent =
+        formatDate(period.start) +
+        " – " +
+        formatDate(period.end);
+
+    updatePeriodNavigation();
+
+    previousPeriodButton.disabled = true;
+    nextPeriodButton.disabled = true;
+
+    timecardBody.innerHTML = `
+        <tr>
+            <td colspan="8" class="loading">
+                Loading timecard...
+            </td>
+        </tr>
+    `;
+
+    await loadOvertimeRuleForPeriod(period);
+
+    /*
+        Extend the punch retrieval range
+        back to the beginning of the workweek.
+
+        This allows weekly overtime to be
+        calculated correctly when a pay
+        period begins in the middle of a week.
+    */
+
+    const periodStartParts =
+        getDatePartsInEmployeeTimeZone(
+            period.start
+        );
+
+    const periodStartNoon =
+        new Date(
+            Date.UTC(
+                periodStartParts.year,
+                periodStartParts.month - 1,
+                periodStartParts.day,
+                12, 0, 0, 0
+            )
+        );
+
+    const weekStartDay =
+        Number(
+            currentOvertimeRule?.week_start_day ?? 0
+        );
+
+    const daysSinceWeekStart =
+        (
+            periodStartNoon.getUTCDay() -
+            weekStartDay +
+            7
+        ) % 7;
+
+    periodStartNoon.setUTCDate(
+        periodStartNoon.getUTCDate() -
+        daysSinceWeekStart
+    );
+
+    const calculationStart =
+        createDateInEmployeeTimeZone(
+            periodStartNoon.getUTCFullYear(),
+            periodStartNoon.getUTCMonth(),
+            periodStartNoon.getUTCDate(),
+            0, 0, 0, 0
+        );
+
+    const {
+        data: punches,
+        error: punchesError
+    } =
+        await supabase
+            .from("punches")
+            .select(
+                "id,punch_type,punched_at,location_name"
+            )
+            .eq(
+                "employee_id",
+                employee.id
+            )
+            .gte(
+                "punched_at",
+                calculationStart.toISOString()
+            )
+            .lte(
+                "punched_at",
+                period.end.toISOString()
+            )
+            .order(
+                "punched_at",
+                {
+                    ascending: true
+                }
+            );
+
+    if (punchesError) {
+        throw punchesError;
+    }
+
+    renderTimecard(
+        punches || [],
+        period
+    );
+
+    updatePeriodNavigation();
+}
+
+function getTimecardErrorMessage(
+    error,
+    fallbackMessage
+) {
+
+    return error?.code ===
+        "OVERTIME_RULE_BOUNDARY"
+            ? error.message
+            : fallbackMessage;
+}
+
 
 async function loadTimecard() {
 
@@ -1685,110 +2096,12 @@ employeeTimeZone =
                 "Employee account is not active."
             );
         }
-/*
-    Load the overtime rule that applies
-    to the employee's jurisdiction.
-*/
-
 if (!employeeData.province) {
     throw new Error(
         "Employee province/jurisdiction is not assigned."
     );
 }
 
-
-const todayParts =
-    getDatePartsInEmployeeTimeZone(
-        new Date()
-    );
-
-const today =
-    `${todayParts.year}-${String(
-        todayParts.month
-    ).padStart(2, "0")}-${String(
-        todayParts.day
-    ).padStart(2, "0")}`;
-
-
-const {
-    data: overtimeRule,
-    error: overtimeRuleError
-} =
-    await supabase
-        .from("overtime_rules")
-        .select(`
-            id,
-            province_code,
-            province_name,
-            rule_name,
-            weekly_threshold_hours,
-            daily_threshold_hours,
-            alternate_daily_threshold_hours,
-            overtime_multiplier,
-            double_time_threshold_hours,
-            double_time_multiplier,
-            holiday_week_threshold_hours,
-            daily_overtime_enabled,
-            weekly_overtime_enabled,
-            requires_schedule_rule,
-            calculation_method,
-            holiday_rule,
-            holiday_reduction_hours,
-            supports_averaging,
-            week_start_day,
-            effective_from,
-            effective_to
-        `)
-        .eq(
-            "province_code",
-            employeeData.province
-        )
-        .eq(
-            "is_active",
-            true
-        )
-        .eq(
-            "is_default",
-            true
-        )
-        .eq(
-            "is_special_rule",
-            false
-        )
-        .lte(
-            "effective_from",
-            today
-        )
-        .or(
-            `effective_to.is.null,effective_to.gte.${today}`
-        )
-        .order(
-            "effective_from",
-            {
-                ascending: false
-            }
-        )
-        .limit(1)
-        .maybeSingle();
-
-
-if (overtimeRuleError) {
-    throw overtimeRuleError;
-}
-
-
-if (!overtimeRule) {
-    throw new Error(
-        `No overtime rule found for ${employeeData.province}.`
-    );
-}
-currentOvertimeRule =
-    overtimeRule;
-
-console.log(
-    "TYMRAK Overtime Rule:",
-    overtimeRule
-);
 
         employee =
             employeeData;
@@ -1820,100 +2133,12 @@ console.log(
             details.join(" • ");
 
 
-        const period =
+        currentPayPeriod =
             getCurrentPayPeriod();
 
-
-        periodValue.textContent =
-            formatDate(period.start) +
-            " – " +
-            formatDate(period.end);
-/*
-    Extend the punch retrieval range
-    back to the beginning of the workweek.
-
-    This allows weekly overtime to be
-    calculated correctly when a pay
-    period begins in the middle of a week.
-*/
-
-const periodStartParts =
-    getDatePartsInEmployeeTimeZone(
-        period.start
-    );
-
-const periodStartNoon =
-    new Date(
-        Date.UTC(
-            periodStartParts.year,
-            periodStartParts.month - 1,
-            periodStartParts.day,
-            12, 0, 0, 0
-        )
-    );
-
-const weekStartDay =
-    Number(
-        currentOvertimeRule?.week_start_day ?? 0
-    );
-
-const daysSinceWeekStart =
-    (
-        periodStartNoon.getUTCDay() -
-        weekStartDay +
-        7
-    ) % 7;
-
-periodStartNoon.setUTCDate(
-    periodStartNoon.getUTCDate() -
-    daysSinceWeekStart
-);
-
-const calculationStart =
-    createDateInEmployeeTimeZone(
-        periodStartNoon.getUTCFullYear(),
-        periodStartNoon.getUTCMonth(),
-        periodStartNoon.getUTCDate(),
-        0, 0, 0, 0
-    );
-        const {
-            data: punches,
-            error: punchesError
-        } =
-            await supabase
-                .from("punches")
-                .select(
-                    "id,punch_type,punched_at,location_name"
-                )
-                .eq(
-                    "employee_id",
-                    employee.id
-                )
-               .gte(
-    "punched_at",
-    calculationStart.toISOString()
-)
-                .lte(
-                    "punched_at",
-                    period.end.toISOString()
-                )
-                .order(
-                    "punched_at",
-                    {
-                        ascending: true
-                    }
-                );
-
-
-        if (punchesError) {
-            throw punchesError;
-        }
-
-
-     renderTimecard(
-    punches || [],
-    period
-);
+        await loadPayPeriod(
+            currentPayPeriod
+        );
 
 
     } catch (error) {
@@ -1929,17 +2154,82 @@ const calculationStart =
         periodValue.textContent =
             "—";
 
+        const errorMessage =
+            getTimecardErrorMessage(
+                error,
+                "Unable to load your timecard."
+            );
+
         timecardBody.innerHTML = `
             <tr>
                 <td colspan="8">
                     <div class="error">
-                        Unable to load your timecard.
+                        ${escapeHTML(errorMessage)}
                     </div>
                 </td>
             </tr>
         `;
     }
 }
+
+async function navigateToPayPeriod(period) {
+
+    try {
+        await loadPayPeriod(period);
+    } catch (error) {
+        console.error(
+            "Pay period navigation error:",
+            error
+        );
+
+        updatePeriodNavigation();
+
+        const errorMessage =
+            getTimecardErrorMessage(
+                error,
+                "Unable to load this pay period."
+            );
+
+        timecardBody.innerHTML = `
+            <tr>
+                <td colspan="8">
+                    <div class="error">
+                        ${escapeHTML(errorMessage)}
+                    </div>
+                </td>
+            </tr>
+        `;
+    }
+}
+
+previousPeriodButton.addEventListener(
+    "click",
+    () => {
+        navigateToPayPeriod(
+            getPreviousPayPeriod(
+                selectedPayPeriod
+            )
+        );
+    }
+);
+
+nextPeriodButton.addEventListener(
+    "click",
+    () => {
+        const nextPeriod =
+            getNextPayPeriod(
+                selectedPayPeriod
+            );
+
+        if (!canNavigateToPayPeriod(nextPeriod)) {
+            return;
+        }
+
+        navigateToPayPeriod(
+            nextPeriod
+        );
+    }
+);
 
 
 clockButton.addEventListener(
