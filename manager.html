@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Manager Portal | TYMRAK</title>
+<style>
+:root { --navy:#14213d; --navy2:#1c2d50; --green:#299764; --bg:#f4f6f8; --ink:#182238; --muted:#667085; --line:#dfe4eb; }
+* { box-sizing:border-box; }
+body { margin:0; min-height:100vh; font-family:Inter,Arial,sans-serif; background:var(--bg); color:var(--ink); }
+.loading { position:fixed; inset:0; z-index:20; display:grid; place-items:center; background:var(--navy); color:white; font-weight:700; letter-spacing:.04em; }
+.app { display:none; min-height:100vh; grid-template-columns:250px 1fr; }
+.sidebar { background:var(--navy); color:white; padding:28px 18px; display:flex; flex-direction:column; }
+.logo { padding:0 12px 28px; }
+.wordmark { font-size:29px; font-weight:900; letter-spacing:.08em; }
+.tagline { color:#62cf96; font-size:9px; font-weight:900; letter-spacing:.15em; }
+nav { display:grid; gap:5px; }
+.nav-item { display:flex; align-items:center; gap:12px; width:100%; padding:12px 13px; border:0; border-radius:8px; background:transparent; color:#cbd4e4; font:inherit; font-weight:650; text-align:left; text-decoration:none; cursor:pointer; }
+.nav-item:hover { background:rgba(255,255,255,.07); color:white; }
+.nav-item.active { background:var(--green); color:white; }
+.nav-item[aria-disabled="true"] { cursor:not-allowed; opacity:.65; }
+.user { margin-top:auto; border-top:1px solid rgba(255,255,255,.12); padding:20px 12px 0; }
+.user-email { font-size:13px; overflow-wrap:anywhere; color:#d9dfeb; }
+.user-role { font-size:11px; text-transform:uppercase; color:#62cf96; margin-top:5px; font-weight:800; letter-spacing:.1em; }
+.signout { margin-top:14px; padding:0; border:0; background:none; color:white; font:inherit; font-size:13px; text-decoration:underline; cursor:pointer; }
+.main { min-width:0; }
+.topbar { min-height:82px; padding:20px 34px; background:white; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
+.topbar h1 { margin:0; color:var(--navy); font-size:24px; }
+.badge { color:var(--green); background:#e8f7ef; border-radius:99px; padding:7px 12px; font-size:12px; font-weight:800; }
+.content { padding:34px; max-width:1100px; }
+.welcome { padding:28px; color:white; border-radius:14px; background:linear-gradient(120deg,var(--navy),var(--navy2)); box-shadow:0 12px 30px rgba(20,33,61,.12); }
+.welcome h2 { margin:0 0 7px; font-size:25px; }
+.welcome p { color:#d8dfeb; margin:0; }
+.section-head { display:flex; align-items:end; justify-content:space-between; gap:20px; margin:32px 0 16px; }
+.section-head h2 { color:var(--navy); margin:0 0 5px; font-size:21px; }
+.section-head p { color:var(--muted); margin:0; font-size:14px; }
+.card { background:white; padding:26px; border:1px solid var(--line); border-radius:13px; box-shadow:0 5px 16px rgba(20,33,61,.04); }
+.view[hidden] { display:none; }
+.module-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:24px; }
+.module-card { background:white; border:1px solid var(--line); border-radius:12px; padding:21px; }
+.module-card strong { display:block; color:var(--navy); margin-bottom:7px; }
+.module-card span { color:var(--muted); font-size:13px; line-height:1.5; }
+.form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:19px 22px; }
+.field.full { grid-column:1/-1; }
+label { display:block; margin-bottom:7px; font-size:13px; color:var(--navy); font-weight:750; }
+.required { color:#b42318; }
+input,select { width:100%; padding:12px; border:1px solid #d4dbe5; border-radius:7px; background:white; color:var(--ink); font:inherit; }
+input:focus,select:focus { outline:3px solid rgba(41,151,100,.12); border-color:var(--green); }
+.actions { margin-top:24px; display:flex; align-items:center; gap:18px; }
+.primary { padding:13px 22px; border:0; border-radius:8px; background:var(--green); color:white; font:inherit; font-weight:800; cursor:pointer; }
+.primary:disabled { opacity:.6; cursor:wait; }
+.result { display:none; flex:1; padding:12px 14px; border-radius:8px; font-size:14px; }
+.result.success { display:block; color:#176b36; background:#e8f7ee; }
+.result.error { display:block; color:#a32020; background:#fdeaea; }
+@media (max-width:760px) { .app { grid-template-columns:1fr; } .sidebar { padding:18px; } .logo { padding-bottom:16px; } nav { grid-template-columns:repeat(4,1fr); overflow:auto; } .nav-item { justify-content:center; padding:10px; font-size:12px; } .user { margin-top:20px; } .topbar,.content { padding:22px 18px; } .form-grid,.module-grid { grid-template-columns:1fr; } .field.full { grid-column:auto; } .actions { align-items:stretch; flex-direction:column; } }
+</style>
+</head>
+<body>
+<div class="loading" id="loading">Verifying manager access…</div>
+<div class="app" id="app">
+  <aside class="sidebar">
+    <div class="logo"><div class="wordmark">TYMRAK</div><div class="tagline">TIME. TRACKED RIGHT.</div></div>
+    <nav aria-label="Manager navigation">
+      <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
+      <button class="nav-item" type="button" data-view="employees">Employees</button>
+      <button class="nav-item" type="button" aria-disabled="true">Timecards</button>
+      <button class="nav-item" type="button" aria-disabled="true">Time Off</button>
+      <button class="nav-item" type="button" aria-disabled="true">Locations</button>
+      <button class="nav-item" type="button" aria-disabled="true">Payroll</button>
+      <button class="nav-item" type="button" aria-disabled="true">Settings</button>
+    </nav>
+    <div class="user">
+      <div class="user-email" id="managerEmail"></div>
+      <div class="user-role" id="managerRole"></div>
+      <button class="signout" id="signOut" type="button">Sign out</button>
+    </div>
+  </aside>
+  <main class="main">
+    <header class="topbar"><h1>Manager Portal</h1><span class="badge">Protected workspace</span></header>
+    <div class="content">
+      <div class="view" id="dashboardView">
+        <section class="welcome"><h2>Welcome to TYMRAK Manager</h2><p>Your secure workspace for managing people and workforce operations.</p></section>
+        <div class="module-grid">
+          <div class="module-card"><strong>Employees</strong><span>Add employees and send secure account activation invitations.</span></div>
+          <div class="module-card"><strong>Workforce tools</strong><span>Timecards, time off, and locations are planned for a future release.</span></div>
+          <div class="module-card"><strong>Administration</strong><span>Payroll and settings are placeholders and are not enabled yet.</span></div>
+        </div>
+      </div>
+      <div class="view" id="employeesView" hidden>
+      <section class="welcome"><h2>Employee management</h2><p>Invite a team member to activate their TYMRAK employee account.</p></section>
+      <div class="section-head"><div><h2>Add Employee</h2><p>Required fields are marked with an asterisk.</p></div></div>
+      <section class="card">
+        <form id="employeeForm">
+          <div class="form-grid">
+            <div class="field"><label for="firstName">First Name <span class="required">*</span></label><input id="firstName" type="text" maxlength="100" autocomplete="given-name" required></div>
+            <div class="field"><label for="lastName">Last Name <span class="required">*</span></label><input id="lastName" type="text" maxlength="100" autocomplete="family-name" required></div>
+            <div class="field"><label for="username">Username <span class="required">*</span></label><input id="username" type="text" maxlength="64" required></div>
+            <div class="field"><label for="email">Email <span class="required">*</span></label><input id="email" type="email" maxlength="254" autocomplete="email" required></div>
+            <div class="field"><label for="position">Position</label><input id="position" type="text" maxlength="150"></div>
+            <div class="field"><label for="department">Department</label><input id="department" type="text" maxlength="150"></div>
+            <div class="field full"><label for="province">Province / Jurisdiction <span class="required">*</span></label>
+              <select id="province" required><option value="">Select province or jurisdiction</option><option value="AB">Alberta</option><option value="BC">British Columbia</option><option value="MB">Manitoba</option><option value="NB">New Brunswick</option><option value="NL">Newfoundland and Labrador</option><option value="NS">Nova Scotia</option><option value="ON">Ontario</option><option value="PE">Prince Edward Island</option><option value="QC">Quebec</option><option value="SK">Saskatchewan</option><option value="NT">Northwest Territories</option><option value="NU">Nunavut</option><option value="YT">Yukon</option><option value="FED">Federal</option></select>
+            </div>
+          </div>
+          <div class="actions"><button class="primary" id="sendButton" type="submit">Send Invitation</button><div id="result" class="result" role="status"></div></div>
+        </form>
+      </section>
+      </div>
+    </div>
+  </main>
+</div>
+<script type="module">
+import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+const SUPABASE_URL = "https://tsosredghislnehfyypi.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
+let currentSession = null;
+
+document.querySelectorAll("[data-view]").forEach(button => {
+  button.addEventListener("click", () => {
+    const showEmployees = button.dataset.view === "employees";
+    document.getElementById("dashboardView").hidden = showEmployees;
+    document.getElementById("employeesView").hidden = !showEmployees;
+    document.querySelectorAll("[data-view]").forEach(item => item.classList.remove("active"));
+    button.classList.add("active");
+  });
+});
+
+async function managerRequest(path, options = {}) {
+  const { data: { session } } = await supabase.auth.getSession();
+  if (!session) throw new Error("Your session has expired. Please sign in again.");
+  currentSession = session;
+  return fetch(path, {
+    ...options,
+    headers: { ...(options.headers || {}), Authorization: `Bearer ${session.access_token}` }
+  });
+}
+
+async function initialize() {
+  try {
+    const response = await managerRequest("/api/manager-session");
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error);
+    document.getElementById("managerEmail").textContent = data.user.email;
+    document.getElementById("managerRole").textContent = data.role;
+    document.getElementById("loading").style.display = "none";
+    document.getElementById("app").style.display = "grid";
+  } catch (_) {
+    await supabase.auth.signOut();
+    window.location.replace("/manager-login.html");
+  }
+}
+
+document.getElementById("employeeForm").addEventListener("submit", async event => {
+  event.preventDefault();
+  const button = document.getElementById("sendButton");
+  const result = document.getElementById("result");
+  button.disabled = true;
+  button.textContent = "Sending…";
+  result.className = "result";
+  try {
+    const response = await managerRequest("/api/send-invitation", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        firstName: document.getElementById("firstName").value.trim(),
+        lastName: document.getElementById("lastName").value.trim(),
+        username: document.getElementById("username").value.trim(),
+        email: document.getElementById("email").value.trim(),
+        position: document.getElementById("position").value.trim(),
+        department: document.getElementById("department").value.trim(),
+        province: document.getElementById("province").value
+      })
+    });
+    const data = await response.json();
+    if (response.status === 401 || response.status === 403) {
+      await supabase.auth.signOut();
+      window.location.replace("/manager-login.html");
+      return;
+    }
+    if (!response.ok) throw new Error(data.error || "Unable to send invitation");
+    result.textContent = data.message;
+    result.className = "result success";
+    event.target.reset();
+  } catch (error) {
+    result.textContent = error.message;
+    result.className = "result error";
+  } finally {
+    button.disabled = false;
+    button.textContent = "Send Invitation";
+  }
+});
+
+document.getElementById("signOut").addEventListener("click", async () => {
+  await supabase.auth.signOut();
+  window.location.replace("/manager-login.html");
+});
+
+supabase.auth.onAuthStateChange(event => {
+  if (event === "SIGNED_OUT" && currentSession) window.location.replace("/manager-login.html");
+});
+
+initialize();
+</script>
+</body>
+</html>

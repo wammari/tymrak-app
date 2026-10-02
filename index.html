@@ -3,337 +3,48 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TYMRAK Invitation Test</title>
-
+<title>TYMRAK | Time. Tracked Right.</title>
 <style>
-body {
-    font-family: Arial, sans-serif;
-    background:#f4f6f8;
-    margin:0;
-    padding:30px;
-}
-.card {
-    max-width:520px;
-    margin:60px auto;
-    background:white;
-    padding:35px;
-    border-radius:14px;
-    box-shadow:0 8px 25px rgba(0,0,0,.08);
-}
-h1 {
-    color:#14213d;
-    margin-bottom:3px;
-}
-.tagline {
-    color:#299764;
-    font-weight:bold;
-    margin-bottom:30px;
-}
-.info {
-    background:#f5f7f9;
-    padding:18px;
-    border-radius:8px;
-    line-height:1.8;
-    margin:20px 0;
-}
-    .info label {
-    display: block;
-    font-weight: 600;
-    color: #14213d;
-    margin-bottom: 5px;
-}
-
-.info input {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 11px 12px;
-    margin-bottom: 16px;
-    border: 1px solid #d6dce5;
-    border-radius: 6px;
-    font-size: 14px;
-    background: #ffffff;
-}
-.info select {
-    width: 100%;
-    box-sizing: border-box;
-    padding: 11px 12px;
-    margin-bottom: 0;
-    border: 1px solid #d6dce5;
-    border-radius: 6px;
-    font-size: 14px;
-    background: #ffffff;
-    color: #14213d;
-}
-
-.info select:focus {
-    outline: none;
-    border-color: #299764;
-}
-.info input:focus {
-    outline: none;
-    border-color: #299764;
-}
-
-.info input:last-of-type {
-    margin-bottom: 0;
-}
-button {
-    width:100%;
-    padding:15px;
-    border:0;
-    border-radius:8px;
-    background:#14213d;
-    color:white;
-    font-size:16px;
-    font-weight:bold;
-    cursor:pointer;
-}
-button:disabled {
-    opacity:.6;
-}
-#result {
-    margin-top:20px;
-    padding:15px;
-    border-radius:8px;
-    display:none;
-}
-.success {
-    display:block !important;
-    background:#e8f7ee;
-    color:#176b36;
-}
-.error {
-    display:block !important;
-    background:#fdeaea;
-    color:#a32020;
-}
+:root { --navy:#14213d; --green:#299764; --ink:#182238; --muted:#667085; --line:#dfe4eb; }
+* { box-sizing:border-box; }
+body { margin:0; min-height:100vh; font-family:Inter,Arial,sans-serif; color:var(--ink); background:linear-gradient(145deg,#f6f9f7 0%,#eef2f7 100%); }
+.shell { min-height:100vh; display:grid; grid-template-columns:1.1fr .9fr; }
+.brand { padding:clamp(40px,8vw,100px); display:flex; flex-direction:column; justify-content:center; background:var(--navy); color:white; }
+.wordmark { font-size:clamp(42px,7vw,76px); letter-spacing:.08em; margin:0; }
+.tagline { color:#67d19a; font-weight:800; letter-spacing:.16em; font-size:13px; }
+.brand p { max-width:520px; margin-top:34px; color:#d6ddea; font-size:19px; line-height:1.7; }
+.entry { padding:40px; display:flex; align-items:center; justify-content:center; }
+.card { width:min(470px,100%); background:white; border:1px solid var(--line); border-radius:18px; padding:38px; box-shadow:0 24px 60px rgba(20,33,61,.09); }
+h2 { margin:0 0 8px; font-size:28px; color:var(--navy); }
+.intro { color:var(--muted); line-height:1.6; margin:0 0 28px; }
+.option { display:block; text-decoration:none; padding:19px 20px; margin-top:14px; border:1px solid var(--line); border-radius:12px; color:var(--ink); transition:.15s ease; }
+.option:hover,.option:focus { border-color:var(--green); transform:translateY(-1px); box-shadow:0 8px 24px rgba(41,151,100,.10); }
+.option strong { display:block; color:var(--navy); margin-bottom:6px; }
+.option span { color:var(--muted); font-size:14px; }
+@media (max-width:760px) { .shell { grid-template-columns:1fr; } .brand { min-height:36vh; padding:40px 28px; } .brand p { font-size:16px; margin-bottom:0; } .entry { padding:28px 18px; } .card { padding:28px 22px; } }
 </style>
 </head>
-
 <body>
-
-<div class="card">
-
-<h1>TYMRAK</h1>
-<div class="tagline">TIME. TRACKED RIGHT.</div>
-
-<h2>Add Employee</h2>
-
-<p>Enter the employee information below to create their TYMRAK account and send an activation invitation.</p>
-
-<div class="info">
-
-    <label for="firstName">
-        First Name
-    </label>
-    <input
-        type="text"
-        id="firstName"
-        placeholder="First name"
-    >
-
-    <label for="lastName">
-        Last Name
-    </label>
-    <input
-        type="text"
-        id="lastName"
-        placeholder="Last name"
-        required
-    >
-
-    <label for="username">
-        Username
-    </label>
-    <input
-        type="text"
-        id="username"
-        placeholder="username"
-        required
-    >
-
-    <label for="email">
-        Email
-    </label>
-    <input
-        type="email"
-        id="email"
-        placeholder="employee@email.com"
-        required
-    >
-
-    <label for="position">
-        Position
-    </label>
-    <input
-        type="text"
-        id="position"
-        placeholder="Position"
-    >
-
-    <label for="department">
-        Department
-    </label>
-    <input
-        type="text"
-        id="department"
-        placeholder="Department"
-    >
-
-    <label for="province">
-        Province / Jurisdiction
-    </label>
-    <select id="province" required>
-        <option value="">
-            Select province or jurisdiction
-        </option>
-        <option value="AB">Alberta</option>
-        <option value="BC">British Columbia</option>
-        <option value="MB">Manitoba</option>
-        <option value="NB">New Brunswick</option>
-        <option value="NL">Newfoundland and Labrador</option>
-        <option value="NS">Nova Scotia</option>
-        <option value="ON">Ontario</option>
-        <option value="PE">Prince Edward Island</option>
-        <option value="QC">Quebec</option>
-        <option value="SK">Saskatchewan</option>
-        <option value="NT">Northwest Territories</option>
-        <option value="NU">Nunavut</option>
-        <option value="YT">Yukon</option>
-        <option value="FED">Federal</option>
-    </select>
-
-</div>
-
-<button
-    id="sendButton"
-    onclick="sendInvitation()">
-    Send Invitation
-</button>
-
-<div id="result"></div>
-
-</div>
-
-<script>
-async function sendInvitation() {
-
-    const button = document.getElementById("sendButton");
-    const result = document.getElementById("result");
-const firstName =
-    document.getElementById("firstName").value.trim();
-
-const lastName =
-    document.getElementById("lastName").value.trim();
-
-const username =
-    document.getElementById("username").value.trim();
-
-const email =
-    document.getElementById("email").value.trim();
-
-const province =
-    document.getElementById("province").value;
-
-
-if (
-    !firstName ||
-    !lastName ||
-    !username ||
-    !email ||
-    !province
-) {
-    result.style.display = "block";
-    result.className = "error";
-    result.textContent =
-        "Please complete all required fields.";
-
-    return;
-}
-    button.disabled = true;
-    button.textContent = "Sending...";
-
-    result.style.display = "none";
-    result.className = "";
-
-    try {
-
-        const response = await fetch("/api/send-invitation", {
-            method: "POST",
-            headers: {
-                "Content-Type": "application/json"
-            },
- body: JSON.stringify({
-    email:
-        document
-            .getElementById("email")
-            .value
-            .trim(),
-
-    firstName:
-        document
-            .getElementById("firstName")
-            .value
-            .trim(),
-
-    lastName:
-        document
-            .getElementById("lastName")
-            .value
-            .trim(),
-
-    username:
-        document
-            .getElementById("username")
-            .value
-            .trim(),
-
-    position:
-        document
-            .getElementById("position")
-            .value
-            .trim(),
-
-    department:
-        document
-            .getElementById("department")
-            .value
-            .trim(),
-
-    province:
-        document
-            .getElementById("province")
-            .value
-})
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-            throw new Error(
-                data.details?.message ||
-                data.error ||
-                "Unable to send invitation."
-            );
-        }
-
-        result.className = "success";
-        result.innerHTML =
-            "<strong>✓ Invitation sent successfully!</strong><br><br>" +
-            "Resend Email ID:<br>" + data.id;
-
-    } catch (error) {
-
-        result.className = "error";
-        result.innerHTML =
-            "<strong>Invitation failed.</strong><br><br>" +
-            error.message;
-    }
-
-   button.disabled = false;
-button.textContent = "Send Invitation";
-}
-</script>
-
+<main class="shell">
+  <section class="brand" aria-labelledby="brand-title">
+    <div class="tagline">TIME. TRACKED RIGHT.</div>
+    <h1 class="wordmark" id="brand-title">TYMRAK</h1>
+    <p>One place for your workday, from a clear clock-in to accurate timecards and dependable payroll preparation.</p>
+  </section>
+  <section class="entry">
+    <div class="card">
+      <h2>Welcome to TYMRAK</h2>
+      <p class="intro">Choose the secure portal for your role.</p>
+      <a class="option" href="/login.html">
+        <strong>Employee Portal</strong>
+        <span>Clock in, review your day, and view timecards.</span>
+      </a>
+      <a class="option" href="/manager-login.html">
+        <strong>Manager Portal</strong>
+        <span>Manage employees and workplace administration.</span>
+      </a>
+    </div>
+  </section>
+</main>
 </body>
 </html>
