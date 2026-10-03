@@ -103,9 +103,11 @@ test("explicit manager roles are authorized", async () => {
   const originalFetch = global.fetch;
   const originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
-  process.env.SUPABASE_SECRET_KEY = "server-secret";
+  process.env.SUPABASE_SECRET_KEY = "sb_secret_server-key";
+  const requests = [];
 
-  global.fetch = async url => {
+  global.fetch = async (url, options) => {
+    requests.push({ url, options });
     if (url.endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({ id: "manager-id", email: "m@example.com" }));
     }
@@ -118,8 +120,64 @@ test("explicit manager roles are authorized", async () => {
     });
     assert.equal(result.ok, true);
     assert.equal(result.role, "manager");
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].options.headers.apikey, "sb_secret_server-key");
+    assert.equal(requests[0].options.headers.Authorization, "Bearer manager-token");
+    assert.deepEqual(requests[1].options.headers, {
+      apikey: "sb_secret_server-key"
+    });
+    assert.notEqual(
+      requests[1].options.headers.Authorization,
+      "Bearer sb_secret_server-key"
+    );
   } finally {
     global.fetch = originalFetch;
+    process.env = originalEnv;
+  }
+});
+
+test("role lookup failures log safe Supabase diagnostics without credentials", async () => {
+  const originalFetch = global.fetch;
+  const originalConsoleError = console.error;
+  const originalEnv = { ...process.env };
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SECRET_KEY = "sb_secret_must-not-be-logged";
+  const errorLogs = [];
+
+  global.fetch = async url => {
+    if (url.endsWith("/auth/v1/user")) {
+      return new Response(JSON.stringify({ id: "manager-id", email: "m@example.com" }));
+    }
+    return new Response(
+      JSON.stringify({ code: "PGRST301", message: "Permission denied" }),
+      { status: 401 }
+    );
+  };
+  console.error = (...args) => errorLogs.push(args);
+
+  try {
+    await assert.rejects(
+      requireManager({
+        headers: { authorization: "Bearer user-token-must-not-be-logged" }
+      }),
+      /Manager role lookup failed/
+    );
+    assert.deepEqual(errorLogs, [[
+      "Manager role lookup rejected",
+      {
+        stage: "role_response",
+        userId: "manager-id",
+        status: 401,
+        code: "PGRST301",
+        message: "Permission denied"
+      }
+    ]]);
+    const serializedLogs = JSON.stringify(errorLogs);
+    assert.doesNotMatch(serializedLogs, /sb_secret_/);
+    assert.doesNotMatch(serializedLogs, /user-token-must-not-be-logged/);
+  } finally {
+    global.fetch = originalFetch;
+    console.error = originalConsoleError;
     process.env = originalEnv;
   }
 });

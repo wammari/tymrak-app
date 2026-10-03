@@ -21,10 +21,13 @@ export default async function handler(req, res) {
       role: authorization.role
     });
   } catch (error) {
-    console.error("Manager session verification failed");
+    console.error("Manager session verification failed", {
+      stage: "unhandled_authorization_error",
+      errorName: error?.name || "Error",
+      message: error?.message || "Unknown authorization error"
+    });
     return res.status(500).json({
       error: "Unable to verify manager access"
     });
   }
 }
-
