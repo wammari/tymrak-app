@@ -103,9 +103,11 @@ test("explicit manager roles are authorized", async () => {
   const originalFetch = global.fetch;
   const originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
-  process.env.SUPABASE_SECRET_KEY = "server-secret";
+  process.env.SUPABASE_SECRET_KEY = "sb_secret_server-key";
+  const requests = [];
 
-  global.fetch = async url => {
+  global.fetch = async (url, options) => {
+    requests.push({ url, options });
     if (url.endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({ id: "manager-id", email: "m@example.com" }));
     }
@@ -118,6 +120,16 @@ test("explicit manager roles are authorized", async () => {
     });
     assert.equal(result.ok, true);
     assert.equal(result.role, "manager");
+    assert.equal(requests.length, 2);
+    assert.equal(requests[0].options.headers.apikey, "sb_secret_server-key");
+    assert.equal(requests[0].options.headers.Authorization, "Bearer manager-token");
+    assert.deepEqual(requests[1].options.headers, {
+      apikey: "sb_secret_server-key"
+    });
+    assert.notEqual(
+      requests[1].options.headers.Authorization,
+      "Bearer sb_secret_server-key"
+    );
   } finally {
     global.fetch = originalFetch;
     process.env = originalEnv;
