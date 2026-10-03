@@ -5,202 +5,72 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Manager Portal | TYMRAK</title>
 <style>
-:root { --navy:#14213d; --navy2:#1c2d50; --green:#299764; --bg:#f4f6f8; --ink:#182238; --muted:#667085; --line:#dfe4eb; }
-* { box-sizing:border-box; }
-body { margin:0; min-height:100vh; font-family:Inter,Arial,sans-serif; background:var(--bg); color:var(--ink); }
-.loading { position:fixed; inset:0; z-index:20; display:grid; place-items:center; background:var(--navy); color:white; font-weight:700; letter-spacing:.04em; }
-.app { display:none; min-height:100vh; grid-template-columns:250px 1fr; }
-.sidebar { background:var(--navy); color:white; padding:28px 18px; display:flex; flex-direction:column; }
-.logo { padding:0 12px 28px; }
-.wordmark { font-size:29px; font-weight:900; letter-spacing:.08em; }
-.tagline { color:#62cf96; font-size:9px; font-weight:900; letter-spacing:.15em; }
-nav { display:grid; gap:5px; }
-.nav-item { display:flex; align-items:center; gap:12px; width:100%; padding:12px 13px; border:0; border-radius:8px; background:transparent; color:#cbd4e4; font:inherit; font-weight:650; text-align:left; text-decoration:none; cursor:pointer; }
-.nav-item:hover { background:rgba(255,255,255,.07); color:white; }
-.nav-item.active { background:var(--green); color:white; }
-.nav-item[aria-disabled="true"] { cursor:not-allowed; opacity:.65; }
-.user { margin-top:auto; border-top:1px solid rgba(255,255,255,.12); padding:20px 12px 0; }
-.user-email { font-size:13px; overflow-wrap:anywhere; color:#d9dfeb; }
-.user-role { font-size:11px; text-transform:uppercase; color:#62cf96; margin-top:5px; font-weight:800; letter-spacing:.1em; }
-.signout { margin-top:14px; padding:0; border:0; background:none; color:white; font:inherit; font-size:13px; text-decoration:underline; cursor:pointer; }
-.main { min-width:0; }
-.topbar { min-height:82px; padding:20px 34px; background:white; border-bottom:1px solid var(--line); display:flex; align-items:center; justify-content:space-between; }
-.topbar h1 { margin:0; color:var(--navy); font-size:24px; }
-.badge { color:var(--green); background:#e8f7ef; border-radius:99px; padding:7px 12px; font-size:12px; font-weight:800; }
-.content { padding:34px; max-width:1100px; }
-.welcome { padding:28px; color:white; border-radius:14px; background:linear-gradient(120deg,var(--navy),var(--navy2)); box-shadow:0 12px 30px rgba(20,33,61,.12); }
-.welcome h2 { margin:0 0 7px; font-size:25px; }
-.welcome p { color:#d8dfeb; margin:0; }
-.section-head { display:flex; align-items:end; justify-content:space-between; gap:20px; margin:32px 0 16px; }
-.section-head h2 { color:var(--navy); margin:0 0 5px; font-size:21px; }
-.section-head p { color:var(--muted); margin:0; font-size:14px; }
-.card { background:white; padding:26px; border:1px solid var(--line); border-radius:13px; box-shadow:0 5px 16px rgba(20,33,61,.04); }
-.view[hidden] { display:none; }
-.module-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:16px; margin-top:24px; }
-.module-card { background:white; border:1px solid var(--line); border-radius:12px; padding:21px; }
-.module-card strong { display:block; color:var(--navy); margin-bottom:7px; }
-.module-card span { color:var(--muted); font-size:13px; line-height:1.5; }
-.form-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:19px 22px; }
-.field.full { grid-column:1/-1; }
-label { display:block; margin-bottom:7px; font-size:13px; color:var(--navy); font-weight:750; }
-.required { color:#b42318; }
-input,select { width:100%; padding:12px; border:1px solid #d4dbe5; border-radius:7px; background:white; color:var(--ink); font:inherit; }
-input:focus,select:focus { outline:3px solid rgba(41,151,100,.12); border-color:var(--green); }
-.actions { margin-top:24px; display:flex; align-items:center; gap:18px; }
-.primary { padding:13px 22px; border:0; border-radius:8px; background:var(--green); color:white; font:inherit; font-weight:800; cursor:pointer; }
-.primary:disabled { opacity:.6; cursor:wait; }
-.result { display:none; flex:1; padding:12px 14px; border-radius:8px; font-size:14px; }
-.result.success { display:block; color:#176b36; background:#e8f7ee; }
-.result.error { display:block; color:#a32020; background:#fdeaea; }
-@media (max-width:760px) { .app { grid-template-columns:1fr; } .sidebar { padding:18px; } .logo { padding-bottom:16px; } nav { grid-template-columns:repeat(4,1fr); overflow:auto; } .nav-item { justify-content:center; padding:10px; font-size:12px; } .user { margin-top:20px; } .topbar,.content { padding:22px 18px; } .form-grid,.module-grid { grid-template-columns:1fr; } .field.full { grid-column:auto; } .actions { align-items:stretch; flex-direction:column; } }
+:root{--navy:#14213d;--navy2:#1c2d50;--green:#299764;--green-dark:#1f7a50;--bg:#f4f6f8;--ink:#182238;--muted:#667085;--line:#dfe4eb;--danger:#b42318}
+*{box-sizing:border-box}body{margin:0;min-height:100vh;font-family:Inter,Arial,sans-serif;background:var(--bg);color:var(--ink)}button,input,select{font:inherit}.loading{position:fixed;inset:0;z-index:30;display:grid;place-items:center;background:var(--navy);color:white;font-weight:700;letter-spacing:.04em}.app{display:none;min-height:100vh;grid-template-columns:250px 1fr}.sidebar{background:var(--navy);color:white;padding:28px 18px;display:flex;flex-direction:column}.logo{padding:0 12px 28px}.wordmark{font-size:29px;font-weight:900;letter-spacing:.08em}.tagline{color:#62cf96;font-size:9px;font-weight:900;letter-spacing:.15em}nav{display:grid;gap:5px}.nav-item{display:flex;align-items:center;gap:12px;width:100%;padding:12px 13px;border:0;border-radius:8px;background:transparent;color:#cbd4e4;font-weight:650;text-align:left;cursor:pointer}.nav-item:hover{background:rgba(255,255,255,.07);color:white}.nav-item.active{background:var(--green);color:white}.nav-item[aria-disabled=true]{cursor:not-allowed;opacity:.65}.user{margin-top:auto;border-top:1px solid rgba(255,255,255,.12);padding:20px 12px 0}.user-email{font-size:13px;overflow-wrap:anywhere;color:#d9dfeb}.user-role{font-size:11px;text-transform:uppercase;color:#62cf96;margin-top:5px;font-weight:800;letter-spacing:.1em}.signout{margin-top:14px;padding:0;border:0;background:none;color:white;font-size:13px;text-decoration:underline;cursor:pointer}.main{min-width:0}.topbar{min-height:82px;padding:20px 34px;background:white;border-bottom:1px solid var(--line);display:flex;align-items:center;justify-content:space-between}.topbar h1{margin:0;color:var(--navy);font-size:24px}.protected{color:var(--green);background:#e8f7ef;border-radius:99px;padding:7px 12px;font-size:12px;font-weight:800}.content{padding:34px;max-width:1480px}.welcome{padding:28px;color:white;border-radius:14px;background:linear-gradient(120deg,var(--navy),var(--navy2));box-shadow:0 12px 30px rgba(20,33,61,.12)}.welcome h2{margin:0 0 7px;font-size:25px}.welcome p{color:#d8dfeb;margin:0}.view[hidden]{display:none}.module-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin-top:24px}.module-card,.card{background:white;border:1px solid var(--line);border-radius:12px;box-shadow:0 5px 16px rgba(20,33,61,.04)}.module-card{padding:21px}.module-card strong{display:block;color:var(--navy);margin-bottom:7px}.module-card span{color:var(--muted);font-size:13px;line-height:1.5}.page-head{display:flex;align-items:center;justify-content:space-between;gap:20px;margin-bottom:22px}.page-head h2{color:var(--navy);font-size:28px;margin:0 0 5px}.page-head p{color:var(--muted);margin:0}.primary{padding:12px 18px;border:0;border-radius:8px;background:var(--green);color:white;font-weight:800;cursor:pointer}.primary:hover{background:var(--green-dark)}.primary:disabled,.link-button:disabled{opacity:.6;cursor:wait}.table-card{overflow:hidden}.table-status{padding:14px 18px;color:var(--muted);font-size:14px;border-bottom:1px solid var(--line)}.table-wrap{overflow:auto}table{width:100%;border-collapse:collapse;min-width:1120px}th{padding:13px 14px;background:#f8fafc;color:#526078;font-size:11px;text-transform:uppercase;letter-spacing:.04em;text-align:left;white-space:nowrap}td{padding:15px 14px;border-top:1px solid #edf0f4;font-size:13px;vertical-align:middle}.employee-name{font-weight:750;color:var(--navy)}.subtle{color:var(--muted)}.status{display:inline-flex;padding:5px 9px;border-radius:99px;font-size:11px;font-weight:800;white-space:nowrap}.status.sent{background:#fff4df;color:#9a6700}.status.activated,.status.active{background:#e8f7ef;color:#176b36}.status.not-sent,.status.inactive{background:#f1f3f6;color:#5e6674}.row-actions{display:flex;gap:11px;align-items:center;white-space:nowrap}.link-button{border:0;background:none;padding:0;color:#176b58;font-weight:750;font-size:12px;cursor:pointer}.link-button.resend{color:#315c9c}.empty{padding:48px 20px;text-align:center;color:var(--muted)}.notice{display:none;margin-bottom:16px;padding:12px 14px;border-radius:8px;font-size:14px}.notice.success{display:block;background:#e8f7ee;color:#176b36}.notice.error{display:block;background:#fdeaea;color:#a32020}.modal{position:fixed;inset:0;z-index:40;display:grid;place-items:center;padding:22px;background:rgba(9,18,37,.62)}.modal[hidden]{display:none}.modal-card{width:min(760px,100%);max-height:calc(100vh - 44px);overflow:auto;background:white;border-radius:14px;box-shadow:0 25px 70px rgba(0,0,0,.24)}.modal-head{display:flex;align-items:start;justify-content:space-between;padding:24px 26px 18px;border-bottom:1px solid var(--line)}.modal-head h2{margin:0 0 5px;color:var(--navy)}.modal-head p{margin:0;color:var(--muted);font-size:13px}.close{border:0;background:#eef1f5;color:var(--navy);width:34px;height:34px;border-radius:50%;font-size:20px;cursor:pointer}.form-body{padding:24px 26px}.form-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px 22px}.field.full{grid-column:1/-1}label{display:block;margin-bottom:7px;font-size:13px;color:var(--navy);font-weight:750}.required{color:var(--danger)}input,select{width:100%;padding:11px 12px;border:1px solid #d4dbe5;border-radius:7px;background:white;color:var(--ink)}input:focus,select:focus{outline:3px solid rgba(41,151,100,.12);border-color:var(--green)}.check-field{display:flex;align-items:center;gap:10px;padding-top:25px}.check-field input{width:18px;height:18px}.check-field label{margin:0}.form-actions{margin-top:24px;display:flex;align-items:center;justify-content:flex-end;gap:12px}.secondary{padding:11px 17px;border:1px solid #cbd3df;border-radius:8px;background:white;color:var(--navy);font-weight:750;cursor:pointer}
+@media(max-width:760px){.app{grid-template-columns:1fr}.sidebar{padding:18px}.logo{padding-bottom:16px}nav{grid-template-columns:repeat(2,1fr)}.nav-item{justify-content:center;padding:10px;font-size:12px}.user{margin-top:20px}.topbar,.content{padding:20px 18px}.module-grid,.form-grid{grid-template-columns:1fr}.field.full{grid-column:auto}.page-head{align-items:flex-start}.protected{display:none}.modal{padding:10px}.form-body,.modal-head{padding:19px}.check-field{padding-top:0}}
 </style>
 </head>
 <body>
 <div class="loading" id="loading">Verifying manager access…</div>
 <div class="app" id="app">
-  <aside class="sidebar">
-    <div class="logo"><div class="wordmark">TYMRAK</div><div class="tagline">TIME. TRACKED RIGHT.</div></div>
-    <nav aria-label="Manager navigation">
-      <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
-      <button class="nav-item" type="button" data-view="employees">Employees</button>
-      <button class="nav-item" type="button" aria-disabled="true">Timecards</button>
-      <button class="nav-item" type="button" aria-disabled="true">Time Off</button>
-      <button class="nav-item" type="button" aria-disabled="true">Locations</button>
-      <button class="nav-item" type="button" aria-disabled="true">Payroll</button>
-      <button class="nav-item" type="button" aria-disabled="true">Settings</button>
-    </nav>
-    <div class="user">
-      <div class="user-email" id="managerEmail"></div>
-      <div class="user-role" id="managerRole"></div>
-      <button class="signout" id="signOut" type="button">Sign out</button>
+<aside class="sidebar">
+  <div class="logo"><div class="wordmark">TYMRAK</div><div class="tagline">TIME. TRACKED RIGHT.</div></div>
+  <nav aria-label="Manager navigation">
+    <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
+    <button class="nav-item" type="button" data-view="employees">Employees</button>
+    <button class="nav-item" type="button" aria-disabled="true">Timecards</button><button class="nav-item" type="button" aria-disabled="true">Time Off</button><button class="nav-item" type="button" aria-disabled="true">Locations</button><button class="nav-item" type="button" aria-disabled="true">Payroll</button><button class="nav-item" type="button" aria-disabled="true">Settings</button>
+  </nav>
+  <div class="user"><div class="user-email" id="managerEmail"></div><div class="user-role" id="managerRole"></div><button class="signout" id="signOut" type="button">Sign out</button></div>
+</aside>
+<main class="main">
+  <header class="topbar"><h1 id="topbarTitle">Manager Portal</h1><span class="protected">Protected workspace</span></header>
+  <div class="content">
+    <div class="view" id="dashboardView"><section class="welcome"><h2>Welcome to TYMRAK Manager</h2><p>Your secure workspace for managing people and workforce operations.</p></section><div class="module-grid"><div class="module-card"><strong>Employees</strong><span>Manage employee profiles and secure account invitations.</span></div><div class="module-card"><strong>Workforce tools</strong><span>Timecards, time off, and locations are planned for a future release.</span></div><div class="module-card"><strong>Administration</strong><span>Payroll and settings are placeholders and are not enabled yet.</span></div></div></div>
+    <div class="view" id="employeesView" hidden>
+      <div class="page-head"><div><h2>Employees</h2><p><span id="employeeCount">0 employees</span> in your workforce</p></div><button class="primary" id="addEmployee" type="button">+ Add Employee</button></div>
+      <div id="pageNotice" class="notice" role="status"></div>
+      <section class="card table-card"><div class="table-status" id="tableStatus">Loading employees…</div><div class="table-wrap"><table id="employeeTable" hidden><thead><tr><th>Employee ID</th><th>Employee Name</th><th>Email</th><th>Username</th><th>Mobile Number</th><th>Position</th><th>Department</th><th>Province / Jurisdiction</th><th>Hire Date</th><th>Invitation Status</th><th>Employment</th><th>Actions</th></tr></thead><tbody id="employeeRows"></tbody></table><div class="empty" id="emptyState" hidden>No employees have been added yet.</div></div></section>
     </div>
-  </aside>
-  <main class="main">
-    <header class="topbar"><h1>Manager Portal</h1><span class="badge">Protected workspace</span></header>
-    <div class="content">
-      <div class="view" id="dashboardView">
-        <section class="welcome"><h2>Welcome to TYMRAK Manager</h2><p>Your secure workspace for managing people and workforce operations.</p></section>
-        <div class="module-grid">
-          <div class="module-card"><strong>Employees</strong><span>Add employees and send secure account activation invitations.</span></div>
-          <div class="module-card"><strong>Workforce tools</strong><span>Timecards, time off, and locations are planned for a future release.</span></div>
-          <div class="module-card"><strong>Administration</strong><span>Payroll and settings are placeholders and are not enabled yet.</span></div>
-        </div>
-      </div>
-      <div class="view" id="employeesView" hidden>
-      <section class="welcome"><h2>Employee management</h2><p>Invite a team member to activate their TYMRAK employee account.</p></section>
-      <div class="section-head"><div><h2>Add Employee</h2><p>Required fields are marked with an asterisk.</p></div></div>
-      <section class="card">
-        <form id="employeeForm">
-          <div class="form-grid">
-            <div class="field"><label for="firstName">First Name <span class="required">*</span></label><input id="firstName" type="text" maxlength="100" autocomplete="given-name" required></div>
-            <div class="field"><label for="lastName">Last Name <span class="required">*</span></label><input id="lastName" type="text" maxlength="100" autocomplete="family-name" required></div>
-            <div class="field"><label for="username">Username <span class="required">*</span></label><input id="username" type="text" maxlength="64" required></div>
-            <div class="field"><label for="email">Email <span class="required">*</span></label><input id="email" type="email" maxlength="254" autocomplete="email" required></div>
-            <div class="field"><label for="position">Position</label><input id="position" type="text" maxlength="150"></div>
-            <div class="field"><label for="department">Department</label><input id="department" type="text" maxlength="150"></div>
-            <div class="field full"><label for="province">Province / Jurisdiction <span class="required">*</span></label>
-              <select id="province" required><option value="">Select province or jurisdiction</option><option value="AB">Alberta</option><option value="BC">British Columbia</option><option value="MB">Manitoba</option><option value="NB">New Brunswick</option><option value="NL">Newfoundland and Labrador</option><option value="NS">Nova Scotia</option><option value="ON">Ontario</option><option value="PE">Prince Edward Island</option><option value="QC">Quebec</option><option value="SK">Saskatchewan</option><option value="NT">Northwest Territories</option><option value="NU">Nunavut</option><option value="YT">Yukon</option><option value="FED">Federal</option></select>
-            </div>
-          </div>
-          <div class="actions"><button class="primary" id="sendButton" type="submit">Send Invitation</button><div id="result" class="result" role="status"></div></div>
-        </form>
-      </section>
-      </div>
-    </div>
-  </main>
+  </div>
+</main>
+</div>
+<div class="modal" id="employeeModal" hidden role="dialog" aria-modal="true" aria-labelledby="formTitle">
+<section class="modal-card"><header class="modal-head"><div><h2 id="formTitle">Add Employee</h2><p id="formDescription">Create a profile and send a secure activation invitation.</p></div><button class="close" id="closeModal" type="button" aria-label="Close">×</button></header>
+<form id="employeeForm"><div class="form-body"><div id="formNotice" class="notice" role="status"></div><div class="form-grid">
+<div class="field"><label for="firstName">First Name <span class="required">*</span></label><input id="firstName" maxlength="100" autocomplete="given-name" required></div><div class="field"><label for="lastName">Last Name <span class="required">*</span></label><input id="lastName" maxlength="100" autocomplete="family-name" required></div>
+<div class="field"><label for="email">Email <span class="required">*</span></label><input id="email" type="email" maxlength="254" autocomplete="email" required></div><div class="field"><label for="username">Username <span class="required">*</span></label><input id="username" maxlength="64" autocomplete="username" required></div>
+<div class="field"><label for="mobile">Mobile Number</label><input id="mobile" type="tel" maxlength="40" autocomplete="tel"></div><div class="field"><label for="position">Position</label><input id="position" maxlength="150"></div>
+<div class="field"><label for="department">Department</label><input id="department" maxlength="150"></div><div class="field"><label for="province">Province / Jurisdiction <span class="required">*</span></label><select id="province" required><option value="">Select province or jurisdiction</option><option>AB</option><option>BC</option><option>SK</option><option>MB</option><option>ON</option><option>QC</option><option>NB</option><option>NS</option><option>PE</option><option>NL</option><option>NT</option><option>NU</option><option>YT</option></select></div>
+<div class="field"><label for="hireDate">Hire Date</label><input id="hireDate" type="date"></div><div class="check-field"><input id="isActive" type="checkbox" checked><label for="isActive">Active employee</label></div>
+</div><div class="form-actions"><button class="secondary" id="cancelForm" type="button">Cancel</button><button class="primary" id="saveEmployee" type="submit">Add Employee &amp; Send Invitation</button></div></div></form></section>
 </div>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-const SUPABASE_URL = "https://tsosredghislnehfyypi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
-const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
-let currentSession = null;
+const SUPABASE_URL="https://tsosredghislnehfyypi.supabase.co";
+const SUPABASE_PUBLISHABLE_KEY="sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
+let currentSession=null;let employees=[];let editingId=null;
+const $=id=>document.getElementById(id);
 
-document.querySelectorAll("[data-view]").forEach(button => {
-  button.addEventListener("click", () => {
-    const showEmployees = button.dataset.view === "employees";
-    document.getElementById("dashboardView").hidden = showEmployees;
-    document.getElementById("employeesView").hidden = !showEmployees;
-    document.querySelectorAll("[data-view]").forEach(item => item.classList.remove("active"));
-    button.classList.add("active");
-  });
-});
-
-async function managerRequest(path, options = {}) {
-  const { data: { session } } = await supabase.auth.getSession();
-  if (!session) throw new Error("Your session has expired. Please sign in again.");
-  currentSession = session;
-  return fetch(path, {
-    ...options,
-    headers: { ...(options.headers || {}), Authorization: `Bearer ${session.access_token}` }
-  });
-}
-
-async function initialize() {
-  try {
-    const response = await managerRequest("/api/manager-session");
-    const data = await response.json();
-    if (!response.ok) throw new Error(data.error);
-    document.getElementById("managerEmail").textContent = data.user.email;
-    document.getElementById("managerRole").textContent = data.role;
-    document.getElementById("loading").style.display = "none";
-    document.getElementById("app").style.display = "grid";
-  } catch (_) {
-    await supabase.auth.signOut();
-    window.location.replace("/manager-login.html");
-  }
-}
-
-document.getElementById("employeeForm").addEventListener("submit", async event => {
-  event.preventDefault();
-  const button = document.getElementById("sendButton");
-  const result = document.getElementById("result");
-  button.disabled = true;
-  button.textContent = "Sending…";
-  result.className = "result";
-  try {
-    const response = await managerRequest("/api/send-invitation", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        firstName: document.getElementById("firstName").value.trim(),
-        lastName: document.getElementById("lastName").value.trim(),
-        username: document.getElementById("username").value.trim(),
-        email: document.getElementById("email").value.trim(),
-        position: document.getElementById("position").value.trim(),
-        department: document.getElementById("department").value.trim(),
-        province: document.getElementById("province").value
-      })
-    });
-    const data = await response.json();
-    if (response.status === 401 || response.status === 403) {
-      await supabase.auth.signOut();
-      window.location.replace("/manager-login.html");
-      return;
-    }
-    if (!response.ok) throw new Error(data.error || "Unable to send invitation");
-    result.textContent = data.message;
-    result.className = "result success";
-    event.target.reset();
-  } catch (error) {
-    result.textContent = error.message;
-    result.className = "result error";
-  } finally {
-    button.disabled = false;
-    button.textContent = "Send Invitation";
-  }
-});
-
-document.getElementById("signOut").addEventListener("click", async () => {
-  await supabase.auth.signOut();
-  window.location.replace("/manager-login.html");
-});
-
-supabase.auth.onAuthStateChange(event => {
-  if (event === "SIGNED_OUT" && currentSession) window.location.replace("/manager-login.html");
-});
-
-initialize();
+async function managerRequest(path,options={}){const{data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("Your session has expired. Please sign in again.");currentSession=session;return fetch(path,{...options,headers:{...(options.headers||{}),Authorization:`Bearer ${session.access_token}`}})}
+async function readResponse(response){const data=await response.json().catch(()=>({}));if(response.status===401||response.status===403){await supabase.auth.signOut();window.location.replace("/manager-login.html");throw new Error("Manager access required")}if(!response.ok)throw new Error(data.error||"Unable to complete request");return data}
+function showNotice(element,message,type){element.textContent=message;element.className=`notice ${type}`}
+function clearNotice(element){element.textContent="";element.className="notice"}
+function setView(name){const employeeView=name==="employees";$("dashboardView").hidden=employeeView;$("employeesView").hidden=!employeeView;$("topbarTitle").textContent=employeeView?"Employees":"Manager Portal";document.querySelectorAll("[data-view]").forEach(item=>item.classList.toggle("active",item.dataset.view===name));if(employeeView)loadEmployees()}
+document.querySelectorAll("[data-view]").forEach(button=>button.addEventListener("click",()=>setView(button.dataset.view)));
+function cell(text,className=""){const td=document.createElement("td");td.textContent=text??"—";if(className)td.className=className;return td}
+function badge(text,kind){const td=document.createElement("td");const span=document.createElement("span");span.className=`status ${kind}`;span.textContent=text;td.append(span);return td}
+function formatHireDate(value){if(!value)return "—";const [year,month,day]=value.split("-");return year&&month&&day?`${month}/${day}/${year}`:value}
+function renderEmployees(){const rows=$("employeeRows");rows.replaceChildren();$("employeeCount").textContent=`${employees.length} employee${employees.length===1?"":"s"}`;$("tableStatus").textContent=`Showing ${employees.length} employee${employees.length===1?"":"s"}`;$("employeeTable").hidden=!employees.length;$("emptyState").hidden=Boolean(employees.length);for(const employee of employees){const tr=document.createElement("tr");tr.append(cell(employee.id,"subtle"),cell(`${employee.first_name||""} ${employee.last_name||""}`.trim(),"employee-name"),cell(employee.email),cell(employee.username),cell(employee.mobile),cell(employee.position),cell(employee.department),cell(employee.province),cell(formatHireDate(employee.hire_date)));const invitation=employee.invitation_status||"Not Sent";tr.append(badge(invitation,invitation==="Account Activated"?"activated":invitation==="Invitation Sent"?"sent":"not-sent"),badge(employee.is_active?"Active":"Inactive",employee.is_active?"active":"inactive"));const actions=document.createElement("td");actions.className="row-actions";const edit=document.createElement("button");edit.type="button";edit.className="link-button";edit.textContent="Edit";edit.addEventListener("click",()=>openForm(employee));actions.append(edit);if(invitation!=="Account Activated"&&!employee.activated_at){const resend=document.createElement("button");resend.type="button";resend.className="link-button resend";resend.textContent="Resend Invitation";resend.addEventListener("click",()=>resendInvitation(employee,resend));actions.append(resend)}tr.append(actions);rows.append(tr)}}
+async function loadEmployees(){clearNotice($("pageNotice"));$("tableStatus").textContent="Loading employees…";try{const data=await readResponse(await managerRequest("/api/employees"));employees=data.employees;renderEmployees()}catch(error){$("tableStatus").textContent="Employees could not be loaded.";showNotice($("pageNotice"),error.message,"error")}}
+function openForm(employee=null){editingId=employee?.id||null;$("employeeForm").reset();$("isActive").checked=employee?Boolean(employee.is_active):true;clearNotice($("formNotice"));$("formTitle").textContent=employee?"Edit Employee":"Add Employee";$("formDescription").textContent=employee?"Update this employee's workforce profile.":"Create a profile and send a secure activation invitation.";$("saveEmployee").textContent=employee?"Save Changes":"Add Employee & Send Invitation";for(const [id,key] of [["firstName","first_name"],["lastName","last_name"],["email","email"],["username","username"],["mobile","mobile"],["position","position"],["department","department"],["province","province"],["hireDate","hire_date"]])$(id).value=employee?.[key]||"";$("employeeModal").hidden=false;$("firstName").focus()}
+function closeForm(){if(!$("saveEmployee").disabled)$("employeeModal").hidden=true}
+function formPayload(){return{firstName:$("firstName").value.trim(),lastName:$("lastName").value.trim(),email:$("email").value.trim(),username:$("username").value.trim(),mobile:$("mobile").value.trim(),position:$("position").value.trim(),department:$("department").value.trim(),province:$("province").value,hireDate:$("hireDate").value,isActive:$("isActive").checked}}
+$("addEmployee").addEventListener("click",()=>openForm());$("closeModal").addEventListener("click",closeForm);$("cancelForm").addEventListener("click",closeForm);$("employeeModal").addEventListener("click",event=>{if(event.target===$("employeeModal"))closeForm()});
+$("employeeForm").addEventListener("submit",async event=>{event.preventDefault();const button=$("saveEmployee");button.disabled=true;clearNotice($("formNotice"));try{const path=editingId?`/api/employees?id=${encodeURIComponent(editingId)}`:"/api/send-invitation";const response=await managerRequest(path,{method:editingId?"PATCH":"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(formPayload())});const data=await readResponse(response);$("employeeModal").hidden=true;showNotice($("pageNotice"),data.message,"success");await loadEmployees();showNotice($("pageNotice"),data.message,"success")}catch(error){showNotice($("formNotice"),error.message,"error")}finally{button.disabled=false}});
+async function resendInvitation(employee,button){if(!window.confirm(`Resend the activation invitation to ${employee.email}?`))return;button.disabled=true;clearNotice($("pageNotice"));try{const data=await readResponse(await managerRequest("/api/resend-invitation",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id:String(employee.id)})}));await loadEmployees();showNotice($("pageNotice"),data.message,"success")}catch(error){showNotice($("pageNotice"),error.message,"error")}finally{button.disabled=false}}
+async function initialize(){try{const data=await readResponse(await managerRequest("/api/manager-session"));$("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("loading").style.display="none";$("app").style.display="grid"}catch(_){await supabase.auth.signOut();window.location.replace("/manager-login.html")}}
+$("signOut").addEventListener("click",async()=>{await supabase.auth.signOut();window.location.replace("/manager-login.html")});supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT"&&currentSession)window.location.replace("/manager-login.html")});initialize();
 </script>
 </body>
 </html>

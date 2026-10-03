@@ -9,8 +9,11 @@ manager.
 
 1. Apply `supabase/migrations/202610010001_manager_roles.sql` in the Supabase SQL
    editor or through the Supabase CLI migration workflow.
-2. Find the approved manager's user UUID in **Authentication > Users**.
-3. Insert only explicitly approved managers or administrators:
+2. Apply `supabase/migrations/202610030001_employee_management_fields.sql` to
+   add the nullable `mobile` and `hire_date` employee profile fields. It does not
+   update existing employee rows.
+3. Find the approved manager's user UUID in **Authentication > Users**.
+4. Insert only explicitly approved managers or administrators:
 
    ```sql
    insert into public.user_roles (auth_user_id, role)
@@ -49,6 +52,6 @@ the fallback.
 3. The server asks Supabase Auth to validate the token, then reads the matching
    `user_roles` row with server-only credentials.
 4. Only `manager` or `admin` reaches the portal or the invitation operation.
-5. `/api/send-invitation` repeats both checks on every request; browser routing
-   and hidden UI are never treated as authorization.
-
+5. Every employee-management endpoint (`/api/employees`,
+   `/api/send-invitation`, and `/api/resend-invitation`) repeats both checks;
+   browser routing and hidden UI are never treated as authorization.
