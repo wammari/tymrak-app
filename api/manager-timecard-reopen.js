@@ -24,7 +24,6 @@ export default async function handler(req, res) {
       return res.status(400).json({ error: "Select a valid employee" });
     }
     const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
-    if (!reason) return res.status(400).json({ error: "Enter a reason for reopening the timecard" });
     if (reason.length > 1000) return res.status(400).json({ error: "Reopen reason must be 1000 characters or fewer" });
     const period = periodFromKey(req.body?.period, new Date(), "America/Toronto");
     if (!period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
@@ -43,7 +42,7 @@ export default async function handler(req, res) {
       headers: databaseHeaders(secretKey, "return=representation"),
       body: JSON.stringify({
         status: "reopened", reopened_by: authorization.user.id,
-        reopened_at: reopenedAt, reopen_reason: reason, updated_at: reopenedAt
+        reopened_at: reopenedAt, reopen_reason: reason || null, updated_at: reopenedAt
       })
     }));
     if (!updated.length) return res.status(409).json({ error: "Timecard approval changed; refresh and try again" });

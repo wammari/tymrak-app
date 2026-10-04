@@ -52,35 +52,37 @@ async function reopen(body, headers = { authorization: "Bearer manager" }) {
 
 test("unauthenticated and employee users cannot reopen a timecard", async () => {
   let env = environment();
-  try { assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2", reason: "Fix punch" }, {})).statusCode, 401); }
+  try { assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" }, {})).statusCode, 401); }
   finally { env.restore(); }
   env = environment("employee");
   try {
-    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2", reason: "Fix punch" })).statusCode, 403);
+    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 403);
     assert.equal(env.approvals[0].status, "approved");
   } finally { env.restore(); }
 });
 
-test("blank reopen reason is rejected", async () => {
+test("manager reopens without a reason and records authenticated audit identity, time, and timezone", async () => {
   const env = environment();
   try {
-    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2", reason: "   " })).statusCode, 400);
-    assert.equal(env.approvals[0].status, "approved");
-  } finally { env.restore(); }
-});
-
-test("manager reopens only the selected period and records authenticated audit identity, time, timezone, and reason", async () => {
-  const env = environment();
-  try {
-    const res = await reopen({ employeeId: "employee-1", period: "2026-09-2", reason: "  Correct missed clock out  ", managerId: "untrusted-user" });
+    const res = await reopen({ employeeId: "employee-1", period: "2026-09-2", managerId: "untrusted-user" });
     assert.equal(res.statusCode, 200);
     assert.equal(env.approvals[0].status, "reopened");
     assert.equal(env.approvals[1].status, "approved");
     assert.deepEqual(env.audit.map(({ occurred_at, ...event }) => ({ ...event, hasTimestamp: /^\d{4}-\d{2}-\d{2}T/.test(occurred_at) })), [{
       employee_id: "employee-1", period_start: "2026-09-16", period_end: "2026-09-30",
       work_timezone: "America/Edmonton", action: "reopened", manager_user_id: "acting-manager",
-      reopen_reason: "Correct missed clock out", hasTimestamp: true
+      reopen_reason: null, hasTimestamp: true
     }]);
+  } finally { env.restore(); }
+});
+
+test("blank optional reopen reason is normalized to null", async () => {
+  const env = environment();
+  try {
+    const res = await reopen({ employeeId: "employee-1", period: "2026-09-2", reason: "   " });
+    assert.equal(res.statusCode, 200);
+    assert.equal(env.approvals[0].reopen_reason, null);
+    assert.equal(env.audit[0].reopen_reason, null);
   } finally { env.restore(); }
 });
 
@@ -89,7 +91,7 @@ test("approved period locks, reopen unlocks, and re-approval locks it again", as
   const writable = () => env.approvals[0].status !== "approved";
   try {
     assert.equal(writable(), false);
-    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2", reason: "Correction required" })).statusCode, 200);
+    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 200);
     assert.equal(writable(), true);
     const res = response();
     await approvalHandler({ method: "POST", headers: { authorization: "Bearer manager" }, body: { employeeIds: ["employee-1"], period: "2026-09-2" } }, res);
@@ -112,34 +114,19 @@ test("audit migration preserves the database lock predicate and creates append-o
   assert.doesNotMatch(audit, /province/i);
 });
 
-test("approval migration constraint rejects null, empty, and whitespace-only reopen reasons", () => {
-  const sql = fs.readFileSync(new URL("../supabase/migrations/202610040002_timecard_approval_audit.sql", import.meta.url), "utf8");
-  const constraint = sql.match(/timecard_approvals_reopen_fields_check check \(([\s\S]*?)\n  \);/)?.[1] || "";
-  assert.match(constraint, /status = 'approved'/);
-  assert.match(constraint, /reopened_by is not null/);
-  assert.match(constraint, /reopened_at is not null/);
-  assert.match(constraint, /reopen_reason is not null and btrim\(reopen_reason\) <> ''/);
-
-  const acceptsReopenedApproval = reason => reason !== null && reason.trim() !== "";
-  assert.equal(acceptsReopenedApproval(null), false);
-  assert.equal(acceptsReopenedApproval(""), false);
-  assert.equal(acceptsReopenedApproval("   \t"), false);
-  assert.equal(acceptsReopenedApproval("Correct missed clock out"), true);
+test("follow-up migration makes reopen reasons optional without weakening actor and timestamp requirements", () => {
+  const sql = fs.readFileSync(new URL("../supabase/migrations/202610040003_optional_timecard_reopen_reason.sql", import.meta.url), "utf8");
+  assert.match(sql, /drop constraint if exists timecard_approvals_reopen_fields_check/i);
+  assert.match(sql, /status = 'approved'[\s\S]+reopened_by is not null and reopened_at is not null/i);
+  assert.doesNotMatch(sql, /btrim\(reopen_reason\)/i);
+  assert.match(sql, /drop constraint if exists timecard_approval_history_reason_check/i);
+  assert.match(sql, /\(action = 'reopened'\) or\s+\(action <> 'reopened' and reopen_reason is null\)/i);
 });
 
-test("history migration constraint accepts a reason only for reopened audit events", () => {
-  const sql = fs.readFileSync(new URL("../supabase/migrations/202610040002_timecard_approval_audit.sql", import.meta.url), "utf8");
-  const constraint = sql.match(/timecard_approval_history_reason_check check \(([\s\S]*?)\n  \)/)?.[1] || "";
-  assert.match(constraint, /action = 'reopened' and reopen_reason is not null and\s+btrim\(reopen_reason\) <> ''/);
-  assert.match(constraint, /action <> 'reopened' and reopen_reason is null/);
-
-  const acceptsHistoryReason = (action, reason) => action === "reopened"
-    ? reason !== null && reason.trim() !== ""
-    : reason === null;
-  assert.equal(acceptsHistoryReason("reopened", null), false);
-  assert.equal(acceptsHistoryReason("reopened", ""), false);
-  assert.equal(acceptsHistoryReason("reopened", "  \n"), false);
-  assert.equal(acceptsHistoryReason("reopened", "Correct missed clock out"), true);
-  assert.equal(acceptsHistoryReason("approved", null), true);
-  assert.equal(acceptsHistoryReason("re-approved", "Unexpected reason"), false);
+test("manager UI uses confirmation-only reopen and spaces the timecard actions", () => {
+  const html = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
+  assert.match(html, /if\(!window\.confirm\(`/);
+  assert.match(html, /action\.className="row-actions"/);
+  assert.doesNotMatch(html, /reopenReason|Reason for reopening|reopenModal/);
+  assert.match(html, /JSON\.stringify\(\{employeeId:card\.employee\.id,period:selectedPeriodKey\}\)/);
 });
