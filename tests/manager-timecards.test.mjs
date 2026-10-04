@@ -83,6 +83,70 @@ test("active employee with no punches remains in summary with zero hours", () =>
   assert.deepEqual(summary.days, []);
 });
 
+test("API does not require an overtime rule for an employee with no punches", async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = { ...process.env };
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SECRET_KEY = "server-only-secret";
+  global.fetch = async url => {
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.includes("/employees?")) return new Response(JSON.stringify([
+      { id: "employee-1", first_name: "No", last_name: "Punches", province: "YT" }
+    ]));
+    if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
+    if (url.includes("/punches?")) return new Response(JSON.stringify([]));
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  try {
+    const res = response();
+    await handler({ method: "GET", headers: { authorization: "Bearer manager" }, query: {} }, res);
+    assert.equal(res.statusCode, 200);
+    assert.equal(res.payload.timecards[0].totalMilliseconds, 0);
+  } finally {
+    global.fetch = originalFetch;
+    process.env = originalEnv;
+  }
+});
+
+test("Supabase failures log safe structured query diagnostics", async () => {
+  const originalFetch = global.fetch;
+  const originalError = console.error;
+  const originalEnv = { ...process.env };
+  const logs = [];
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SECRET_KEY = "server-secret-must-not-be-logged";
+  console.error = (...values) => logs.push(values);
+  global.fetch = async url => {
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.includes("/employees?")) return new Response(JSON.stringify({
+      code: "42703", message: "column employees.province does not exist"
+    }), { status: 400 });
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  try {
+    const res = response();
+    await handler({ method: "GET", headers: { authorization: "Bearer access-token-must-not-be-logged" }, query: {} }, res);
+    assert.equal(res.statusCode, 500);
+    assert.deepEqual(logs.at(-1), [
+      "Manager timecard Supabase request failed",
+      {
+        stage: "employees_query", resource: "employees",
+        query: "active_employee_timecard_fields", status: 400,
+        code: "42703", message: "column employees.province does not exist"
+      }
+    ]);
+    const serialized = JSON.stringify(logs);
+    assert.doesNotMatch(serialized, /server-secret-must-not-be-logged/);
+    assert.doesNotMatch(serialized, /access-token-must-not-be-logged/);
+  } finally {
+    global.fetch = originalFetch;
+    console.error = originalError;
+    process.env = originalEnv;
+  }
+});
+
 test("incomplete sequence is a Missing Punch exception", () => {
   const shifts = buildShifts([{ id: "p1", punch_type: "clock_in", punched_at: "2026-10-02T14:00:00Z" }], "America/Edmonton");
   assert.equal(shifts.length, 1);

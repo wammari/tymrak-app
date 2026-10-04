@@ -6,8 +6,6 @@ export const PROVINCE_TIME_ZONES = {
   YT: "America/Whitehorse"
 };
 
-const DAY = 86400000;
-
 export function dateParts(date, timeZone) {
   const parts = new Intl.DateTimeFormat("en-CA", {
     timeZone, year: "numeric", month: "2-digit", day: "2-digit"
