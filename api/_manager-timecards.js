@@ -53,6 +53,21 @@ export function getPreviousPayPeriod(period, timeZone = "America/Toronto") {
     : getPayPeriod(period.year, period.month - 1, 2, timeZone);
 }
 
+export function getNextPayPeriod(period, timeZone = "America/Toronto") {
+  return period.half === 1
+    ? getPayPeriod(period.year, period.month, 2, timeZone)
+    : getPayPeriod(period.year, period.month + 1, 1, timeZone);
+}
+
+export function getPayPeriodDateKeys(period) {
+  const month = String(period.month + 1).padStart(2, "0");
+  const lastDay = new Date(Date.UTC(period.year, period.month + 1, 0)).getUTCDate();
+  return {
+    startKey: `${period.year}-${month}-${period.half === 1 ? "01" : "16"}`,
+    endKey: `${period.year}-${month}-${period.half === 1 ? "15" : String(lastDay).padStart(2, "0")}`
+  };
+}
+
 export function periodFromKey(key, now = new Date(), timeZone = "America/Toronto") {
   const match = /^(\d{4})-(\d{2})-([12])$/.exec(key || "");
   if (!match) return null;

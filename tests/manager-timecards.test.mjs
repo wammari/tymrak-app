@@ -2,8 +2,9 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import handler from "../api/manager-timecards.js";
 import {
-  applyOvertime, buildShifts, getCurrentPayPeriod, getPreviousPayPeriod,
-  periodFromKey, summarizeEmployee
+  applyOvertime, buildShifts, getCurrentPayPeriod, getNextPayPeriod,
+  getPayPeriod, getPayPeriodDateKeys, getPreviousPayPeriod, periodFromKey,
+  summarizeEmployee
 } from "../api/_manager-timecards.js";
 
 function response() {
@@ -71,9 +72,54 @@ test("semi-monthly current, previous, and month-end periods are timezone safe", 
   assert.equal(periodFromKey("2026-10-2", new Date("2026-10-04T18:00:00Z"), "America/Edmonton"), null);
 });
 
+test("all September and October 2026 semi-monthly labels use calendar boundaries", () => {
+  const expected = [
+    [2026, 8, 1, "2026-09-01", "2026-09-15"],
+    [2026, 8, 2, "2026-09-16", "2026-09-30"],
+    [2026, 9, 1, "2026-10-01", "2026-10-15"],
+    [2026, 9, 2, "2026-10-16", "2026-10-31"]
+  ];
+  for (const [year, month, half, startKey, endKey] of expected) {
+    const period = getPayPeriod(year, month, half, "America/Edmonton");
+    assert.deepEqual(getPayPeriodDateKeys(period), { startKey, endKey });
+    const localStart = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton" }).format(period.start);
+    const localEnd = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Edmonton" }).format(period.end);
+    assert.equal(localStart, startKey);
+    assert.equal(localEnd, endKey);
+    assert.equal(period.start.getUTCMilliseconds(), 0);
+    assert.equal(period.end.getUTCMilliseconds(), 999);
+  }
+});
+
+test("period navigation crosses month and year boundaries", () => {
+  const septemberSecond = getPayPeriod(2026, 8, 2, "America/Edmonton");
+  assert.equal(getNextPayPeriod(septemberSecond, "America/Edmonton").key, "2026-10-1");
+  assert.equal(getPreviousPayPeriod(getNextPayPeriod(septemberSecond, "America/Edmonton"), "America/Edmonton").key, "2026-09-2");
+  const decemberSecond = getPayPeriod(2026, 11, 2, "America/Edmonton");
+  assert.equal(getNextPayPeriod(decemberSecond, "America/Edmonton").key, "2027-01-1");
+  assert.equal(getPreviousPayPeriod(getNextPayPeriod(decemberSecond, "America/Edmonton"), "America/Edmonton").key, "2026-12-2");
+});
+
 const albertaRule = { daily_threshold_hours: 8, weekly_threshold_hours: 44,
   daily_overtime_enabled: true, weekly_overtime_enabled: true,
   calculation_method: "greater_daily_or_weekly", week_start_day: 0 };
+
+test("October 1 punches do not leak into the September 16-30 summary", () => {
+  const period = getPayPeriod(2026, 8, 2, "America/Edmonton");
+  const summary = summarizeEmployee(
+    { id: "e1", first_name: "Boundary", last_name: "Worker", province: "AB" },
+    [
+      { punch_type: "clock_in", punched_at: "2026-09-30T14:00:00Z" },
+      { punch_type: "clock_out", punched_at: "2026-09-30T22:00:00Z" },
+      { punch_type: "clock_in", punched_at: "2026-10-01T14:00:00Z" },
+      { punch_type: "clock_out", punched_at: "2026-10-01T22:00:00Z" }
+    ],
+    albertaRule,
+    period
+  );
+  assert.deepEqual(summary.days.map(day => day.date), ["2026-09-30"]);
+  assert.equal(summary.totalMilliseconds, 8 * 3600000);
+});
 
 test("active employee with no punches remains in summary with zero hours", () => {
   const period = getCurrentPayPeriod(new Date("2026-10-04T18:00:00Z"), "America/Edmonton");

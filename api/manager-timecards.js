@@ -1,6 +1,6 @@
 import { requireManager } from "./_manager-auth.js";
 import { databaseHeaders } from "./_employee-management.js";
-import { PROVINCE_TIME_ZONES, calculationStart, getCurrentPayPeriod, getPayPeriod, periodFromKey, summarizeEmployee } from "./_manager-timecards.js";
+import { PROVINCE_TIME_ZONES, calculationStart, getCurrentPayPeriod, getPayPeriod, getPayPeriodDateKeys, periodFromKey, summarizeEmployee } from "./_manager-timecards.js";
 
 async function safeSupabaseError(response) {
   try {
@@ -55,10 +55,7 @@ export default async function handler(req, res) {
     const requested = Array.isArray(req.query?.period) ? req.query.period[0] : req.query?.period;
     const period = requested ? periodFromKey(requested, new Date(), "America/Toronto") : current;
     if (!period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
-    const month = String(period.month + 1).padStart(2, "0");
-    const startKey = `${period.year}-${month}-${period.half === 1 ? "01" : "16"}`;
-    const lastDay = new Date(Date.UTC(period.year, period.month + 1, 0)).getUTCDate();
-    const endKey = `${period.year}-${month}-${period.half === 1 ? "15" : String(lastDay).padStart(2, "0")}`;
+    const { startKey, endKey } = getPayPeriodDateKeys(period);
 
     const employees = await query({
       url: `${supabaseUrl}/rest/v1/employees?is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc`,
@@ -111,7 +108,18 @@ export default async function handler(req, res) {
       }
       return summarizeEmployee(employee, employeePunches, applicable[0], period);
     });
-    return res.status(200).json({ period: { key: period.key, start: period.start.toISOString(), end: period.end.toISOString(), current: period.key === current.key }, timecards: cards, approvalPersistence: false });
+    return res.status(200).json({
+      period: {
+        key: period.key,
+        start: period.start.toISOString(),
+        end: period.end.toISOString(),
+        startDate: startKey,
+        endDate: endKey,
+        current: period.key === current.key
+      },
+      timecards: cards,
+      approvalPersistence: false
+    });
   } catch (error) {
     if (!error?.diagnosticLogged) {
       console.error("Manager timecard operation failed", {
