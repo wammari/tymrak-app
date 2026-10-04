@@ -39,7 +39,7 @@ function employee(overrides = {}) {
 function input(overrides = {}) {
   return {
     firstName: "Ada", lastName: "Lovelace", email: "ada@example.com",
-    username: "ada", mobile: "", position: "Engineer",
+    username: "ada", mobile: "+1 403 555 0100", position: "Engineer",
     department: "Technology", province: "AB", hireDate: "2026-10-01",
     isActive: true, ...overrides
   };
@@ -115,6 +115,7 @@ test("a manager can create an active employee and send an invitation", async () 
     if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
       const body = JSON.parse(options.body);
       assert.equal(body.is_active, true);
+      assert.equal(body.mobile, "+1 403 555 0100");
       assert.equal(body.hire_date, "2026-10-01");
       assert.equal(body.auth_user_id, "auth-employee-1");
       assert.equal(body.invitation_status, "Invitation Sent");
@@ -152,6 +153,8 @@ test("a manager edits exactly one employee and can save inactive status", async 
       patchUrl = url;
       const body = JSON.parse(options.body);
       assert.equal(body.is_active, false);
+      assert.equal(body.mobile, "+1 403 555 0100");
+      assert.equal(body.hire_date, "2026-10-01");
       assert.equal("auth_user_id" in body, false);
       assert.equal("invitation_status" in body, false);
       return new Response(JSON.stringify([employee({ is_active: false })]));
@@ -201,4 +204,15 @@ test("server credentials never appear in Manager Portal browser code", () => {
   const browserSource = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
   assert.doesNotMatch(browserSource, /SUPABASE_SECRET_KEY|server-secret-never-public|service_role/);
   assert.match(browserSource, /Authorization:`Bearer \$\{session\.access_token\}`/);
+});
+
+test("employee list is the default Employees view and add/edit exposes mobile and hire date", () => {
+  const browserSource = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
+  assert.match(browserSource, /id="employeeModal" hidden/);
+  assert.match(browserSource, /<label for="mobile">Mobile Number<\/label>/);
+  assert.match(browserSource, /<label for="hireDate">Hire Date<\/label>/);
+  assert.match(browserSource, /mobile:\$\("mobile"\)\.value\.trim\(\)/);
+  assert.match(browserSource, /hireDate:\$\("hireDate"\)\.value/);
+  assert.match(browserSource, /\["mobile","mobile"\]/);
+  assert.match(browserSource, /\["hireDate","hire_date"\]/);
 });
