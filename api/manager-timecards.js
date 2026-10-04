@@ -69,6 +69,7 @@ export default async function handler(req, res) {
     });
     const employeeIds = employees.map(employee => employee.id);
     let punches = [];
+    let approvals = [];
     if (employeeIds.length) {
       const earliest = Math.min(...employees.map(employee => {
         const zone = PROVINCE_TIME_ZONES[employee.province] || "America/Toronto";
@@ -84,6 +85,11 @@ export default async function handler(req, res) {
         secretKey, stage: "punches_query", resource: "punches",
         queryName: "employee_period_punches"
       });
+      approvals = await query({
+        url: `${supabaseUrl}/rest/v1/timecard_approvals?employee_id=in.${encodeURIComponent(ids)}&period_start=eq.${startKey}&period_end=eq.${endKey}&select=id,employee_id,status,approved_by,approved_at,period_start,period_end,work_timezone`,
+        secretKey, stage: "approvals_query", resource: "timecard_approvals",
+        queryName: "employee_period_approvals"
+      });
     }
     const cards = employees.map(employee => {
       const employeePunches = punches.filter(punch => punch.employee_id === employee.id);
@@ -91,7 +97,11 @@ export default async function handler(req, res) {
       // A rule is not needed to truthfully render an active employee with no time.
       // Previously, such an employee could make the entire manager list fail merely
       // because their jurisdiction did not yet have a configured overtime rule.
-      if (employeePunches.length === 0) return summarizeEmployee(employee, [], null, period);
+      const approval = approvals.find(record => record.employee_id === employee.id && record.status === "approved");
+      if (employeePunches.length === 0) {
+        return { ...summarizeEmployee(employee, [], null, period),
+          approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null };
+      }
       if (applicable.length !== 1) {
         console.error("Manager timecard overtime rule resolution failed", {
           stage: "overtime_rule_resolution",
@@ -106,7 +116,8 @@ export default async function handler(req, res) {
         error.diagnosticLogged = true;
         throw error;
       }
-      return summarizeEmployee(employee, employeePunches, applicable[0], period);
+      return { ...summarizeEmployee(employee, employeePunches, applicable[0], period),
+        approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null };
     });
     return res.status(200).json({
       period: {

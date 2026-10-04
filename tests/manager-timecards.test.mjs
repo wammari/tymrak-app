@@ -142,6 +142,7 @@ test("API does not require an overtime rule for an employee with no punches", as
     ]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));
+    if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify([]));
     throw new Error(`Unexpected URL: ${url}`);
   };
   try {
