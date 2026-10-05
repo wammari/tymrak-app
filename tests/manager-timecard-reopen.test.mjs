@@ -127,6 +127,6 @@ test("manager UI uses confirmation-only reopen and spaces the timecard actions",
   const html = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
   assert.match(html, /if\(!window\.confirm\(`/);
   assert.match(html, /action\.className="row-actions"/);
-  assert.doesNotMatch(html, /reopenReason|Reason for reopening|reopenModal/);
+  assert.doesNotMatch(html, /submitReopen|openReopen|closeReopen|reopenReason|reopenModal|reopenForm|Reason for reopening/);
   assert.match(html, /JSON\.stringify\(\{employeeId:card\.employee\.id,period:selectedPeriodKey\}\)/);
 });
