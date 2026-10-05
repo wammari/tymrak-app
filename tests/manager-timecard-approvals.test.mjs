@@ -25,7 +25,7 @@ function installEnvironment(role = "manager") {
         { id: "employee-2", province: "ON" }
       ]));
     }
-    if (url.includes("/timecard_approvals?") && options.method === "POST") {
+    if (url.includes("/timecard_approvals") && options.method === "POST") {
       for (const record of JSON.parse(options.body)) {
         if (!approvals.some(value => value.employee_id === record.employee_id && value.period_start === record.period_start && value.period_end === record.period_end)) {
           approvals.push({ id: `approval-${approvals.length + 1}`, ...record });
