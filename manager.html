@@ -54,16 +54,12 @@
 <div class="field"><label for="hireDate">Hire Date</label><input id="hireDate" type="date"></div><div class="check-field"><input id="isActive" type="checkbox" checked><label for="isActive">Active employee</label></div>
 </div><div class="form-actions"><button class="secondary" id="cancelForm" type="button">Cancel</button><button class="primary" id="saveEmployee" type="submit">Add Employee &amp; Send Invitation</button></div></div></form></section>
 </div>
-<div class="modal" id="reopenModal" hidden role="dialog" aria-modal="true" aria-labelledby="reopenTitle">
-<section class="modal-card"><header class="modal-head"><div><h2 id="reopenTitle">Reopen Timecard</h2><p id="reopenDescription"></p></div><button class="close" id="closeReopen" type="button" aria-label="Close">×</button></header>
-<form id="reopenForm"><div class="form-body"><div id="reopenNotice" class="notice" role="status"></div><label for="reopenReason">Reason for reopening <span class="required">*</span></label><textarea id="reopenReason" maxlength="1000" required placeholder="Describe the correction that is needed."></textarea><div class="form-actions"><button class="secondary" id="cancelReopen" type="button">Cancel</button><button class="primary" id="confirmReopen" type="submit">Reopen Timecard</button></div></div></form></section>
-</div>
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 const SUPABASE_URL="https://tsosredghislnehfyypi.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-let currentSession=null;let employees=[];let editingId=null;let timecards=[];let selectedPeriodKey=null;let currentPeriodKey=null;let reopeningCard=null;
+let currentSession=null;let employees=[];let editingId=null;let timecards=[];let selectedPeriodKey=null;let currentPeriodKey=null;
 const $=id=>document.getElementById(id);
 
 async function managerRequest(path,options={}){const{data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("Your session has expired. Please sign in again.");currentSession=session;return fetch(path,{...options,headers:{...(options.headers||{}),Authorization:`Bearer ${session.access_token}`}})}
