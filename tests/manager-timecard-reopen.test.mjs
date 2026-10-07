@@ -135,3 +135,59 @@ test("manager UI uses confirmation-only reopen and spaces the timecard actions",
   assert.doesNotMatch(html, /Reason for reopening/);
   assert.match(html, /JSON\.stringify\(\{employeeId:card\.employee\.id,period:selectedPeriodKey\}\)/);
 });
+
+test("corrective migration drops the exact obsolete constraint and preserves all other schema", () => {
+  const original = fs.readFileSync(new URL("../supabase/migrations/202610040001_timecard_approvals.sql", import.meta.url), "utf8");
+  const audit = fs.readFileSync(new URL("../supabase/migrations/202610040002_timecard_approval_audit.sql", import.meta.url), "utf8");
+  const correction = fs.readFileSync(new URL("../supabase/migrations/202610070001_drop_obsolete_timecard_status_constraint.sql", import.meta.url), "utf8");
+  assert.match(original, /constraint timecard_approvals_status check \(status = 'approved'\)/);
+  assert.match(audit, /drop constraint if exists timecard_approvals_status_check;/);
+  assert.match(audit, /add constraint timecard_approvals_status_check\s+check \(status in \('approved', 'reopened'\)\)/);
+  const statements = correction.replace(/--[^\n]*/g, "").trim();
+  assert.match(statements, /^alter table public\.timecard_approvals\s+drop constraint if exists timecard_approvals_status;$/i);
+});
+
+for (const operation of ["approval_lookup", "reopen_update"]) {
+  test(`database failure logs safe diagnostics for ${operation} without exposing them to browser`, async () => {
+    const env = environment();
+    const underlyingFetch = global.fetch;
+    const originalError = console.error;
+    const logs = [];
+    console.error = (...args) => logs.push(args);
+    global.fetch = async (url, options = {}) => {
+      if (url.includes("/timecard_approvals?") &&
+          (operation === "approval_lookup" || options.method === "PATCH")) {
+        return new Response(JSON.stringify({
+          code: "23514", message: 'violates check constraint "timecard_approvals_status" server-secret manager',
+          details: "private row details", hint: "private hint"
+        }), { status: 400 });
+      }
+      return underlyingFetch(url, options);
+    };
+    try {
+      const result = await reopen({ employeeId: "employee-1", period: "2026-09-2" });
+      assert.equal(result.statusCode, 500);
+      assert.deepEqual(result.payload, { error: "Unable to reopen timecard" });
+      assert.deepEqual(logs, [["Manager timecard database request failed", {
+        operation, status: 400, code: "23514",
+        message: 'violates check constraint "timecard_approvals_status" [REDACTED] [REDACTED]'
+      }]]);
+      assert.equal(env.approvals[0].status, "approved");
+      assert.equal(env.audit.length, 0);
+    } finally { console.error = originalError; env.restore(); }
+  });
+}
+
+test("non-JSON database errors retain operation and HTTP status", async () => {
+  const env = environment();
+  const underlyingFetch = global.fetch;
+  const originalError = console.error;
+  const logs = [];
+  console.error = (...args) => logs.push(args);
+  global.fetch = async (url, options = {}) => url.includes("/timecard_approvals?") && options.method === "PATCH"
+    ? new Response("private upstream error", { status: 503 }) : underlyingFetch(url, options);
+  try {
+    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 500);
+    assert.deepEqual(logs[0][1], { operation: "reopen_update", status: 503, code: null, message: null });
+  } finally { console.error = originalError; env.restore(); }
+});
