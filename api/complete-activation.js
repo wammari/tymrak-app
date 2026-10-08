@@ -1,147 +1,69 @@
+import { getBearerToken, getSupabaseConfiguration } from "./_manager-auth.js";
+
+// Modern secret keys belong only in apikey; legacy service-role JWTs also
+// require Authorization. Never forward the employee JWT to privileged RPCs.
+export function activationServerHeaders(secretKey) {
+  return {
+    apikey: secretKey,
+    ...(secretKey.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${secretKey}` }),
+    "Content-Type": "application/json"
+  };
+}
+
 export default async function handler(req, res) {
+  res.setHeader("Cache-Control", "no-store");
   if (req.method !== "POST") {
-    return res.status(405).json({
-      error: "Method not allowed"
-    });
+    res.setHeader("Allow", "POST");
+    return res.status(405).json({ error: "Method not allowed" });
   }
-
+  const accessToken = getBearerToken(req);
+  if (!accessToken) return res.status(401).json({ error: "Authentication required" });
+  const configuration = getSupabaseConfiguration();
+  if (!configuration) {
+    return res.status(500).json({ error: "Supabase environment variables are not configured" });
+  }
+  const { supabaseUrl, secretKey } = configuration;
   try {
-    const authorization = req.headers.authorization;
-
-    if (
-      !authorization ||
-      !authorization.startsWith("Bearer ")
-    ) {
-      return res.status(401).json({
-        error: "Authentication required"
-      });
+    // Auth verifies the JWT remotely; browser-supplied IDs and JWT payloads
+    // are never used as identity evidence.
+    const userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
+      headers: { apikey: secretKey, Authorization: `Bearer ${accessToken}` }
+    });
+    if (!userResponse.ok) {
+      if (userResponse.status >= 500) throw new Error("Auth unavailable");
+      return res.status(401).json({ error: "Invalid or expired activation session" });
     }
-
-    const accessToken =
-      authorization.substring("Bearer ".length);
-
-    const supabaseUrl = process.env.SUPABASE_URL;
-    const secretKey = process.env.SUPABASE_SECRET_KEY;
-
-    if (!supabaseUrl || !secretKey) {
-      return res.status(500).json({
-        error: "Supabase environment variables are not configured"
-      });
+    const user = await userResponse.json();
+    if (typeof user?.id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+      return res.status(401).json({ error: "Invalid or expired activation session" });
     }
-
-    /*
-     * STEP 1
-     * Verify the employee's access token with Supabase.
-     * We do not trust a user ID supplied by the browser.
-     */
-    const userResponse = await fetch(
-      `${supabaseUrl}/auth/v1/user`,
-      {
-        method: "GET",
-        headers: {
-          apikey: secretKey,
-          Authorization: `Bearer ${accessToken}`
-        }
-      }
-    );
-
-    const userData = await userResponse.json();
-
-    if (!userResponse.ok || !userData?.id) {
-      console.error(
-        "Activation user verification error:",
-        userData
-      );
-
-      return res.status(401).json({
-        error: "Invalid or expired activation session"
-      });
+    const response = await fetch(`${supabaseUrl}/rest/v1/rpc/complete_employee_activation`, {
+      method: "POST",
+      headers: activationServerHeaders(secretKey),
+      body: JSON.stringify({ p_auth_user_id: user.id })
+    });
+    if (!response.ok) throw new Error("Activation transaction failed");
+    const result = await response.json();
+    if (result?.outcome === "missing") {
+      return res.status(404).json({ error: "No TYMRAK employee record was found for this account." });
     }
-
-    /*
-     * STEP 2
-     * Update only the employee record belonging
-     * to the authenticated Supabase user.
-     */
-    const employeeResponse = await fetch(
-      `${supabaseUrl}/rest/v1/employees?auth_user_id=eq.${encodeURIComponent(
-        userData.id
-      )}`,
-      {
-        method: "PATCH",
-        headers: {
-          apikey: secretKey,
-          Authorization: `Bearer ${secretKey}`,
-          "Content-Type": "application/json",
-          Prefer: "return=representation"
-        },
-        body: JSON.stringify({
-          invitation_status: "Account Activated",
-          activated_at: new Date().toISOString()
-        })
-      }
-    );
-
-    if (!employeeResponse.ok) {
-      const employeeError =
-        await employeeResponse.text();
-
-      console.error(
-        "Activation employee update error:",
-        employeeError
-      );
-
-      return res.status(500).json({
-        error:
-          "Your password was created, but TYMRAK could not update the employee activation status."
-      });
+    if (result?.outcome === "duplicate") {
+      return res.status(409).json({ error: "Multiple employee records map to this account. Please contact your manager." });
     }
-
-const employeeData =
-  await employeeResponse.json();
-
-if (
-  !Array.isArray(employeeData) ||
-  employeeData.length === 0
-) {
-  return res.status(404).json({
-    error:
-      "No TYMRAK employee record was found for this account."
-  });
-}
-
-const updatedEmployee =
-  employeeData[0];
-
-if (
-  updatedEmployee.invitation_status !==
-    "Account Activated" ||
-  !updatedEmployee.activated_at
-) {
-  console.error(
-    "Activation verification failed:",
-    updatedEmployee
-  );
-
-  return res.status(500).json({
-    error:
-      "TYMRAK could not verify the employee activation update."
-  });
-}
-
-return res.status(200).json({
-  success: true,
-  message: "TYMRAK account activated successfully"
-});
-
+    if (!["activated", "already_activated"].includes(result?.outcome)) {
+      throw new Error("Invalid activation transaction response");
+    }
+    return res.status(200).json({
+      success: true,
+      alreadyActivated: result.outcome === "already_activated",
+      message: "TYMRAK account activated successfully"
+    });
   } catch (error) {
-    console.error(
-      "Complete activation error:",
-      error
-    );
-
+    // Do not log tokens, Auth bodies, employee records, or database responses.
+    console.error("Complete activation failed", { errorName: error?.name || "Error" });
     return res.status(500).json({
-      error: "Server error"
+      error: "TYMRAK could not complete activation. Your saved password is unchanged; please retry activation completion."
     });
   }
 }
+
