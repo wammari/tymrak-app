@@ -3,7 +3,9 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "test:no-sql": "node --test tests/employee-activation.test.mjs tests/employee-management.test.mjs tests/manager-security.test.mjs tests/manager-timecard-approvals.test.mjs tests/manager-timecard-reopen.test.mjs tests/manager-timecards.test.mjs tests/timecard-pay-period.test.mjs tests/staging-configuration.test.mjs",
+    "prepare:staging-sql": "node scripts/prepare-staging-sql.mjs"
   },
   "devDependencies": {
     "@electric-sql/pglite": "0.5.8"
