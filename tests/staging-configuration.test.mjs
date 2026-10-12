@@ -217,7 +217,8 @@ test("empty-staging guard checks all relation kinds and routines before any sche
   assert.match(guard,/if existing_public_object is not null then\s+raise exception/);
   assert.match(guard,/current_setting\('tymrak\.staging_confirmation', true\)/);
   assert.match(guard,/if exists \(select 1 from auth\.users\)/);
-  assert.doesNotMatch(guard,/\b(?:create|alter|drop|insert|update|delete|truncate|grant|revoke)\b/i);
+  assert.doesNotMatch(guard.replace(/'(?:''|[^'])*'/g,"''").replace(/--[^\n]*/g,""),
+    /\b(?:create|alter|drop|insert|update|delete|truncate|grant|revoke)\b/i);
   assert.ok(sql.indexOf("$guard$;")<sql.indexOf("create table public.employees"));
 });
 
@@ -228,5 +229,9 @@ test("empty-staging guard rejects standalone schema objects and public extension
     "pg_ts_config","pg_ts_dict","pg_ts_parser","pg_ts_template","pg_extension"]) {
     assert.match(guard,new RegExp("pg_catalog\\."+catalog+"\\b"));
   }
-  assert.doesNotMatch(guard,/\b(?:not exists|except)\b/i,"extension membership must not bypass the guard");
+  const objects=guard.slice(guard.indexOf("from ("),guard.indexOf(") as objects"));
+  assert.doesNotMatch(objects,/\b(?:not exists|except)\b/i,"extension membership must not bypass the guard");
+  assert.match(objects,/pg_catalog\.pg_proc where oid is distinct from verified_rls_oid/);
+  assert.match(guard,/325ae266d9b166715ef5230ceaf7ff9d523e483cf5610dfb9779ab3f183f4af9/);
+  assert.match(guard,/verified_rls_oid := rls_helper\.oid/);
 });

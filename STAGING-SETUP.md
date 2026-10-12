@@ -66,13 +66,33 @@ Only PR #17's outer BEGIN/COMMIT are omitted from the bundle so it retains one
 transaction. The original migration file is unchanged.
 
 Bootstrap refuses to run unless the operator explicitly confirms the staging ref,
-the public schema has no relations (including views, materialized views,
+the public schema has no application relations (including views, materialized views,
 sequences, foreign tables or indexes), routines, types, collations, operators,
 operator classes/families, conversions, text-search objects or extensions,
 and Auth has no users. Public extension objects are deliberately not exempted;
 an unexpected extension blocks initialization and requires inspection.
 Supabase-managed objects in other schemas and existing schema/default grants
-are not treated as public application objects. The confirmation string is an
+are not treated as public application objects.
+
+One narrow exception permits the existing `public.rls_auto_enable()` and
+`ensure_rls` event trigger recovered from staging on 2026-10-12. The guard verifies
+the exact function body using a SHA-256 fingerprint (normalizing CRLF only),
+postgres ownership, plpgsql language, event_trigger return type, SECURITY DEFINER,
+exact pg_catalog search path and standard volatility/strictness/parallel settings.
+It requires exactly one binding: ensure_rls, ddl_command_end, enabled O,
+postgres owner, and precisely CREATE TABLE / CREATE TABLE AS / SELECT INTO tags.
+Only that verified function OID is excluded from the routine inventory.
+An overload, altered helper, disabled/missing/extra binding or any other public
+object still blocks initialization. The function and trigger are inspected only:
+the bootstrap never changes their definition, ownership, ACLs, settings or enabled
+state. They are not installed by this bootstrap when absent. Do not delete them
+or manually remove the guard to resolve an initialization error.
+
+This is consistent with Supabase's documented automatic-RLS pattern; the metadata
+does not prove who originally installed it. Its existing presence does not mean
+the project contains employee data. The test-only fixture lives under
+`tests/fixtures/` and must never be copied to a Supabase SQL editor.
+The confirmation string is an
 operator safeguard, not a reliable way to detect a Supabase project from PostgreSQL.
 Verify the actual Dashboard URL/project ref before running any SQL.
 The error reports the kind and name of the first conflicting public object.
@@ -324,8 +344,8 @@ Local database success does not establish live deployment readiness.
 `npm run test:no-sql` covers all existing JavaScript/API/page tests and new
 configuration regression/static SQL-assembly checks without executing SQL.
 On 2026-10-12, disposable local SQL testing was separately authorized.
-The full `npm test` passed: 115 tests, zero failures. This includes the 86
-non-SQL checks, PR #17's five activation database tests, and 24 new checks in
+The full `npm test` passed: 129 tests, zero failures. This includes the 86
+non-SQL checks, PR #17's five activation database tests, and 38 new checks in
 `tests/staging-bootstrap-database.test.mjs`.
 
 The new tests execute the entire generated bootstrap, enabling only its commented
@@ -353,7 +373,13 @@ Verified:
 - Refusal of repeated initialization, and test-manager seeding that changes only
   the selected role and rejects confirmation errors, employee identities and repeats.
 
-The local tests passed without any changes to the bootstrap SQL. Repeat the live
+The automatic-RLS exception was subsequently added after live staging metadata
+revealed that helper in an otherwise empty project. Disposable regression tests
+verify successful initialization with it present, unchanged function/trigger
+metadata and continued automatic RLS on a new probe table, plus rejection of
+changed bodies/owners/settings, missing/disabled/renamed triggers, incorrect tags,
+additional bindings, overloaded routines and unexpected public objects.
+Repeat the live
 staging acceptance checklist after the separately authorized setup. The local
 auth.uid() helper simulates verified claims; it does not test email delivery,
 JWT verification, Supabase role configuration, real one-time callbacks or concurrency.

@@ -10,6 +10,7 @@ const rawBootstrap = fs.readFileSync(new URL("../supabase/staging/initialize-emp
 const confirmation = "-- set local tymrak.staging_confirmation = 'cztwqcsizwkrqgpgrgg';";
 assert.equal(rawBootstrap.split(confirmation).length, 2);
 const bootstrap = rawBootstrap.replace(confirmation, confirmation.slice(3));
+const rlsFixture = fs.readFileSync(new URL("./fixtures/verified-rls-auto-enable.sql", import.meta.url), "utf8");
 const ids = {
   a: "11111111-1111-4111-8111-111111111111",
   b: "22222222-2222-4222-8222-222222222222",
@@ -137,6 +138,65 @@ test("failure after schema creation rolls back the complete bootstrap", async ()
     assert.deepEqual(await publicCatalog(db), []);
   });
 });
+
+async function rlsObjects(db) {
+  return {
+    function: (await db.query(`select oid, proowner, prosrc, proconfig, proacl::text,
+      pg_get_functiondef(oid) as definition from pg_proc
+      where oid='public.rls_auto_enable()'::regprocedure`)).rows,
+    trigger: (await db.query("select * from pg_event_trigger order by evtname")).rows
+  };
+}
+test("reviewed automatic-RLS function and trigger are preserved and remain active after bootstrap", async () => {
+  await disposable(async db => {
+    await db.exec(rlsFixture);
+    const before = await rlsObjects(db);
+    await db.exec(bootstrap);
+    assert.deepEqual(await rlsObjects(db), before, "definition, owner, configuration, ACLs and trigger must be unchanged");
+    await db.exec("create table public.synthetic_rls_probe (id integer)");
+    assert.equal((await db.query("select relrowsecurity from pg_class where oid='public.synthetic_rls_probe'::regclass")).rows[0].relrowsecurity, true);
+    assert.equal((await db.query("select count(*)::int as count from pg_policies where schemaname='public'")).rows[0].count, 4);
+  });
+});
+
+for (const [name, tamper] of [
+  ["changed body", `create or replace function public.rls_auto_enable() returns event_trigger language plpgsql
+    security definer set search_path to pg_catalog as $$ begin null; end; $$;`],
+  ["wrong owner", "alter function public.rls_auto_enable() owner to authenticated;"],
+  ["wrong search path", "alter function public.rls_auto_enable() set search_path to public;"],
+  ["changed volatility", "alter function public.rls_auto_enable() immutable;"],
+  ["disabled trigger", "alter event trigger ensure_rls disable;"],
+  ["missing trigger", "drop event trigger ensure_rls;"],
+  ["wrong trigger tags", `drop event trigger ensure_rls; create event trigger ensure_rls on ddl_command_end
+    when tag in ('CREATE TABLE') execute function public.rls_auto_enable();`],
+  ["renamed trigger", "alter event trigger ensure_rls rename to unexpected_rls;"],
+  ["additional binding", `create event trigger additional_rls on ddl_command_end
+    when tag in ('CREATE TABLE') execute function public.rls_auto_enable();`],
+  ["wrong trigger owner", "create role other_event_owner superuser; alter event trigger ensure_rls owner to other_event_owner;"]
+]) {
+  test("RLS exception refuses " + name + " without modifying existing objects", async () => {
+    await disposable(async db => {
+      await db.exec(rlsFixture); await db.exec(tamper);
+      const before = await rlsObjects(db);
+      await rejectedWithoutWrites(db, bootstrap, /differs from the reviewed/);
+      assert.deepEqual(await rlsObjects(db), before);
+    });
+  });
+}
+for (const [name, fixture] of [
+  ["another routine", "create function public.unexpected() returns integer language sql as $$ select 42 $$;"],
+  ["overloaded helper", "create function public.rls_auto_enable(integer) returns integer language sql as $$ select $1 $$;"],
+  ["existing table", "create table public.unexpected (id integer);"]
+]) {
+  test("verified RLS helper does not exempt " + name, async () => {
+    await disposable(async db => {
+      await db.exec(rlsFixture); await db.exec(fixture);
+      const before = await rlsObjects(db);
+      await rejectedWithoutWrites(db, bootstrap, /public schema already contains/);
+      assert.deepEqual(await rlsObjects(db), before);
+    });
+  });
+}
 
 let db, initialCounts;
 test.before(async () => {

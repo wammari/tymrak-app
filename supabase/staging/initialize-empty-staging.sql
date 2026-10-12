@@ -9,9 +9,48 @@ begin;
 do $guard$
 declare
   existing_public_object text;
+  verified_rls_oid oid;
+  rls_helper record;
 begin
   if current_setting('tymrak.staging_confirmation', true) is distinct from 'cztwqcsizwkrqgpgrgg' then
     raise exception 'STOP: explicitly confirm the staging project before initialization';
+  end if;
+  -- The only permitted existing public routine is the reviewed automatic-RLS
+  -- helper supplied from staging on 2026-10-12, with its exact trigger binding.
+  -- Inspect only: never replace, disable, grant on, or delete these objects.
+  select p.*, l.lanname into rls_helper
+  from pg_catalog.pg_proc p
+  join pg_catalog.pg_namespace n on n.oid = p.pronamespace
+  join pg_catalog.pg_language l on l.oid = p.prolang
+  where n.nspname = 'public' and p.proname = 'rls_auto_enable' and p.pronargs = 0;
+  if found then
+    if rls_helper.prokind <> 'f'
+      or rls_helper.prorettype <> 'pg_catalog.event_trigger'::regtype
+      or rls_helper.lanname <> 'plpgsql'
+      or pg_catalog.pg_get_userbyid(rls_helper.proowner) <> 'postgres'
+      or rls_helper.prosecdef is distinct from true
+      or rls_helper.proconfig is distinct from array['search_path=pg_catalog']::text[]
+      or rls_helper.proretset or rls_helper.proisstrict or rls_helper.proleakproof
+      or rls_helper.provolatile <> 'v' or rls_helper.proparallel <> 'u'
+      or pg_catalog.encode(pg_catalog.sha256(pg_catalog.convert_to(
+        pg_catalog.replace(rls_helper.prosrc, pg_catalog.chr(13), ''), 'UTF8')), 'hex')
+        <> '325ae266d9b166715ef5230ceaf7ff9d523e483cf5610dfb9779ab3f183f4af9' then
+      raise exception 'STOP: public.rls_auto_enable() differs from the reviewed helper; inspect it before initialization';
+    end if;
+    if (select count(*) from pg_catalog.pg_event_trigger where evtfoid = rls_helper.oid) <> 1
+      or not exists (
+        select 1 from pg_catalog.pg_event_trigger e
+        where e.evtname = 'ensure_rls' and e.evtfoid = rls_helper.oid
+          and e.evtevent = 'ddl_command_end' and e.evtenabled = 'O'
+          and pg_catalog.pg_get_userbyid(e.evtowner) = 'postgres'
+          and pg_catalog.cardinality(e.evttags) = 3
+          and e.evttags @> array['CREATE TABLE','CREATE TABLE AS','SELECT INTO']::text[]
+      ) then
+      raise exception 'STOP: ensure_rls binding differs from the reviewed event trigger; inspect it before initialization';
+    end if;
+    verified_rls_oid := rls_helper.oid;
+  elsif exists (select 1 from pg_catalog.pg_event_trigger where evtname = 'ensure_rls') then
+    raise exception 'STOP: ensure_rls exists without the reviewed public RLS helper';
   end if;
   -- Reject every relation kind (including views, materialized views, sequences,
   -- foreign tables and indexes), plus routines and standalone schema objects.
@@ -21,7 +60,7 @@ begin
     into existing_public_object
   from (
     select 'relation' as object_kind, relname::text as object_name, relnamespace as namespace_oid from pg_catalog.pg_class
-    union all select 'routine', proname::text, pronamespace from pg_catalog.pg_proc
+    union all select 'routine', proname::text, pronamespace from pg_catalog.pg_proc where oid is distinct from verified_rls_oid
     union all select 'type', typname::text, typnamespace from pg_catalog.pg_type
     union all select 'collation', collname::text, collnamespace from pg_catalog.pg_collation
     union all select 'operator', oprname::text, oprnamespace from pg_catalog.pg_operator
