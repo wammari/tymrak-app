@@ -314,17 +314,49 @@ Use application-created test accounts for activation/recovery, not real users.
 Do not delete/recreate usable Auth accounts or resend invitations to repair a
 completion failure. Investigate mapping/configuration separately.
 
-SQL transaction execution, RLS enforcement, SMTP delivery, one-time links and
-Deployment Protection still require these real staging checks. Passing mock
-tests does not establish live deployment readiness.
+SQL transactions and RLS have now been exercised in disposable embedded
+PostgreSQL. Supabase's managed Auth/gateway behavior, SMTP delivery, one-time
+links and Deployment Protection still require these real staging checks.
+Local database success does not establish live deployment readiness.
 
 ## Validation and future production boundary
 
 `npm run test:no-sql` covers all existing JavaScript/API/page tests and new
 configuration regression/static SQL-assembly checks without executing SQL.
-The full `npm test` additionally runs PR #17's five embedded PostgreSQL tests.
-Those are not run during this preparation because the instruction forbids SQL
-execution. Run the full suite later only when disposable SQL testing is authorized.
+On 2026-10-12, disposable local SQL testing was separately authorized.
+The full `npm test` passed: 115 tests, zero failures. This includes the 86
+non-SQL checks, PR #17's five activation database tests, and 24 new checks in
+`tests/staging-bootstrap-database.test.mjs`.
+
+The new tests execute the entire generated bootstrap, enabling only its commented
+confirmation inside an in-memory PGlite 0.5.8 database. The source SQL otherwise
+matches the reviewed PR exactly. Simulated managed Auth UUID/email objects,
+an auth.uid() claim helper, and anon/authenticated/service roles provide the local
+dependencies; these are not a running Supabase Auth server. Broad initial default
+table/sequence grants are included so the bootstrap must actually revoke them.
+No Supabase API, remote database, actual passwords or real employees are used.
+
+Verified:
+
+- Successful creation of all six RLS-enabled tables, recovered column counts,
+  identity sequence, four policies, final approval constraints and synthetic ON rule.
+- Refusal of missing/wrong confirmation and pre-existing tables, views, materialized
+  views, sequences, functions, procedures, enums, domains, collations, text-search
+  configuration, public extensions and Auth accounts, without replacing them.
+- Complete rollback after a deliberate failure following migration execution.
+- Browser privilege restrictions, server-only activation RPC, own-profile/own-punch
+  RLS, denial before activation and denial for inactive/cross-employee punches.
+- Successful activation, unchanged identity/profile fields, timestamp-preserving
+  retries, legacy activation evidence, missing mapping and real unique-ID rejection.
+- Approval locking, optional-reason reopening, re-approval audit events and
+  append-only history, with the server role unable to insert history directly.
+- Refusal of repeated initialization, and test-manager seeding that changes only
+  the selected role and rejects confirmation errors, employee identities and repeats.
+
+The local tests passed without any changes to the bootstrap SQL. Repeat the live
+staging acceptance checklist after the separately authorized setup. The local
+auth.uid() helper simulates verified claims; it does not test email delivery,
+JWT verification, Supabase role configuration, real one-time callbacks or concurrency.
 
 This staging PR cannot be merged to main without a separately reviewed production
 configuration rollout. Before deploying the changed frontend to production,
