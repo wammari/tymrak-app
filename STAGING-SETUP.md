@@ -66,9 +66,16 @@ Only PR #17's outer BEGIN/COMMIT are omitted from the bundle so it retains one
 transaction. The original migration file is unchanged.
 
 Bootstrap refuses to run unless the operator explicitly confirms the staging ref,
-there are no public tables, and Auth has no users. The confirmation string is an
+the public schema has no relations (including views, materialized views,
+sequences, foreign tables or indexes), routines, types, collations, operators,
+operator classes/families, conversions, text-search objects or extensions,
+and Auth has no users. Public extension objects are deliberately not exempted;
+an unexpected extension blocks initialization and requires inspection.
+Supabase-managed objects in other schemas and existing schema/default grants
+are not treated as public application objects. The confirmation string is an
 operator safeguard, not a reliable way to detect a Supabase project from PostgreSQL.
 Verify the actual Dashboard URL/project ref before running any SQL.
+The error reports the kind and name of the first conflicting public object.
 Do not weaken the guards. If the project is not empty, stop and review its contents;
 do not delete users/tables to make the bootstrap pass.
 

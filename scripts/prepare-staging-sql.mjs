@@ -21,13 +21,39 @@ begin;
 -- After verifying the staging project, uncomment this confirmation:
 -- set local tymrak.staging_confirmation = 'cztwqcsizwkrqgpgrgg';
 do $guard$
+declare
+  existing_public_object text;
 begin
   if current_setting('tymrak.staging_confirmation', true) is distinct from 'cztwqcsizwkrqgpgrgg' then
     raise exception 'STOP: explicitly confirm the staging project before initialization';
   end if;
-  if exists (select 1 from pg_catalog.pg_class c join pg_catalog.pg_namespace n on n.oid = c.relnamespace
-    where n.nspname = 'public' and c.relkind in ('r','p')) then
-    raise exception 'STOP: public tables already exist; this is an empty-staging bootstrap only';
+  -- Reject every relation kind (including views, materialized views, sequences,
+  -- foreign tables and indexes), plus routines and standalone schema objects.
+  -- Do not exempt extension objects: an unexpected public extension is a reason
+  -- to inspect the project, not silently replace objects or weaken the guard.
+  select object_kind || ' ' || pg_catalog.quote_ident(object_name)
+    into existing_public_object
+  from (
+    select 'relation' as object_kind, relname::text as object_name, relnamespace as namespace_oid from pg_catalog.pg_class
+    union all select 'routine', proname::text, pronamespace from pg_catalog.pg_proc
+    union all select 'type', typname::text, typnamespace from pg_catalog.pg_type
+    union all select 'collation', collname::text, collnamespace from pg_catalog.pg_collation
+    union all select 'operator', oprname::text, oprnamespace from pg_catalog.pg_operator
+    union all select 'operator class', opcname::text, opcnamespace from pg_catalog.pg_opclass
+    union all select 'operator family', opfname::text, opfnamespace from pg_catalog.pg_opfamily
+    union all select 'conversion', conname::text, connamespace from pg_catalog.pg_conversion
+    union all select 'text search configuration', cfgname::text, cfgnamespace from pg_catalog.pg_ts_config
+    union all select 'text search dictionary', dictname::text, dictnamespace from pg_catalog.pg_ts_dict
+    union all select 'text search parser', prsname::text, prsnamespace from pg_catalog.pg_ts_parser
+    union all select 'text search template', tmplname::text, tmplnamespace from pg_catalog.pg_ts_template
+    union all select 'extension', extname::text, extnamespace from pg_catalog.pg_extension
+  ) as objects
+  join pg_catalog.pg_namespace n on n.oid = objects.namespace_oid
+  where n.nspname = 'public'
+  order by object_kind, object_name
+  limit 1;
+  if existing_public_object is not null then
+    raise exception 'STOP: public schema already contains %; this is an empty-staging bootstrap only', existing_public_object;
   end if;
   if exists (select 1 from auth.users) then
     raise exception 'STOP: Auth accounts already exist; initialize before creating test users';

@@ -195,7 +195,7 @@ test("prepared bootstrap contains exact migrations, guards and narrowed grants w
     }
     assert.equal(sql.slice(at+marker.length,end),expected);
   }
-  assert.match(sql,/public tables already exist/);assert.match(sql,/Auth accounts already exist/);
+  assert.match(sql,/public schema already contains/);assert.match(sql,/Auth accounts already exist/);
   assert.equal(sql.match(/^begin;$/gm)?.length,1);
   assert.equal(sql.match(/^commit;$/gm)?.length,1);
   assert.match(sql,/employees_auth_user_id_key unique \(auth_user_id\)/);
@@ -204,4 +204,29 @@ test("prepared bootstrap contains exact migrations, guards and narrowed grants w
   assert.match(sql,/grant insert on public.punches to authenticated/);
   assert.doesNotMatch(sql,/grant[^;]*\btruncate\b/i);
   assert.doesNotMatch(sql,/insert into (?:public\.)?employees|insert into auth\.users/i);
+});
+
+test("empty-staging guard checks all relation kinds and routines before any schema write",()=>{
+  const sql=fs.readFileSync(new URL("../supabase/staging/initialize-empty-staging.sql",import.meta.url),"utf8");
+  const guard=sql.slice(sql.indexOf("do $guard$"),sql.indexOf("$guard$;")+8);
+  assert.match(guard,/pg_catalog\.pg_class\b/);
+  assert.doesNotMatch(guard,/relkind\s*(?:in|=)/i,"views/sequences/foreign relations must not be excluded");
+  assert.match(guard,/pg_catalog\.pg_proc\b/);
+  assert.match(guard,/pg_catalog\.pg_namespace n on n\.oid = objects\.namespace_oid/);
+  assert.match(guard,/where n\.nspname = 'public'/);
+  assert.match(guard,/if existing_public_object is not null then\s+raise exception/);
+  assert.match(guard,/current_setting\('tymrak\.staging_confirmation', true\)/);
+  assert.match(guard,/if exists \(select 1 from auth\.users\)/);
+  assert.doesNotMatch(guard,/\b(?:create|alter|drop|insert|update|delete|truncate|grant|revoke)\b/i);
+  assert.ok(sql.indexOf("$guard$;")<sql.indexOf("create table public.employees"));
+});
+
+test("empty-staging guard rejects standalone schema objects and public extensions without exemptions",()=>{
+  const sql=fs.readFileSync(new URL("../supabase/staging/initialize-empty-staging.sql",import.meta.url),"utf8");
+  const guard=sql.slice(sql.indexOf("do $guard$"),sql.indexOf("$guard$;")+8);
+  for(const catalog of ["pg_type","pg_collation","pg_operator","pg_opclass","pg_opfamily","pg_conversion",
+    "pg_ts_config","pg_ts_dict","pg_ts_parser","pg_ts_template","pg_extension"]) {
+    assert.match(guard,new RegExp("pg_catalog\\."+catalog+"\\b"));
+  }
+  assert.doesNotMatch(guard,/\b(?:not exists|except)\b/i,"extension membership must not bypass the guard");
 });
