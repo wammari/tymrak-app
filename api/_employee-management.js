@@ -1,3 +1,5 @@
+import { getSiteUrl } from "./_deployment-config.js";
+
 export const EMPLOYEE_SELECT = [
   "id", "first_name", "last_name", "email", "username", "mobile",
   "position", "department", "province", "hire_date", "invitation_status",
@@ -102,8 +104,7 @@ export async function findDuplicate({ supabaseUrl, secretKey, email, username, e
 }
 
 export function activationRedirect() {
-  const siteUrl = (process.env.SITE_URL || "https://tymrak.vercel.app").replace(/\/$/, "");
-  return `${siteUrl}/activate.html`;
+  return `${getSiteUrl()}/activate.html`;
 }
 
 export async function sendActivationInvite(configuration, employee) {
