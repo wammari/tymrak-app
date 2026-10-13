@@ -10,7 +10,7 @@ Obtain separate authorization before carrying out the setup steps below.
 - Draft PR #17 reviewed: `ed6280789d6571c23681a50012f7595a6231d542`.
 - This draft is stacked on `fix/employee-activation-reliability-phase1`, so its
   diff contains staging work only. PR #17 and this PR stay unmerged.
-- Staging Supabase: `https://cztwqcsizwkrqgpgrgg.supabase.co`.
+- Staging Supabase: `https://ctztwqcsizwkrqgpgrgg.supabase.co`.
 - Dedicated Vercel project to create later: `tymrak-staging`.
 - Preparation branch: `setup/isolated-staging`. Its `vercel.json` disables automatic
   Git deployment for this exact branch before the branch is published. It does
@@ -160,7 +160,7 @@ to verify employee activation. No real employee or punch seed is included.
 
 ### 1. Review and initialize the empty staging database
 
-Verify Supabase Dashboard project ref `cztwqcsizwkrqgpgrgg`, not production.
+Verify Supabase Dashboard project ref `ctztwqcsizwkrqgpgrgg`, not production.
 Before creating any test Auth accounts, review the generated initialization SQL.
 In the staging SQL editor, paste the full file and uncomment only the explicit
 staging-confirmation line. Run it once as the administrative SQL operator.
@@ -213,8 +213,8 @@ exact reviewed commit is preferable during initial testing.
 | Variable | Value/source |
 | --- | --- |
 | APP_ENV | `staging` |
-| SUPABASE_URL | `https://cztwqcsizwkrqgpgrgg.supabase.co` |
-| SUPABASE_EXPECTED_PROJECT_REF | `cztwqcsizwkrqgpgrgg` |
+| SUPABASE_URL | `https://ctztwqcsizwkrqgpgrgg.supabase.co` |
+| SUPABASE_EXPECTED_PROJECT_REF | `ctztwqcsizwkrqgpgrgg` |
 | SUPABASE_PUBLISHABLE_KEY | Staging Dashboard's publishable key, or its legacy anon key |
 | SUPABASE_SECRET_KEY | Staging secret key, entered as Secret; server only |
 | SITE_URL | Verified stable staging HTTPS origin, no path/query |
@@ -402,3 +402,15 @@ No migration, project creation, credential entry or merge happens automatically.
 - [Supabase redirect URLs](https://supabase.com/docs/guides/auth/redirect-urls)
 - [Supabase custom SMTP](https://supabase.com/docs/guides/auth/auth-smtp)
 - [Supabase admin invitations](https://supabase.com/docs/reference/javascript/auth-admin-inviteuserbyemail)
+
+## Staging URL correction (2026-10-13)
+
+The verified Dashboard Project URL is `https://ctztwqcsizwkrqgpgrgg.supabase.co`.
+The earlier supplied reference omitted the first `t`. Update only the dedicated
+staging project's SUPABASE_URL and SUPABASE_EXPECTED_PROJECT_REF in Production
+and Preview, then manually deploy the corrected reviewed commit. Keep its keys
+and SITE_URL unchanged. The staging database was already initialized: do not
+rerun the empty bootstrap, recreate users/tables, or apply migrations again.
+The optional manager script accepts the exact old bootstrap comment as a legacy
+marker while still requiring explicit confirmation of the corrected project ref.
+No database change is required for this correction.

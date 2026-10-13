@@ -7,7 +7,7 @@ import { pgcrypto } from "@electric-sql/pglite/contrib/pgcrypto";
 // In-memory PostgreSQL only. No Supabase URL, credentials, sockets or Auth API.
 // Simulate only the managed roles/auth objects that the app SQL depends on.
 const rawBootstrap = fs.readFileSync(new URL("../supabase/staging/initialize-empty-staging.sql", import.meta.url), "utf8");
-const confirmation = "-- set local tymrak.staging_confirmation = 'cztwqcsizwkrqgpgrgg';";
+const confirmation = "-- set local tymrak.staging_confirmation = 'ctztwqcsizwkrqgpgrgg';";
 assert.equal(rawBootstrap.split(confirmation).length, 2);
 const bootstrap = rawBootstrap.replace(confirmation, confirmation.slice(3));
 const rlsFixture = fs.readFileSync(new URL("./fixtures/verified-rls-auto-enable.sql", import.meta.url), "utf8");
@@ -74,7 +74,7 @@ async function rejectedWithoutWrites(db, sql, pattern) {
 test("bootstrap requires an explicit local confirmation and rejects a wrong project string", async () => {
   await disposable(async db => {
     await rejectedWithoutWrites(db, rawBootstrap, /explicitly confirm/);
-    await rejectedWithoutWrites(db, bootstrap.replace("= 'cztwqcsizwkrqgpgrgg';", "= 'wrong-project';"), /explicitly confirm/);
+    await rejectedWithoutWrites(db, bootstrap.replace("= 'ctztwqcsizwkrqgpgrgg';", "= 'wrong-project';"), /explicitly confirm/);
   });
 });
 
@@ -392,6 +392,12 @@ test("test-manager seed requires confirmation, adds only the selected test role 
   await assert.rejects(db.exec(raw), /staging bootstrap marker and explicit confirmation/);
   await db.exec("rollback");
   await assert.rejects(db.exec(raw.replace(confirmation, confirmation.slice(3))), /Replace the test manager email/);
+  await db.exec("rollback");
+  await db.exec("comment on table public.employees is 'unrelated marker'");
+  await assert.rejects(db.exec(selected), /staging bootstrap marker/);
+  await db.exec("rollback");
+  await db.exec("comment on table public.employees is 'TYMRAK empty staging bootstrap: cztwqcsizwkrqgpgrgg'");
+  await assert.rejects(db.exec(selected.replace("= 'ctztwqcsizwkrqgpgrgg';", "= 'cztwqcsizwkrqgpgrgg';")), /explicit confirmation/);
   await db.exec("rollback");
   await db.exec(selected);
   assert.deepEqual((await db.query("select auth_user_id, role from public.user_roles")).rows,

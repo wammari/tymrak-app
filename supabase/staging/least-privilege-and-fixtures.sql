@@ -15,7 +15,7 @@ grant select, insert, update on public.timecard_approvals to service_role;
 revoke execute on function public.set_updated_at() from public, anon, authenticated, service_role;
 -- Other trigger-function and activation RPC grants come from the exact migrations.
 
-comment on table public.employees is 'TYMRAK empty staging bootstrap: cztwqcsizwkrqgpgrgg';
+comment on table public.employees is 'TYMRAK empty staging bootstrap: ctztwqcsizwkrqgpgrgg';
 
 -- Synthetic fixture for ON-only smoke tests, not a recovered business dataset.
 insert into public.overtime_rules (

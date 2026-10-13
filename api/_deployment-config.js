@@ -1,5 +1,5 @@
 // All deployed APIs and browser configuration share the same Supabase target.
-export const STAGING_PROJECT_REF = "cztwqcsizwkrqgpgrgg";
+export const STAGING_PROJECT_REF = "ctztwqcsizwkrqgpgrgg";
 
 function environment(env) {
   const name = env.APP_ENV;

@@ -11,8 +11,8 @@ import invitationHandler from "../api/send-invitation.js";
 
 const staging = {
   APP_ENV: "staging", VERCEL: "1", VERCEL_ENV: "production",
-  SUPABASE_URL: "https://cztwqcsizwkrqgpgrgg.supabase.co/",
-  SUPABASE_EXPECTED_PROJECT_REF: "cztwqcsizwkrqgpgrgg",
+  SUPABASE_URL: "https://ctztwqcsizwkrqgpgrgg.supabase.co/",
+  SUPABASE_EXPECTED_PROJECT_REF: "ctztwqcsizwkrqgpgrgg",
   SUPABASE_PUBLISHABLE_KEY: "sb_publishable_test",
   SUPABASE_SECRET_KEY: "sb_secret_never_in_browser",
   SITE_URL: "https://tymrak-staging.vercel.app/"
@@ -61,9 +61,9 @@ test("production can explicitly select its own project and never falls back to s
 });
 
 test("malformed Supabase URLs and staging site origins fail closed", () => {
-  for(const SUPABASE_URL of ["","http://cztwqcsizwkrqgpgrgg.supabase.co","https://user:pass@cztwqcsizwkrqgpgrgg.supabase.co",
-    "https://cztwqcsizwkrqgpgrgg.supabase.co/path","https://cztwqcsizwkrqgpgrgg.supabase.co?x=1",
-    "https://cztwqcsizwkrqgpgrgg.supabase.co.evil.test"]) {
+  for(const SUPABASE_URL of ["","http://ctztwqcsizwkrqgpgrgg.supabase.co","https://user:pass@ctztwqcsizwkrqgpgrgg.supabase.co",
+    "https://ctztwqcsizwkrqgpgrgg.supabase.co/path","https://ctztwqcsizwkrqgpgrgg.supabase.co?x=1",
+    "https://ctztwqcsizwkrqgpgrgg.supabase.co.evil.test"]) {
     assert.throws(()=>getSupabaseTarget({...staging,SUPABASE_URL}));
   }
   for(const SITE_URL of ["","https://app.example.com","http://tymrak-staging.vercel.app",
@@ -149,7 +149,7 @@ async function recoveryPage({event="PASSWORD_RECOVERY",error=null}={}) {
   const context={document:{getElementById:id=>elements[id]},
     console:{log(){},error(){}},loadSupabaseConfiguration:async()=>getPublicConfiguration(staging),
     createClient(url,key,options) {
-      assert.equal(url,"https://cztwqcsizwkrqgpgrgg.supabase.co");
+      assert.equal(url,"https://ctztwqcsizwkrqgpgrgg.supabase.co");
       assert.equal(key,"sb_publishable_test");
       assert.equal(options.auth.detectSessionInUrl,true);assert.equal(options.auth.persistSession,true);
       return {auth:{onAuthStateChange(fn){listener=fn;},
@@ -234,4 +234,10 @@ test("empty-staging guard rejects standalone schema objects and public extension
   assert.match(objects,/pg_catalog\.pg_proc where oid is distinct from verified_rls_oid/);
   assert.match(guard,/325ae266d9b166715ef5230ceaf7ff9d523e483cf5610dfb9779ab3f183f4af9/);
   assert.match(guard,/verified_rls_oid := rls_helper\.oid/);
+});
+
+test("the earlier misspelled staging host is rejected even with its matching expected ref", () => {
+  assert.throws(() => getSupabaseTarget({...staging,
+    SUPABASE_URL: "https://cztwqcsizwkrqgpgrgg.supabase.co",
+    SUPABASE_EXPECTED_PROJECT_REF: "cztwqcsizwkrqgpgrgg"}));
 });
