@@ -1,50 +1,20 @@
 <!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TYMRAK | Time. Tracked Right.</title>
+<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>TYMRAK | Time. Tracked Right.</title>
 <style>
-:root { --navy:#14213d; --green:#299764; --ink:#182238; --muted:#667085; --line:#dfe4eb; }
-* { box-sizing:border-box; }
-body { margin:0; min-height:100vh; font-family:Inter,Arial,sans-serif; color:var(--ink); background:linear-gradient(145deg,#f6f9f7 0%,#eef2f7 100%); }
-.shell { min-height:100vh; display:grid; grid-template-columns:1.1fr .9fr; }
-.brand { padding:clamp(40px,8vw,100px); display:flex; flex-direction:column; justify-content:center; background:var(--navy); color:white; }
-.wordmark { font-size:clamp(42px,7vw,76px); letter-spacing:.08em; margin:0; }
-.tagline { color:#67d19a; font-weight:800; letter-spacing:.16em; font-size:13px; }
-.brand p { max-width:520px; margin-top:34px; color:#d6ddea; font-size:19px; line-height:1.7; }
-.entry { padding:40px; display:flex; align-items:center; justify-content:center; }
-.card { width:min(470px,100%); background:white; border:1px solid var(--line); border-radius:18px; padding:38px; box-shadow:0 24px 60px rgba(20,33,61,.09); }
-h2 { margin:0 0 8px; font-size:28px; color:var(--navy); }
-.intro { color:var(--muted); line-height:1.6; margin:0 0 28px; }
-.option { display:block; text-decoration:none; padding:19px 20px; margin-top:14px; border:1px solid var(--line); border-radius:12px; color:var(--ink); transition:.15s ease; }
-.option:hover,.option:focus { border-color:var(--green); transform:translateY(-1px); box-shadow:0 8px 24px rgba(41,151,100,.10); }
-.option strong { display:block; color:var(--navy); margin-bottom:6px; }
-.option span { color:var(--muted); font-size:14px; }
-@media (max-width:760px) { .shell { grid-template-columns:1fr; } .brand { min-height:36vh; padding:40px 28px; } .brand p { font-size:16px; margin-bottom:0; } .entry { padding:28px 18px; } .card { padding:28px 22px; } }
-</style>
-</head>
-<body>
-<main class="shell">
-  <section class="brand" aria-labelledby="brand-title">
-    <div class="tagline">TIME. TRACKED RIGHT.</div>
-    <h1 class="wordmark" id="brand-title">TYMRAK</h1>
-    <p>One place for your workday, from a clear clock-in to accurate timecards and dependable payroll preparation.</p>
-  </section>
-  <section class="entry">
-    <div class="card">
-      <h2>Welcome to TYMRAK</h2>
-      <p class="intro">Choose the secure portal for your role.</p>
-      <a class="option" href="/login.html">
-        <strong>Employee Portal</strong>
-        <span>Clock in, review your day, and view timecards.</span>
-      </a>
-      <a class="option" href="/manager-login.html">
-        <strong>Manager Portal</strong>
-        <span>Manage employees and workplace administration.</span>
-      </a>
-    </div>
-  </section>
-</main>
-</body>
-</html>
+:root{--navy:#092c55;--green:#159f3e}*{box-sizing:border-box}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--navy);background:radial-gradient(ellipse at 90% 55%,#d9e8f2 0%,transparent 48%),linear-gradient(135deg,#d8f5f0,#f8fcff 30%,#e5f1fb 80%,#d3e7f4);min-height:100vh}
+main{position:relative;min-height:100vh;overflow:hidden;padding:36px 20px 42px;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center}
+main:before{content:"";position:absolute;width:55vw;height:35vw;border-radius:50%;background:linear-gradient(120deg,#29c38b55,#1784bb55);left:-25vw;bottom:-18vw;transform:rotate(20deg)}
+main:after{content:"";position:absolute;width:38vw;height:38vw;border-radius:50%;background:radial-gradient(circle,#65a58d30,transparent 68%);right:-14vw;top:12vw;filter:blur(20px)}
+.corner{position:absolute;right:5%;top:32px;letter-spacing:.22em;font-size:12px;line-height:1.9;text-align:right}.corner:after{content:"";display:block;margin:12px 0 0 auto;background:#21ac52;width:60px;height:3px}
+.logo{width:min(400px,80vw);height:auto;position:relative;z-index:1;margin:5px auto 15px}
+h1{font-size:clamp(32px,4vw,54px);margin:10px 0 4px}p.lead{font-size:clamp(17px,2vw,24px);margin:0 0 34px;color:#345375}
+.portals{position:relative;z-index:1;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:26px;width:min(950px,100%)}.portal{background:#ffffffdc;border:1px solid #b8d5eb;border-radius:14px;padding:22px 24px;text-decoration:none;color:var(--navy);box-shadow:0 8px 28px #16476b16;transition:transform .15s}.portal:first-child{border-color:#a4dfba}.portal:hover,.portal:focus-visible{transform:translateY(-3px)}.symbol{font-size:38px;margin-bottom:8px}.portal strong{display:block;font-size:25px;margin-bottom:8px}.portal .desc{display:block;min-height:50px;line-height:1.5;font-size:16px}.action{display:block;margin-top:18px;background:linear-gradient(#2ab859,#099237);color:white;padding:15px;border-radius:9px;font-weight:bold;font-size:17px}.portal:nth-child(2) .action{background:linear-gradient(#145a98,#063367)}
+.features{position:relative;z-index:1;display:grid;grid-template-columns:repeat(5,1fr);width:min(1150px,100%);gap:15px;margin-top:45px}.feature{padding:0 10px;border-right:1px solid #bed1df}.feature:last-child{border:0}.feature .circle{display:grid;place-items:center;background:#e1effb;border-radius:50%;width:58px;height:58px;margin:0 auto 12px;font-size:29px}.feature strong{display:block;font-size:16px}.feature small{display:block;margin-top:6px;color:#45627e;line-height:1.4}
+@media(max-width:700px){main{padding:95px 18px 36px}.corner{top:18px;right:20px;font-size:9px}.portals{grid-template-columns:1fr;gap:14px}.portal{padding:16px}.portal .desc{min-height:0}.features{grid-template-columns:repeat(2,1fr);gap:22px;margin-top:32px}.feature:nth-child(2n){border:0}.logo{width:min(300px,80vw)}}
+</style></head><body><main>
+<div class="corner">ANYTIME. ANYWHERE.<br>A BRIGHTER TOMORROW.</div>
+<svg class="logo" viewBox="0 0 440 320" role="img" aria-label="TYMRAK. Time. Tracked Right."><path d="M218 19 A109 109 0 1 0 220 237" fill="none" stroke="#07315b" stroke-width="27"/><path d="M227 237 A109 109 0 0 0 312 72" fill="none" stroke="#28ad54" stroke-width="27"/><path d="M165 102 H214 V195 L192 214 V128 H182 Z" fill="#07315b"/><path d="M218 114 L246 143 L329 50 L247 168 L218 139 Z" fill="#28ad54"/><text x="220" y="277" text-anchor="middle" font-family="Arial,sans-serif" font-size="76" font-weight="900" letter-spacing="-4"><tspan fill="#07315b">TYM</tspan><tspan fill="#28ad54">RAK</tspan></text><text x="220" y="310" text-anchor="middle" font-family="Arial,sans-serif" font-size="18" letter-spacing="7" fill="#07315b">TIME. TRACKED RIGHT.</text></svg>
+<h1>Welcome to TYMRAK</h1><p class="lead">More than time tracking. A smarter way to manage your team.</p>
+<div class="portals"><a class="portal" href="/login.html"><div class="symbol" aria-hidden="true">●</div><strong>Employee Portal</strong><span class="desc">Clock in, view your timecard<br>and manage your requests.</span><span class="action">Enter Employee Portal →</span></a><a class="portal" href="/manager-login.html"><div class="symbol" aria-hidden="true">♟</div><strong>Manager Portal</strong><span class="desc">Approve timecards, manage employees<br>and view reports.</span><span class="action">Enter Manager Portal →</span></a></div>
+<div class="features"><div class="feature"><div class="circle">◷</div><strong>Track Time</strong><small>Accurately and effortlessly</small></div><div class="feature"><div class="circle">▦</div><strong>Manage Schedules</strong><small>Keep your team on track</small></div><div class="feature"><div class="circle">⌖</div><strong>Geofencing</strong><small>Ensure the right place, right time</small></div><div class="feature"><div class="circle">♟</div><strong>Team Management</strong><small>Support your people</small></div><div class="feature"><div class="circle">▥</div><strong>Reports &amp; Insights</strong><small>Make informed decisions</small></div></div>
+</main></body></html>
