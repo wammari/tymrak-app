@@ -55,9 +55,20 @@ test("hosted environments must explicitly select APP_ENV and previews cannot use
 
 test("production can explicitly select its own project and never falls back to staging", () => {
   const env={...staging,APP_ENV:"production",SUPABASE_URL:"https://productionexample.supabase.co",
-    SUPABASE_EXPECTED_PROJECT_REF:"productionexample",SITE_URL:"https://app.example.com"};
+    SUPABASE_EXPECTED_PROJECT_REF:"productionexample",SITE_URL:"https://www.tymrak.com"};
   assert.equal(getPublicConfiguration(env).supabaseUrl,"https://productionexample.supabase.co");
   assert.throws(()=>getSupabaseTarget({...staging,APP_ENV:"production"}));
+});
+
+test("production accepts only the canonical TYMRAK site for Auth redirects", () => {
+  const env={...staging,APP_ENV:"production",VERCEL_ENV:"production",
+    SUPABASE_URL:"https://productionexample.supabase.co",
+    SUPABASE_EXPECTED_PROJECT_REF:"productionexample",SITE_URL:"https://www.tymrak.com"};
+  assert.equal(getSiteUrl(env),"https://www.tymrak.com");
+  for(const SITE_URL of ["https://app.example.com","https://tymrak.com",
+    "https://www.tymrak.com.evil.test","http://www.tymrak.com"]) {
+    assert.throws(()=>getSiteUrl({...env,SITE_URL}));
+  }
 });
 
 test("malformed Supabase URLs and staging site origins fail closed", () => {
