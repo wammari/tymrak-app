@@ -43,6 +43,9 @@ export function getSiteUrl(env = process.env) {
   if (appEnvironment === "staging" &&
       !(url.hostname.startsWith("tymrak-staging") && url.hostname.endsWith(".vercel.app")) &&
       url.hostname !== "staging.tymrak.com") throw new Error("Invalid staging site origin");
+  if (appEnvironment === "production" && url.origin !== "https://www.tymrak.com") {
+    throw new Error("Invalid production site origin");
+  }
   return url.origin;
 }
 
