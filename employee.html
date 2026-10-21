@@ -451,11 +451,11 @@ h2 {
 
 <script type="module">
 
-const SUPABASE_URL =
-    "https://tsosredghislnehfyypi.supabase.co";
+import { loadSupabaseConfiguration } from "/supabase-config.js";
+const deploymentConfiguration = await loadSupabaseConfiguration();
+const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
 
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
 
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";

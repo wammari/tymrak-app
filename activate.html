@@ -2,6 +2,7 @@
 <html lang="en">
 
 <head>
+<meta name="referrer" content="no-referrer">
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -153,6 +154,7 @@ Confirm Password
 <button
     id="activateButton"
     type="submit"
+    disabled
 >
 Activate My Account
 </button>
@@ -171,8 +173,14 @@ Activate My Account
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-const SUPABASE_URL = "https://tsosredghislnehfyypi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+import { loadSupabaseConfiguration } from "/supabase-config.js";
+// Preserve the callback in memory and clear credentials before config fetching.
+const invitationQuery = new URLSearchParams(window.location.search);
+const invitationFragment = new URLSearchParams(window.location.hash.slice(1));
+window.history.replaceState({}, document.title, window.location.pathname);
+const deploymentConfiguration = await loadSupabaseConfiguration();
+const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
+const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
 
 // Invitation sessions stay in memory and never consume or overwrite the normal
 // login/recovery client's saved session. URL processing is explicit below.
@@ -200,10 +208,8 @@ function showMessage(type, text) {
 }
 
 async function prepareActivation() {
-    const query = new URLSearchParams(window.location.search);
-    const fragment = new URLSearchParams(window.location.hash.slice(1));
-    // Remove credentials even for rejected links, before any network request.
-    window.history.replaceState({}, document.title, window.location.pathname);
+    const query = invitationQuery;
+    const fragment = invitationFragment;
     try {
         if (query.has("error") || fragment.has("error")) throw new Error("Invalid invitation");
         let result;
