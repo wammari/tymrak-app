@@ -247,6 +247,7 @@ test("empty-staging guard rejects standalone schema objects and public extension
   assert.match(guard,/verified_rls_oid := rls_helper\.oid/);
 });
 
+// Keep this regression guard in CI whenever staging configuration changes.
 test("the earlier misspelled staging host is rejected even with its matching expected ref", () => {
   assert.throws(() => getSupabaseTarget({...staging,
     SUPABASE_URL: "https://cztwqcsizwkrqgpgrgg.supabase.co",
