@@ -69,7 +69,17 @@ test("semi-monthly current, previous, and month-end periods are timezone safe", 
   const previous = getPreviousPayPeriod(current, "America/Edmonton");
   assert.equal(previous.key, "2026-09-2");
   assert.equal(previous.end.toISOString(), "2026-10-01T05:59:59.999Z");
-  assert.equal(periodFromKey("2028-02-2", new Date("2028-03-01T12:00:00Z"), "America/Edmonton").end.toISOString(), "2028-03-01T06:59:59.999Z");
+  // Future timezone offsets can differ across operating-system tzdata versions.
+  // Assert the payroll requirement in local time, independent of the UTC offset.
+  const leapDayEnd = periodFromKey("2028-02-2", new Date("2028-03-01T12:00:00Z"), "America/Edmonton").end;
+  const localEnd = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit",
+    hour: "2-digit", minute: "2-digit", second: "2-digit", hourCycle: "h23"
+  }).formatToParts(leapDayEnd).filter(part => part.type !== "literal").map(part => [part.type, part.value]));
+  assert.deepEqual(localEnd, {
+    month: "02", day: "29", year: "2028", hour: "23", minute: "59", second: "59"
+  });
+  assert.equal(leapDayEnd.getUTCMilliseconds(), 999);
   assert.equal(periodFromKey("2026-10-2", new Date("2026-10-04T18:00:00Z"), "America/Edmonton"), null);
 });
 
