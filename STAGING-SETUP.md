@@ -1,22 +1,17 @@
 # Isolated employee activation staging setup
 
-Prepared for review only. No deployment, SQL execution, credentials configuration,
-email sending or production data changes are authorized by this preparation.
-Obtain separate authorization before carrying out the setup steps below.
+## Current status (October 21, 2026)
 
-## Source and review scope
-
-- Main reviewed: `1fe60fda19a94167a069c0b773cf8d4cbf41b6bc`.
-- Draft PR #17 reviewed: `ed6280789d6571c23681a50012f7595a6231d542`.
-- This draft is stacked on `fix/employee-activation-reliability-phase1`, so its
-  diff contains staging work only. PR #17 and this PR stay unmerged.
-- Staging Supabase: `https://ctztwqcsizwkrqgpgrgg.supabase.co`.
-- Dedicated Vercel project to create later: `tymrak-staging`.
-- Preparation branch: `setup/isolated-staging`. Its `vercel.json` disables automatic
-  Git deployment for this exact branch before the branch is published. It does
-  not change other branches or any existing Vercel project settings.
-- Do not deploy the original main/PR #17 pages: they embed production Supabase
-  settings. Do not deploy this branch to any existing production project.
+- PR #17 activation reliability work has already been merged into `main`.
+- PR #18 targets `main` and remains a draft, unmerged.
+- Dedicated staging Supabase project: `https://ctztwqcsizwkrqgpgrgg.supabase.co`.
+- Dedicated staging Vercel project is deployed at `https://tymrak-staging.vercel.app`.
+- Staging employee login, clock in/out, database persistence, timecard display, manager login, manager timecards, approval and reopening were manually verified October 21.
+- GPS fields in the test punches were null; mandatory geofencing is not implemented by this PR.
+- Production environment variables have been prepared, but production rollout and deployment of this PR have NOT been authorized.
+- The staging branch intentionally disables automatic Git deployments for its own branch; manually authorized staging deployment was performed separately.
+- Do not execute empty-staging bootstrap again on the already populated staging database.
+- Before merge: synchronize with latest `main`, rerun CI, review production environment variables and deployment behavior. Do not merge or deploy automatically.
 
 ## Configuration behavior
 
