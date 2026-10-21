@@ -69,7 +69,7 @@ test("semi-monthly current, previous, and month-end periods are timezone safe", 
   assert.equal(previous.key, "2026-09-2");
   assert.equal(previous.end.toISOString(), "2026-10-01T05:59:59.999Z");
   // Future timezone offsets can differ across operating-system tzdata versions.
-  // Assert the actual payroll requirement: February ends at 23:59:59.999 local time.
+  // Assert the payroll requirement in local time, independent of the UTC offset.
   const leapDayEnd = periodFromKey("2028-02-2", new Date("2028-03-01T12:00:00Z"), "America/Edmonton").end;
   const localEnd = Object.fromEntries(new Intl.DateTimeFormat("en-CA", {
     timeZone: "America/Edmonton", year: "numeric", month: "2-digit", day: "2-digit",
