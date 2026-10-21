@@ -392,6 +392,7 @@ tbody tr:last-child td {
 
 
 <script type="module">
+import { buildWorkSessions, summarizeSessions } from "./work-sessions.js";
 
 import { loadSupabaseConfiguration } from "/supabase-config.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
@@ -1250,192 +1251,24 @@ function calculateGreaterDailyOrWeeklyOvertime(
     );
 }
 function calculateDay(punches) {
-
-    let firstClockIn = null;
-    let lastClockOut = null;
-
-    let workStartedAt = null;
-    let breakStartedAt = null;
-
-    let workedMilliseconds = 0;
-    let breakMilliseconds = 0;
-
-    const sortedPunches =
-        [...punches].sort(
-            (a, b) =>
-                new Date(a.punched_at) -
-                new Date(b.punched_at)
-        );
-
-
-    for (const punch of sortedPunches) {
-
-        const time =
-            new Date(
-                punch.punched_at
-            ).getTime();
-
-
-        if (punch.punch_type === "clock_in") {
-
-            if (firstClockIn === null) {
-                firstClockIn =
-                    punch.punched_at;
-            }
-
-            /*
-                Start a new work session only
-                if one is not already open.
-            */
-
-            if (workStartedAt === null) {
-                workStartedAt = time;
-            }
-
-            breakStartedAt = null;
-
-
-        } else if (
-            punch.punch_type === "break_start"
-        ) {
-
-            if (workStartedAt !== null) {
-
-                workedMilliseconds +=
-                    Math.max(
-                        0,
-                        time - workStartedAt
-                    );
-
-                workStartedAt = null;
-            }
-
-            if (breakStartedAt === null) {
-                breakStartedAt = time;
-            }
-
-
-        } else if (
-            punch.punch_type === "break_end"
-        ) {
-
-            if (breakStartedAt !== null) {
-
-                breakMilliseconds +=
-                    Math.max(
-                        0,
-                        time - breakStartedAt
-                    );
-
-                breakStartedAt = null;
-            }
-
-            if (workStartedAt === null) {
-                workStartedAt = time;
-            }
-
-
-        } else if (
-            punch.punch_type === "clock_out"
-        ) {
-
-            if (workStartedAt !== null) {
-
-                workedMilliseconds +=
-                    Math.max(
-                        0,
-                        time - workStartedAt
-                    );
-
-                workStartedAt = null;
-            }
-
-            /*
-                If someone clocks out while
-                on break, close the break too.
-            */
-
-            if (breakStartedAt !== null) {
-
-                breakMilliseconds +=
-                    Math.max(
-                        0,
-                        time - breakStartedAt
-                    );
-
-                breakStartedAt = null;
-            }
-
-            lastClockOut =
-                punch.punched_at;
+    const ordered = [...punches].sort((a,b)=>Date.parse(a.punched_at)-Date.parse(b.punched_at));
+    const sessions = buildWorkSessions(ordered);
+    const today = getDatePartsInEmployeeTimeZone(new Date());
+    const first = ordered.length ? getDatePartsInEmployeeTimeZone(new Date(ordered[0].punched_at)) : null;
+    const isToday = first && first.year===today.year && first.month===today.month && first.day===today.day;
+    if (!isToday) for (const session of sessions) {
+        if (!session.clockOut && session.clockIn) {
+            session.workedMilliseconds = buildWorkSessions(session.punches,Date.parse(session.clockIn))[0]?.workedMilliseconds || 0;
         }
     }
-
-
-    /*
-        For today's open shift, continue
-        counting until the current time.
-
-        Historical incomplete shifts will
-        later be flagged as Missing Punch.
-    */
-
-   const todayParts =
-    getDatePartsInEmployeeTimeZone(
-        new Date()
-    );
-
-const punchParts =
-    sortedPunches.length > 0
-        ? getDatePartsInEmployeeTimeZone(
-            new Date(
-                sortedPunches[0].punched_at
-            )
-        )
-        : null;
-
-const isToday =
-    punchParts &&
-    punchParts.year === todayParts.year &&
-    punchParts.month === todayParts.month &&
-    punchParts.day === todayParts.day;
-
-    if (
-        isToday &&
-        workStartedAt !== null
-    ) {
-
-        workedMilliseconds +=
-            Math.max(
-                0,
-                Date.now() -
-                workStartedAt
-            );
-    }
-
-
-    if (
-        isToday &&
-        breakStartedAt !== null
-    ) {
-
-        breakMilliseconds +=
-            Math.max(
-                0,
-                Date.now() -
-                breakStartedAt
-            );
-    }
-
-
     return {
-        firstClockIn,
-        lastClockOut,
-        workedMilliseconds,
-        breakMilliseconds
+        firstClockIn: sessions.find(x=>x.clockIn)?.clockIn || null,
+        lastClockOut: [...sessions].reverse().find(x=>x.clockOut)?.clockOut || null,
+        workedMilliseconds: summarizeSessions(sessions).workedMilliseconds,
+        breakMilliseconds: 0,
+        sessions
     };
 }
-
 function renderTimecard(
     punches,
     period
@@ -1729,6 +1562,17 @@ const overtime =
 
                     </tr>
 
+
+                    ${result.sessions.map((session,index)=>`
+                    <tr class="timecard-session-row">
+                        <td><span class="pending">Pending</span></td>
+                        <td>↳ Session ${index+1}</td>
+                        <td>${escapeHTML(formatTime(session.clockIn))}</td>
+                        <td>${escapeHTML(formatTime(session.clockOut))}</td>
+                        <td>${escapeHTML(session.location || "—")}</td>
+                        <td>${escapeHTML(formatDuration(session.workedMilliseconds))}</td>
+                        <td>—</td><td>—</td>
+                    </tr>`).join("")}
 
                     <tr
                         class="punch-detail-row"
