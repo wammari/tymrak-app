@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import { buildWorkSessions, summarizeSessions } from "../work-sessions.js";
 
 const source =
     fs.readFileSync(
@@ -60,14 +61,16 @@ const functionNames = [
 ];
 
 const functions =
-    Function(`
+    Function("sharedBuildWorkSessions", "sharedSummarizeSessions", `
         let employeeTimeZone = "America/Edmonton";
         let currentPayPeriod = null;
+        const buildWorkSessions = sharedBuildWorkSessions;
+        const summarizeSessions = sharedSummarizeSessions;
         ${functionNames.map(extractFunction).join("\n")}
         return {
             ${functionNames.join(",")}
         };
-    `)();
+    `)(buildWorkSessions, summarizeSessions);
 
 function assertPeriod(
     period,
