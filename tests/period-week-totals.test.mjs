@@ -18,7 +18,7 @@ test("partial semi-monthly weeks, weekly overtime and grand total", () => {
   assert.equal(totals.overtimeMilliseconds,ms(2));
 });
 test("empty period still shows partial weeks and zero grand total",()=>{
-  const result=groupPeriodWeeks([],"2026-10-16","2026-10-31",0);
+  const result=groupPeriodWeeks([],"2026-10-16","2026-10-31",6);
   assert.equal(result.weeks.length,4);
   assert.equal(result.totals.workedMilliseconds,0);
 });
