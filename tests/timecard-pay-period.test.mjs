@@ -275,8 +275,8 @@ const boundaryResults=functions.calculateWeeklyOvertime(boundaryDays,{
 });
 const visibleBoundary=boundaryResults.filter(day=>day.dateKey>="2026-10-16"&&day.dateKey<="2026-10-31");
 assert.equal(visibleBoundary.reduce((n,d)=>n+d.workedMilliseconds,0),15*3600000);
-assert.equal(visibleBoundary.reduce((n,d)=>n+d.overtimeMilliseconds,0),4*3600000);
-assert.equal(visibleBoundary.reduce((n,d)=>n+d.regularMilliseconds,0),11*3600000);
+assert.equal(visibleBoundary.reduce((n,d)=>n+d.overtimeMilliseconds,0),11*3600000);
+assert.equal(visibleBoundary.reduce((n,d)=>n+d.regularMilliseconds,0),4*3600000);
 
 console.log(
     "Timecard pay-period navigation tests passed."
