@@ -2,7 +2,7 @@ name: TYMRAK tests
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, setup/isolated-staging]
   push:
     branches: [main]
   workflow_dispatch:
