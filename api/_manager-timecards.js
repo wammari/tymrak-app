@@ -178,7 +178,7 @@ export function summarizeEmployee(employee, punches, rule, period) {
   const overtime = days.reduce((sum, day) => sum + day.overtimeMilliseconds, 0);
   return { employee: { id: employee.id, first_name: employee.first_name, last_name: employee.last_name, province: employee.province },
     regularMilliseconds: total - overtime, overtimeMilliseconds: overtime, totalMilliseconds: total,
-    exceptionCount: days.filter(day => day.missingPunch).length, approvalStatus: "Not approved", days };
+    exceptionCount: days.filter(day => day.missingPunch).length, weekStartDay: Number(rule?.week_start_day ?? 0), approvalStatus: "Not approved", days };
 }
 
 export function calculationStart(period, weekStartDay = 0, timeZone = "America/Toronto") {
