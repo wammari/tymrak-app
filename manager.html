@@ -62,6 +62,13 @@ import { groupPeriodWeeks } from "./period-week-totals.js";
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 const SUPABASE_URL="https://tsosredghislnehfyypi.supabase.co";
 const SUPABASE_PUBLISHABLE_KEY="sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+// Fail closed on preview/unknown hosts: these files retain production Supabase settings.
+// Staging testing must use the isolated staging-configured branch instead.
+const allowedProductionHosts = new Set(["www.tymrak.com", "tymrak.com", "tymrak.vercel.app", "localhost", "127.0.0.1"]);
+if (!allowedProductionHosts.has(window.location.hostname.toLowerCase())) {
+    document.body.textContent = "TYMRAK preview unavailable: database isolation is required before testing.";
+    throw new Error("Blocked production Supabase access from an unapproved preview host");
+}
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let currentSession=null;let employees=[];let editingId=null;let timecards=[];let selectedPeriodKey=null;let currentPeriodKey=null;
 const $=id=>document.getElementById(id);
