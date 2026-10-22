@@ -257,6 +257,9 @@ tbody tr:last-child td {
 .timecard-row:hover {
     background: #f8fafc;
 }
+.timecard-week-heading td{background:#eaf0f7;font-weight:700;padding:13px 12px}
+.timecard-week-total td{background:#f0f3f7;font-weight:700;border-top:2px solid #d5dce7}
+.timecard-period-total td{background:#dcece4;font-weight:700;border-top:2px solid #299764}
 </style>
  
 </head>
@@ -392,6 +395,8 @@ tbody tr:last-child td {
 
 
 <script type="module">
+import { buildWorkSessions, summarizeSessions } from "./work-sessions.js";
+import { groupPeriodWeeks } from "./period-week-totals.js";
 
 const SUPABASE_URL =
     "https://tsosredghislnehfyypi.supabase.co";
@@ -405,6 +410,13 @@ import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
 
+// Fail closed on preview/unknown hosts: these files retain production Supabase settings.
+// Staging testing must use the isolated staging-configured branch instead.
+const allowedProductionHosts = new Set(["www.tymrak.com", "tymrak.com", "tymrak.vercel.app", "localhost", "127.0.0.1"]);
+if (!allowedProductionHosts.has(window.location.hostname.toLowerCase())) {
+    document.body.textContent = "TYMRAK preview unavailable: database isolation is required before testing.";
+    throw new Error("Blocked production Supabase access from an unapproved preview host");
+}
 const supabase =
     createClient(
         SUPABASE_URL,
@@ -1250,215 +1262,28 @@ function calculateGreaterDailyOrWeeklyOvertime(
     );
 }
 function calculateDay(punches) {
-
-    let firstClockIn = null;
-    let lastClockOut = null;
-
-    let workStartedAt = null;
-    let breakStartedAt = null;
-
-    let workedMilliseconds = 0;
-    let breakMilliseconds = 0;
-
-    const sortedPunches =
-        [...punches].sort(
-            (a, b) =>
-                new Date(a.punched_at) -
-                new Date(b.punched_at)
-        );
-
-
-    for (const punch of sortedPunches) {
-
-        const time =
-            new Date(
-                punch.punched_at
-            ).getTime();
-
-
-        if (punch.punch_type === "clock_in") {
-
-            if (firstClockIn === null) {
-                firstClockIn =
-                    punch.punched_at;
-            }
-
-            /*
-                Start a new work session only
-                if one is not already open.
-            */
-
-            if (workStartedAt === null) {
-                workStartedAt = time;
-            }
-
-            breakStartedAt = null;
-
-
-        } else if (
-            punch.punch_type === "break_start"
-        ) {
-
-            if (workStartedAt !== null) {
-
-                workedMilliseconds +=
-                    Math.max(
-                        0,
-                        time - workStartedAt
-                    );
-
-                workStartedAt = null;
-            }
-
-            if (breakStartedAt === null) {
-                breakStartedAt = time;
-            }
-
-
-        } else if (
-            punch.punch_type === "break_end"
-        ) {
-
-            if (breakStartedAt !== null) {
-
-                breakMilliseconds +=
-                    Math.max(
-                        0,
-                        time - breakStartedAt
-                    );
-
-                breakStartedAt = null;
-            }
-
-            if (workStartedAt === null) {
-                workStartedAt = time;
-            }
-
-
-        } else if (
-            punch.punch_type === "clock_out"
-        ) {
-
-            if (workStartedAt !== null) {
-
-                workedMilliseconds +=
-                    Math.max(
-                        0,
-                        time - workStartedAt
-                    );
-
-                workStartedAt = null;
-            }
-
-            /*
-                If someone clocks out while
-                on break, close the break too.
-            */
-
-            if (breakStartedAt !== null) {
-
-                breakMilliseconds +=
-                    Math.max(
-                        0,
-                        time - breakStartedAt
-                    );
-
-                breakStartedAt = null;
-            }
-
-            lastClockOut =
-                punch.punched_at;
+    const ordered = [...punches].sort((a,b)=>Date.parse(a.punched_at)-Date.parse(b.punched_at));
+    const sessions = buildWorkSessions(ordered);
+    const today = getDatePartsInEmployeeTimeZone(new Date());
+    const first = ordered.length ? getDatePartsInEmployeeTimeZone(new Date(ordered[0].punched_at)) : null;
+    const isToday = first && first.year===today.year && first.month===today.month && first.day===today.day;
+    if (!isToday) for (const session of sessions) {
+        if (!session.clockOut && session.clockIn) {
+            session.workedMilliseconds = buildWorkSessions(session.punches,Date.parse(session.clockIn))[0]?.workedMilliseconds || 0;
         }
     }
-
-
-    /*
-        For today's open shift, continue
-        counting until the current time.
-
-        Historical incomplete shifts will
-        later be flagged as Missing Punch.
-    */
-
-   const todayParts =
-    getDatePartsInEmployeeTimeZone(
-        new Date()
-    );
-
-const punchParts =
-    sortedPunches.length > 0
-        ? getDatePartsInEmployeeTimeZone(
-            new Date(
-                sortedPunches[0].punched_at
-            )
-        )
-        : null;
-
-const isToday =
-    punchParts &&
-    punchParts.year === todayParts.year &&
-    punchParts.month === todayParts.month &&
-    punchParts.day === todayParts.day;
-
-    if (
-        isToday &&
-        workStartedAt !== null
-    ) {
-
-        workedMilliseconds +=
-            Math.max(
-                0,
-                Date.now() -
-                workStartedAt
-            );
-    }
-
-
-    if (
-        isToday &&
-        breakStartedAt !== null
-    ) {
-
-        breakMilliseconds +=
-            Math.max(
-                0,
-                Date.now() -
-                breakStartedAt
-            );
-    }
-
-
     return {
-        firstClockIn,
-        lastClockOut,
-        workedMilliseconds,
-        breakMilliseconds
+        firstClockIn: sessions.find(x=>x.clockIn)?.clockIn || null,
+        lastClockOut: [...sessions].reverse().find(x=>x.clockOut)?.clockOut || null,
+        workedMilliseconds: summarizeSessions(sessions).workedMilliseconds,
+        breakMilliseconds: 0,
+        sessions
     };
 }
-
 function renderTimecard(
     punches,
     period
 ) {
-
-    if (
-        !punches ||
-        punches.length === 0
-    ) {
-
-        timecardBody.innerHTML = `
-            <tr>
-                <td
-                    colspan="8"
-                    class="empty">
-                    No time recorded for this pay period.
-                </td>
-            </tr>
-        `;
-
-        return;
-    }
-
 
     const groups =
         groupPunchesByDate(
@@ -1530,6 +1355,7 @@ const overtimeByDate =
         )
     );
 
+const dailyDisplayRecords = [];
 const rows =
     Object.keys(groups)
         .sort()
@@ -1675,6 +1501,9 @@ const overtime =
                         .join("");
 
 
+                dailyDisplayRecords.push({ dateKey, workedMilliseconds: result.workedMilliseconds,
+                    regularMilliseconds: overtimeRecord ? overtimeRecord.regularMilliseconds : result.workedMilliseconds,
+                    overtimeMilliseconds: overtimeRecord ? overtimeRecord.overtimeMilliseconds : 0 });
                 return `
 
                     <tr
@@ -1730,6 +1559,17 @@ const overtime =
                     </tr>
 
 
+                    ${result.sessions.map((session,index)=>`
+                    <tr class="timecard-session-row">
+                        <td><span class="pending">Pending</span></td>
+                        <td>↳ Session ${index+1}</td>
+                        <td>${escapeHTML(formatTime(session.clockIn))}</td>
+                        <td>${escapeHTML(formatTime(session.clockOut))}</td>
+                        <td>${escapeHTML(session.location || "—")}</td>
+                        <td>${escapeHTML(formatDuration(session.workedMilliseconds))}</td>
+                        <td>—</td><td>—</td>
+                    </tr>`).join("")}
+
                     <tr
                         class="punch-detail-row"
                         data-detail-date="${escapeHTML(dateKey)}">
@@ -1752,12 +1592,27 @@ const overtime =
 
                     </tr>
                 `;
-            })
-            .join("");
+            });
 
-
-    timecardBody.innerHTML =
-        rows;
+    const startParts = getDatePartsInEmployeeTimeZone(period.start);
+    const endParts = getDatePartsInEmployeeTimeZone(period.end);
+    const localKey = parts => `${parts.year}-${String(parts.month).padStart(2,"0")}-${String(parts.day).padStart(2,"0")}`;
+    const groupedWeeks = groupPeriodWeeks(dailyDisplayRecords, localKey(startParts), localKey(endParts),
+        6);
+    const htmlByDate = new Map(dailyDisplayRecords.map((day, index) => [day.dateKey, rows[index]]));
+    const subtotal = (label, values, className) => `<tr class="${className}">
+        <td colspan="5"><strong>${escapeHTML(label)}</strong></td>
+        <td><strong>${escapeHTML(formatDuration(values.workedMilliseconds))}</strong></td>
+        <td><strong>${escapeHTML(formatDuration(values.regularMilliseconds))}</strong></td>
+        <td><strong>${escapeHTML(formatDuration(values.overtimeMilliseconds))}</strong></td>
+    </tr>`;
+    const groupedHtml = groupedWeeks.weeks.map((week, index) => `
+        <tr class="timecard-week-heading"><td colspan="8"><strong>Week ${index + 1} · ${escapeHTML(week.visibleStart)} – ${escapeHTML(week.visibleEnd)}</strong></td></tr>
+        ${week.entries.map(day => htmlByDate.get(day.dateKey) || "").join("")}
+        ${subtotal(`Week ${index + 1} Total`, week, "timecard-week-total")}
+    `).join("");
+    timecardBody.innerHTML = groupedHtml +
+        subtotal("Pay Period Total", groupedWeeks.totals, "timecard-period-total");
 
 
     /*

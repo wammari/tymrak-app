@@ -230,3 +230,42 @@ test("overnight punches are paired before grouping on the clock-in date", () => 
   assert.equal(shift.workedMilliseconds, 8 * 3600000);
   assert.equal(shift.missingPunch, false);
 });
+
+test("weekly overtime carries across the October 15/16 pay-period boundary", () => {
+  const period = getPayPeriod(2026, 9, 2, "America/Toronto");
+  const employee = { id: "e1", first_name: "Boundary", last_name: "Test", province: "ON" };
+  const rule = { weekly_threshold_hours: 44, weekly_overtime_enabled: true,
+    daily_overtime_enabled: false, calculation_method: "weekly_only", week_start_day: 0 };
+  const shifts = [
+    ["2026-10-12",10],["2026-10-13",10],["2026-10-14",10],
+    ["2026-10-15",10],["2026-10-16",8],["2026-10-17",7]
+  ];
+  const punches = shifts.flatMap(([day,hours]) => [
+    { punch_type: "clock_in", punched_at: day+"T13:00:00Z" },
+    { punch_type: "clock_out", punched_at: new Date(Date.parse(day+"T13:00:00Z")+hours*3600000).toISOString() }
+  ]);
+  const summary = summarizeEmployee(employee,punches,rule,period);
+  assert.deepEqual(summary.days.map(day=>day.date),["2026-10-16","2026-10-17"]);
+  assert.equal(summary.totalMilliseconds,15*3600000);
+  assert.equal(summary.regularMilliseconds,4*3600000);
+  assert.equal(summary.overtimeMilliseconds,11*3600000);
+  assert.equal(summary.days[0].overtimeMilliseconds,4*3600000);
+  assert.equal(summary.days[1].overtimeMilliseconds,7*3600000);
+});
+
+test("pay-period display totals exclude preceding days while keeping overtime classification", () => {
+  const period=getPayPeriod(2026,9,2,"America/Toronto");
+  const employee={id:"e1",first_name:"Boundary",last_name:"Test",province:"ON"};
+  const rule={weekly_threshold_hours:44,weekly_overtime_enabled:true,daily_overtime_enabled:false,
+    calculation_method:"weekly_only",week_start_day:0};
+  const punches=[
+    ["2026-10-15T13:00:00Z","2026-10-15T23:00:00Z"],
+    ["2026-10-16T13:00:00Z","2026-10-16T23:00:00Z"]
+  ].flatMap(([start,end])=>[
+    {punch_type:"clock_in",punched_at:start},{punch_type:"clock_out",punched_at:end}
+  ]);
+  const summary=summarizeEmployee(employee,punches,rule,period);
+  assert.equal(summary.totalMilliseconds,10*3600000);
+  assert.equal(summary.days.length,1);
+  assert.equal(summary.days[0].date,"2026-10-16");
+});
