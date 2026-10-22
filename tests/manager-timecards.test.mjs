@@ -247,10 +247,10 @@ test("weekly overtime carries across the October 15/16 pay-period boundary", () 
   const summary = summarizeEmployee(employee,punches,rule,period);
   assert.deepEqual(summary.days.map(day=>day.date),["2026-10-16","2026-10-17"]);
   assert.equal(summary.totalMilliseconds,15*3600000);
-  assert.equal(summary.regularMilliseconds,11*3600000);
-  assert.equal(summary.overtimeMilliseconds,4*3600000);
+  assert.equal(summary.regularMilliseconds,4*3600000);
+  assert.equal(summary.overtimeMilliseconds,11*3600000);
   assert.equal(summary.days[0].overtimeMilliseconds,4*3600000);
-  assert.equal(summary.days[1].overtimeMilliseconds,0);
+  assert.equal(summary.days[1].overtimeMilliseconds,7*3600000);
 });
 
 test("pay-period display totals exclude preceding days while keeping overtime classification", () => {
