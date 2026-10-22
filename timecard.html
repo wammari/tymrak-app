@@ -1278,25 +1278,6 @@ function renderTimecard(
     period
 ) {
 
-    if (false && (
-        !punches ||
-        punches.length === 0
-    )) {
-
-        timecardBody.innerHTML = `
-            <tr>
-                <td
-                    colspan="8"
-                    class="empty">
-                    No time recorded for this pay period.
-                </td>
-            </tr>
-        `;
-
-        return;
-    }
-
-
     const groups =
         groupPunchesByDate(
             punches
