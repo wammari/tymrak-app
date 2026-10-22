@@ -257,6 +257,9 @@ tbody tr:last-child td {
 .timecard-row:hover {
     background: #f8fafc;
 }
+.timecard-week-heading td{background:#eaf0f7;font-weight:700;padding:13px 12px}
+.timecard-week-total td{background:#f0f3f7;font-weight:700;border-top:2px solid #d5dce7}
+.timecard-period-total td{background:#dcece4;font-weight:700;border-top:2px solid #299764}
 </style>
  
 </head>
@@ -393,6 +396,7 @@ tbody tr:last-child td {
 
 <script type="module">
 import { buildWorkSessions, summarizeSessions } from "./work-sessions.js";
+import { groupPeriodWeeks } from "./period-week-totals.js";
 
 import { loadSupabaseConfiguration } from "/supabase-config.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
@@ -1363,6 +1367,7 @@ const overtimeByDate =
         )
     );
 
+const dailyDisplayRecords = [];
 const rows =
     Object.keys(groups)
         .sort()
@@ -1508,6 +1513,9 @@ const overtime =
                         .join("");
 
 
+                dailyDisplayRecords.push({ dateKey, workedMilliseconds: result.workedMilliseconds,
+                    regularMilliseconds: overtimeRecord ? overtimeRecord.regularMilliseconds : result.workedMilliseconds,
+                    overtimeMilliseconds: overtimeRecord ? overtimeRecord.overtimeMilliseconds : 0 });
                 return `
 
                     <tr
@@ -1596,12 +1604,27 @@ const overtime =
 
                     </tr>
                 `;
-            })
-            .join("");
+            });
 
-
-    timecardBody.innerHTML =
-        rows;
+    const startParts = getDatePartsInEmployeeTimeZone(period.start);
+    const endParts = getDatePartsInEmployeeTimeZone(period.end);
+    const localKey = parts => `${parts.year}-${String(parts.month).padStart(2,"0")}-${String(parts.day).padStart(2,"0")}`;
+    const groupedWeeks = groupPeriodWeeks(dailyDisplayRecords, localKey(startParts), localKey(endParts),
+        Number(currentOvertimeRule?.week_start_day ?? 0));
+    const htmlByDate = new Map(dailyDisplayRecords.map((day, index) => [day.dateKey, rows[index]]));
+    const subtotal = (label, values, className) => `<tr class="${className}">
+        <td colspan="5"><strong>${escapeHTML(label)}</strong></td>
+        <td><strong>${escapeHTML(formatDuration(values.workedMilliseconds))}</strong></td>
+        <td><strong>${escapeHTML(formatDuration(values.regularMilliseconds))}</strong></td>
+        <td><strong>${escapeHTML(formatDuration(values.overtimeMilliseconds))}</strong></td>
+    </tr>`;
+    const groupedHtml = groupedWeeks.weeks.map((week, index) => `
+        <tr class="timecard-week-heading"><td colspan="8"><strong>Week ${index + 1} · ${escapeHTML(week.visibleStart)} – ${escapeHTML(week.visibleEnd)}</strong></td></tr>
+        ${week.entries.map(day => htmlByDate.get(day.dateKey) || "").join("")}
+        ${subtotal(`Week ${index + 1} Total`, week, "timecard-week-total")}
+    `).join("");
+    timecardBody.innerHTML = groupedHtml +
+        subtotal("Pay Period Total", groupedWeeks.totals, "timecard-period-total");
 
 
     /*
