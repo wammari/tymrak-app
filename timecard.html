@@ -1278,10 +1278,10 @@ function renderTimecard(
     period
 ) {
 
-    if (
+    if (false && (
         !punches ||
         punches.length === 0
-    ) {
+    )) {
 
         timecardBody.innerHTML = `
             <tr>
@@ -1610,7 +1610,7 @@ const overtime =
     const endParts = getDatePartsInEmployeeTimeZone(period.end);
     const localKey = parts => `${parts.year}-${String(parts.month).padStart(2,"0")}-${String(parts.day).padStart(2,"0")}`;
     const groupedWeeks = groupPeriodWeeks(dailyDisplayRecords, localKey(startParts), localKey(endParts),
-        Number(currentOvertimeRule?.week_start_day ?? 0));
+        6);
     const htmlByDate = new Map(dailyDisplayRecords.map((day, index) => [day.dateKey, rows[index]]));
     const subtotal = (label, values, className) => `<tr class="${className}">
         <td colspan="5"><strong>${escapeHTML(label)}</strong></td>
