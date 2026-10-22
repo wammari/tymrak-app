@@ -57,6 +57,7 @@ const functionNames = [
     "createDateInEmployeeTimeZone",
     "formatDuration",
     "calculateGreaterDailyOrWeeklyOvertime",
+    "calculateWeeklyOvertime",
     "calculateDay"
 ];
 
@@ -262,6 +263,20 @@ assert.equal(
     ),
     "04:00"
 );
+
+
+const boundaryDays = [
+    ["2026-10-12",10],["2026-10-13",10],["2026-10-14",10],
+    ["2026-10-15",10],["2026-10-16",8],["2026-10-17",7]
+].map(([dateKey,hours])=>({dateKey,workedMilliseconds:hours*3600000}));
+const boundaryResults=functions.calculateWeeklyOvertime(boundaryDays,{
+    weekly_threshold_hours:44,weekly_overtime_enabled:true,
+    daily_overtime_enabled:false,calculation_method:"weekly_only",week_start_day:0
+});
+const visibleBoundary=boundaryResults.filter(day=>day.dateKey>="2026-10-16"&&day.dateKey<="2026-10-31");
+assert.equal(visibleBoundary.reduce((n,d)=>n+d.workedMilliseconds,0),15*3600000);
+assert.equal(visibleBoundary.reduce((n,d)=>n+d.overtimeMilliseconds,0),4*3600000);
+assert.equal(visibleBoundary.reduce((n,d)=>n+d.regularMilliseconds,0),11*3600000);
 
 console.log(
     "Timecard pay-period navigation tests passed."
