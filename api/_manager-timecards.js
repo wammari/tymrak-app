@@ -164,6 +164,11 @@ export function summarizeEmployee(employee, punches, rule, period) {
     location: [...new Set(entries.map(entry => entry.location).filter(value => value && value !== "—"))].join(", ") || "—",
     workedMilliseconds: entries.reduce((sum, entry) => sum + entry.workedMilliseconds, 0),
     missingPunch: entries.some(entry => entry.missingPunch),
+    sessions: entries.map(entry => ({
+      clockIn: entry.clockIn, clockOut: entry.clockOut, location: entry.location,
+      workedMilliseconds: entry.workedMilliseconds, missingPunch: entry.missingPunch,
+      punches: entry.punches
+    })),
     punches: entries.flatMap(entry => entry.punches).sort((a, b) => new Date(a.punched_at) - new Date(b.punched_at))
   }));
   const allShifts = applyOvertime(dailyRecords, rule);
@@ -173,7 +178,7 @@ export function summarizeEmployee(employee, punches, rule, period) {
   const overtime = days.reduce((sum, day) => sum + day.overtimeMilliseconds, 0);
   return { employee: { id: employee.id, first_name: employee.first_name, last_name: employee.last_name, province: employee.province },
     regularMilliseconds: total - overtime, overtimeMilliseconds: overtime, totalMilliseconds: total,
-    exceptionCount: days.filter(day => day.missingPunch).length, approvalStatus: "Not approved", days };
+    exceptionCount: days.filter(day => day.missingPunch).length, weekStartDay: Number(rule?.week_start_day ?? 0), approvalStatus: "Not approved", days };
 }
 
 export function calculationStart(period, weekStartDay = 0, timeZone = "America/Toronto") {
