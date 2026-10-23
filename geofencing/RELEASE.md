@@ -45,22 +45,18 @@ has no automatic project backups. Obtain and verify a manual backup/recovery poi
 any production migration. Do not upgrade or incur charges. Do not replay bootstrap SQL.
 Confirm all users share one customer database; multi-customer tenancy is still unsupported.
 
-## Optional Google Maps picker
+## Free OpenStreetMap picker
 
-The manager form can search Google Places, populate reference address/coordinates,
-click the map to adjust the centre, and preview the radius. Loading is explicit and only
-available to authenticated managers. Without a configured key, manual entry still works.
-No database migration or GPS enforcement change is needed for this UI enhancement.
+Replaces the unconfigured Google prototype. Leaflet 1.9.4 is pinned with official SRI
+hashes. Managers explicitly load the map, click a building or drag its pin, and preview
+the radius. Coordinates fill automatically; address remains an optional reference label.
+No search/geocoding API, Google key, billing account, paid fallback or background tracking.
 
-To enable: use a billing-enabled Google Cloud project, enable Maps JavaScript API and
-Places API (New), create a browser key restricted to those APIs and exact site referrers
-(e.g. https://tymrak-staging.vercel.app/* and separately https://www.tymrak.com/*), create
-a Google Maps map ID, and set GOOGLE_MAPS_BROWSER_KEY and GOOGLE_MAPS_MAP_ID in Vercel.
-Never reuse a server key or leave a browser key unrestricted. Do not paste credentials
-in chat. Set quotas/budget alerts in Google Cloud; budgets are alerts, not a hard cost cap.
-No Google Cloud billing, keys or paid services were provisioned by this change.
+Tiles load directly in the browser from https://tile.openstreetmap.org with visible OSM
+attribution, HTTPS, a valid website Referer, normal browser caching, and no bulk download,
+offline packs or prefetch features. This is low-volume manager configuration only.
+OSMF tile policy: https://operations.osmfoundation.org/policies/tiles/ . Service is
+best-effort and can block inappropriate usage; no SLA is promised. Manual coordinates
+remain available on tile/CDN failure. Reassess hosting before materially scaling usage.
 
-117 local tests passed after the picker addition, including selected-place field mapping,
-map click/radius interaction and authorization. Live Google loading/search and configured
-website restrictions remain unverified until a real restricted key/map ID are supplied.
-Do not claim this as deployed or live-connected merely because the code is present.
+Map changes do not alter server-side geofence enforcement or existing workplace records.
