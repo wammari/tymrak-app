@@ -12,7 +12,7 @@ const body=()=>({requestId:crypto.randomUUID(),punchType:'clock_in',expectedLast
 test('API trusts only verified Auth ID and strips employee and timestamp input',async()=>{
  setup();let calls=0;global.fetch=async(url,init)=>{
   if(calls++===0) return Response.json({id:user});
-  assert.deepEqual(JSON.parse(init.body),{p_auth_user_id:user,p_punch_type:'clock_in',p_request_id:b.requestId,p_expected_last_id:null});
+  assert.deepEqual(JSON.parse(init.body),{p_auth_user_id:user,p_punch_type:'clock_in',p_request_id:b.requestId,p_expected_last_id:null,p_location:null});
   assert.equal(init.headers.Authorization,undefined);return Response.json({success:true});
  };const b=body(),r=res();await handler(req(b),r);assert.equal(r.code,200);
 });
