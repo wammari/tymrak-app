@@ -44,3 +44,23 @@ this new candidate and real workplace staging acceptance before inclusion. Free 
 has no automatic project backups. Obtain and verify a manual backup/recovery point before
 any production migration. Do not upgrade or incur charges. Do not replay bootstrap SQL.
 Confirm all users share one customer database; multi-customer tenancy is still unsupported.
+
+## Optional Google Maps picker
+
+The manager form can search Google Places, populate reference address/coordinates,
+click the map to adjust the centre, and preview the radius. Loading is explicit and only
+available to authenticated managers. Without a configured key, manual entry still works.
+No database migration or GPS enforcement change is needed for this UI enhancement.
+
+To enable: use a billing-enabled Google Cloud project, enable Maps JavaScript API and
+Places API (New), create a browser key restricted to those APIs and exact site referrers
+(e.g. https://tymrak-staging.vercel.app/* and separately https://www.tymrak.com/*), create
+a Google Maps map ID, and set GOOGLE_MAPS_BROWSER_KEY and GOOGLE_MAPS_MAP_ID in Vercel.
+Never reuse a server key or leave a browser key unrestricted. Do not paste credentials
+in chat. Set quotas/budget alerts in Google Cloud; budgets are alerts, not a hard cost cap.
+No Google Cloud billing, keys or paid services were provisioned by this change.
+
+117 local tests passed after the picker addition, including selected-place field mapping,
+map click/radius interaction and authorization. Live Google loading/search and configured
+website restrictions remain unverified until a real restricted key/map ID are supplied.
+Do not claim this as deployed or live-connected merely because the code is present.

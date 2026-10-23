@@ -1,19 +1,31 @@
 import {loadSupabaseConfiguration} from './supabase-config.js';
+import {loadGoogleMaps,createWorkplaceMap} from './workplace-map.js';
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
-const $=id=>document.getElementById(id);let client,workplaces=[],employees=[],editing=null;
+const $=id=>document.getElementById(id);let client,workplaces=[],employees=[],editing=null,mapPicker=null;
 function message(text){$('message').textContent=text;}
 async function request(url,method='GET',body){
  const {data:{session}}=await client.auth.getSession();if(!session)throw new Error('Sign in with your manager account first.');
  const response=await fetch(url,{method,headers:{Authorization:`Bearer ${session.access_token}`,'Content-Type':'application/json'},...(body?{body:JSON.stringify(body)}:{})});
  const data=await response.json();if(!response.ok)throw new Error(data.error||'Unable to complete request');return data;
 }
-function edit(w){editing=w?.id||null;$('title').textContent=w?'Edit workplace':'Add workplace';$('name').value=w?.name||'';$('address').value=w?.address||'';$('latitude').value=w?.latitude??'';$('longitude').value=w?.longitude??'';$('radius').value=w?.radius_metres??150;$('active').checked=w?.is_active??true;
+function edit(w){mapPicker?.cancelSelection();if(w)mapPicker?.setPosition(w.latitude,w.longitude);editing=w?.id||null;$('title').textContent=w?'Edit workplace':'Add workplace';$('name').value=w?.name||'';$('address').value=w?.address||'';$('latitude').value=w?.latitude??'';$('longitude').value=w?.longitude??'';$('radius').value=w?.radius_metres??150;$('active').checked=w?.is_active??true;
  const assigned=new Set(w?.employee_ids||[]);$('employees').replaceChildren();
  for(const e of employees){const label=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.value=e.id;box.checked=assigned.has(e.id);label.append(box,document.createTextNode(` ${e.first_name} ${e.last_name}${e.is_active?'':' (inactive)'}`));$('employees').append(label);}
 }
 function render(){const list=$('list');list.replaceChildren();if(!workplaces.length)list.textContent='No workplaces configured yet.';
  for(const w of workplaces){const row=document.createElement('p'),button=document.createElement('button');row.append(document.createTextNode(`${w.name} — ${w.is_active?'Active':'Inactive'} · ${w.radius_metres} m · ${w.employee_ids.length} assigned `));button.textContent='Edit';button.type='button';button.addEventListener('click',()=>edit(w));row.append(button);list.append(row);}
 }
+$('loadMap').addEventListener('click',async()=>{
+ $('loadMap').disabled=true;$('mapStatus').textContent='Loading map search…';
+ try {const config=await request('/api/workplace-map-config');if(!config.configured)throw new Error('Map search is not available yet. You can still enter workplace coordinates manually.');
+  const maps=await loadGoogleMaps(config.apiKey);$('workplaceMap').hidden=false;
+  mapPicker=await createWorkplaceMap({maps,config,searchContainer:$('mapSearch'),mapContainer:$('workplaceMap'),getRadius:()=>Number($('radius').value)||150,
+   onError:text=>$('mapStatus').textContent=text,onSelect:value=>{$('latitude').value=value.latitude;$('longitude').value=value.longitude;if(value.address)$('address').value=value.address;if(value.name&&!$('name').value.trim())$('name').value=value.name;$('mapStatus').textContent='Workplace centre selected. Review the pin, radius and assignments, then save.';}});
+  if($('latitude').value!==''&&$('longitude').value!=='')mapPicker.setPosition(Number($('latitude').value),Number($('longitude').value));
+  $('mapStatus').textContent='Search for a business or address. Select a result, then click the map to adjust its centre if needed.';$('loadMap').hidden=true;
+ }catch(error){$('mapStatus').textContent=error.message;$('loadMap').disabled=false;}
+});
+$('radius').addEventListener('input',()=>mapPicker?.updateRadius());
 $('new').addEventListener('click',()=>edit(null));
 $('form').addEventListener('submit',async event=>{event.preventDefault();$('save').disabled=true;message('Saving…');try{
  const body={id:editing,name:$('name').value,address:$('address').value,latitude:Number($('latitude').value),longitude:Number($('longitude').value),radiusMetres:Number($('radius').value),isActive:$('active').checked,employeeIds:[...$('employees').querySelectorAll('input:checked')].map(e=>e.value)};
