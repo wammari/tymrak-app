@@ -55,3 +55,16 @@ test('5xx preserves request, definitive stale-state rejection clears it',async()
  await assert.rejects(c.record('clock_in',null));assert.ok(c.pending);
  status=409;await assert.rejects(c.record('clock_in',null));assert.equal(c.pending,null);
 });
+
+test('future punches are excluded from summary without hiding the transition guard',async()=>{
+ setup();const future={id:'99',punch_type:'clock_out',punched_at:'2999-01-01T00:00:00Z'};
+ const past={id:'98',punch_type:'clock_in',punched_at:'2020-01-01T00:00:00Z'};
+ let calls=0;global.fetch=async()=>calls++===0?Response.json({id:user}):Response.json({punches:[past,future],lastPunch:future});
+ const r=res();await handler(req({},'GET'),r);assert.equal(r.code,200);
+ assert.deepEqual(r.body.punches,[past]);assert.deepEqual(r.body.lastPunch,future);
+});
+test('future punch rejection explains that a manager correction is needed',async()=>{
+ setup();let calls=0;global.fetch=async()=>calls++===0?Response.json({id:user}):Response.json({error:'future_punch'});
+ const r=res();await handler(req(body()),r);assert.equal(r.code,409);
+ assert.match(r.body.error,/future-dated punch/);assert.match(r.body.error,/manager/);assert.doesNotMatch(r.body.error,/Refresh/);
+});

@@ -31,9 +31,14 @@ export default async function handler(req,res) {
     const result=await response.json();
     if(result?.error) {
       const unavailable=result.error==='employee_unavailable';
-      return res.status(unavailable?403:409).json({error:unavailable?'This employee account is unavailable. Please contact your manager.':'Your clock state changed or this punch is not allowed. Refresh and try again.',code:result.error});
+      return res.status(unavailable?403:409).json({error:unavailable?'This employee account is unavailable. Please contact your manager.':result.error==='future_punch'?'Your timecard contains a future-dated punch. Please contact your manager to correct it before clocking again.':'Your clock state changed or this punch is not allowed. Refresh and try again.',code:result.error});
     }
     if(req.method==='GET' ? !Array.isArray(result?.punches) : result?.success!==true) throw new Error('Invalid punch response');
+    if(req.method==='GET') {
+      // Keep the actual last ID for transition checks; never count future fixtures as worked time.
+      const now=Date.now();
+      result.punches=result.punches.filter(p=>Number.isFinite(Date.parse(p.punched_at)) && Date.parse(p.punched_at)<=now);
+    }
     return res.status(200).json(result);
   } catch {
     return res.status(503).json({error:'Unable to confirm your punch. Retry the same request before starting another punch.'});
