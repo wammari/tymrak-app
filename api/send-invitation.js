@@ -18,13 +18,14 @@ export default async function handler(req, res) {
     if (validation.error) return res.status(400).json({ error: validation.error });
     const { supabaseUrl, secretKey } = authorization.configuration;
     const duplicate = await findDuplicate({
-      supabaseUrl, secretKey, email: validation.input.email, username: validation.input.username
+      supabaseUrl, secretKey, organizationId: authorization.organizationId, email: validation.input.email, username: validation.input.username
     });
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });
 
     const invite = await sendActivationInvite(authorization.configuration, validation.input);
     const employee = {
       ...toEmployeeRecord(validation.input),
+      organization_id: authorization.organizationId,
       auth_user_id: invite.id,
       invitation_status: "Invitation Sent",
       invited_at: new Date().toISOString()

@@ -135,7 +135,7 @@ export async function requireManager(req) {
     roleResponse = await fetch(
       `${supabaseUrl}/rest/v1/user_roles?auth_user_id=eq.${encodeURIComponent(
         user.id
-      )}&select=role`,
+      )}&select=role,organization_id,organization:organizations!inner(is_active)&organization.is_active=eq.true`,
       {
         headers: {
           apikey: secretKey
@@ -174,8 +174,12 @@ export async function requireManager(req) {
     });
     throw error;
   }
-  const role = Array.isArray(roleRecords) ? roleRecords[0]?.role : null;
-  const authorized = MANAGER_ROLES.has(role);
+  const membership = Array.isArray(roleRecords) && roleRecords.length === 1 ? roleRecords[0] : null;
+  const role = membership?.role;
+  const organizationId = membership?.organization_id;
+  const authorized = MANAGER_ROLES.has(role) &&
+    typeof organizationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId) &&
+    membership?.organization?.is_active === true;
 
   console.info("Manager role lookup completed", {
     stage: "authorization_decision",
@@ -189,7 +193,7 @@ export async function requireManager(req) {
     return {
       ok: false,
       status: 403,
-      error: "Manager access required"
+      error: "Manager access requires an active company membership"
     };
   }
 
@@ -200,6 +204,7 @@ export async function requireManager(req) {
       email: user.email || ""
     },
     role,
+    organizationId,
     configuration
   };
 }

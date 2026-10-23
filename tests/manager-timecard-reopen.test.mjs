@@ -21,8 +21,9 @@ function environment(role = "manager") {
   const audit = [];
   global.fetch = async (url, options = {}) => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "acting-manager", email: "manager@example.com" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role }]));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     if (url.includes("/employees?") && url.includes("is_active=eq.true")) return new Response(JSON.stringify([{ id: "employee-1", province: "AB" }]));
+    if (url.includes("/employees?") && url.includes("select=id&limit=2")) return new Response(JSON.stringify([{id:"employee-1"}]));
     if (url.includes("/timecard_approvals?")) {
       let matches = approvals.filter(item => !url.includes("employee_id=eq.") || url.includes(`employee_id=eq.${item.employee_id}`));
       if (url.includes("employee_id=in.")) matches = matches.filter(item => url.includes(item.employee_id));

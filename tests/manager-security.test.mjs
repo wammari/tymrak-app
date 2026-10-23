@@ -112,7 +112,7 @@ test("explicit manager roles are authorized", async () => {
     if (url.endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({ id: "manager-id", email: "m@example.com" }));
     }
-    return new Response(JSON.stringify([{ role: "manager" }]));
+    return new Response(JSON.stringify([{ role: "manager", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
   };
 
   try {

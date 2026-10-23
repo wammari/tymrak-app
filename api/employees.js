@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { databaseRows } from "./_database-pages.js";
 import {
   EMPLOYEE_SELECT, databaseHeaders, findDuplicate,
   toEmployeeRecord, validateEmployeeInput
@@ -20,12 +21,10 @@ export default async function handler(req, res) {
     const { supabaseUrl, secretKey } = authorization.configuration;
 
     if (req.method === "GET") {
-      const response = await fetch(
-        `${supabaseUrl}/rest/v1/employees?select=${EMPLOYEE_SELECT}&order=last_name.asc,first_name.asc`,
-        { headers: databaseHeaders(secretKey) }
+      const employees = await databaseRows(
+        `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT}&order=last_name.asc,first_name.asc,id.asc`,
+        databaseHeaders(secretKey)
       );
-      if (!response.ok) throw new Error("Employee list query failed");
-      const employees = await response.json();
       if (!Array.isArray(employees)) throw new Error("Employee list returned invalid data");
       return res.status(200).json({ employees });
     }
@@ -35,13 +34,13 @@ export default async function handler(req, res) {
     const validation = validateEmployeeInput(req.body);
     if (validation.error) return res.status(400).json({ error: validation.error });
     const duplicate = await findDuplicate({
-      supabaseUrl, secretKey, email: validation.input.email,
+      supabaseUrl, secretKey, organizationId: authorization.organizationId, email: validation.input.email,
       username: validation.input.username, excludeId: id
     });
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT}`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT}`,
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),

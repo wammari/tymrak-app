@@ -16,7 +16,7 @@ export default async function handler(req, res) {
     if (!id) return res.status(400).json({ error: "A valid employee ID is required" });
     const { supabaseUrl, secretKey } = authorization.configuration;
     const lookup = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
       { headers: databaseHeaders(secretKey) }
     );
     if (!lookup.ok) throw new Error("Employee lookup failed");
@@ -33,7 +33,7 @@ export default async function handler(req, res) {
       lastName: employee.last_name, username: employee.username
     });
     const update = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT}`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT}`,
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),

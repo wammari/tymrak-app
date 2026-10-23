@@ -1,0 +1,100 @@
+# Company isolation candidate
+
+This draft is stacked on PR #26 (which depends on #25). It is not deployed.
+No production or staging rows have been changed by this work. No paid service is required.
+
+## Implemented boundary
+
+An organization is an employer/customer. Existing server-managed user_roles becomes
+the explicit manager membership by adding organization_id. One manager identity has
+one company in this first version; a global manager/admin role alone grants no access.
+The manager identity is verified with Auth, and its role, company ID and active company
+are read from the database for every API request. Editable Auth metadata and submitted
+organization/role fields cannot choose a company.
+
+Employee list/update/duplicate checks/invite/resend and manager timecards are scoped
+to the verified company. Approval/reopening validates employee ownership before child
+table access. The workplace RPC checks the manager company again inside SQL, filters
+its results, and rejects foreign employee/workplace IDs. Composite foreign keys reject
+cross-company workplace assignments independently of the API.
+
+Clocking and activation retain their tested implementations behind service-only company
+gates. Suspended and unassigned companies fail closed. The internal functions are moved
+to a private schema and revoked from browser and service roles. Employee personal reads
+have restrictive ownership/company policies in addition to existing permissive policies.
+Browser DML and anonymous reads on employees/punches are revoked, including column grants.
+Historical punches, receipts and audit records are retained under their immutable parent
+employee/workplace ownership. Organizations and role membership have no browser access.
+
+No real records are automatically assigned to a company. Existing employees/workplaces
+receive null company IDs; they remain quarantined until reviewed mapping is supplied.
+NOT VALID constraints retain these legacy rows while requiring a company on new or
+updated rows. Company ownership cannot later be changed through ordinary updates.
+The unique Auth mapping is enforced; this initial version does not support the same
+employee Auth identity working for several employers. Existing username/email uniqueness
+is preserved. This is not a public self-service company onboarding system.
+
+## Reporting fix
+
+Employee and manager timecard reads page through PostgREST results with an exact count,
+stable ordering and company/employee predicates retained on every page. Missing counts,
+empty incomplete pages, count changes, later HTTP failures and results above 100,000 rows
+fail instead of returning a partial result. This prevents the ordinary API row cap from
+silently omitting punches. It is not a transactional snapshot across several HTTP reads;
+recheck a report if employees or historical punches are edited during reporting.
+Very large employee-ID filters, the global geofence lock and hosted concurrency still
+need load validation before promising capacity for many clients.
+
+## Required migration rehearsal
+
+1. Verify #25 and #26 migrations and compatible schema. Run the read-only
+   supabase/verification/company-isolation-preflight.sql. Review unexpected tables,
+   views, policies, public RPCs and legacy duplicates instead of guessing their purpose.
+2. Take and restore-test a complete private backup. Do not put backup data, database
+   passwords, Auth exports or server keys into this repository.
+3. Obtain an explicit legacy mapping: organization names and the employee IDs,
+   workplace IDs and manager Auth UUIDs belonging to each. Unknown rows stay quarantined.
+   Do not infer membership from email domain, department or a global admin role.
+4. Rehearse the company migration and reviewed mapping transaction on a disposable
+   database. No seed/backfill is embedded in this candidate. Assign each employee and
+   workplace once, set user_roles.organization_id explicitly, and set assignment
+   organization IDs only where both parents have the same verified organization.
+   Resolve mismatches; do not delete evidence or bypass foreign keys to force a mapping.
+5. Validate employees_company_required, workplaces_company_required and
+   employee_workplaces_company_required after mapping. Confirm zero unassigned in-scope
+   records and no cross-company assignments. Unassigned legacy records must be explicitly
+   excluded from a release until reviewed; validation will continue to fail otherwise.
+6. Exercise two synthetic companies end-to-end on an isolated hosted candidate: manager
+   lists/updates/invites/resends, approvals/reopen, locations/assignments, employee activation,
+   login/recovery and every punch type. Try guessed foreign IDs and direct browser calls.
+   Confirm existing overnight/retry/approval-lock behavior. Run advisors after hosted DDL.
+7. Retire all old unscoped deployments and rotate their privileged API credentials during
+   the controlled cutover. Old deployment snapshots holding a still-valid service key can
+   bypass new API filters because service_role bypasses RLS. Updating only the current
+   domain while old unique deployment URLs keep working is not sufficient isolation.
+   Provision the replacement credential securely to the exact new release; never expose
+   it to the browser. Do not change credentials or shut down live deployments casually.
+8. Deploy compatible code and mapped schema together during maintenance. Confirm company
+   membership before opening access. Code-only rollback is unsafe after the migration;
+   use a reviewed forward repair or verified restore plan.
+
+## Release gates outside this PR
+
+- Production customer SMTP and external-recipient delivery are not yet verified.
+- A verified manual backup/restore is still absent.
+- Current Vercel Hobby is restricted to personal/non-commercial usage; a commercial
+  release must use suitable hosting. No upgrade or free-host migration is performed here.
+- Live manager map and mobile inside/outside geofence acceptance remain pending.
+- A single-company pilot can precede broad rollout only with verified data isolation,
+  operational gates, and commercially suitable hosting. Do not onboard multiple unrelated
+  clients to the currently deployed app.
+
+## Verification
+
+The full local suite includes executable PostgreSQL tests for same-company success,
+cross-company list/edit/assignment denial, foreign keys, immutable ownership, suspended
+company denial, quarantined legacy records, restrictive browser reads, internal RPC
+privileges and activation gates. API tests cover forged company fields and foreign IDs
+for employee updates, invitations, approval/reopening and timecards. Paging tests cover
+lower server row caps, complete reads, absent counts and later-page failures.
+These do not replace hosted acceptance, a backup restore or a load test.

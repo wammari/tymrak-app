@@ -45,6 +45,11 @@ export default async function handler(req, res) {
     const { startKey, endKey } = getPayPeriodDateKeys(period);
     const { supabaseUrl, secretKey } = authorization.configuration;
     const sensitiveValues = [secretKey, req.headers.authorization?.replace(/^Bearer\s+/i, "")];
+    const owned = await readArray(await fetch(
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${authorization.organizationId}&select=id&limit=2`,
+      { headers: databaseHeaders(secretKey) }
+    ), "employee_ownership", sensitiveValues);
+    if (owned.length !== 1) return res.status(404).json({ error: "Employee not found" });
     const base = `${supabaseUrl}/rest/v1/timecard_approvals?employee_id=eq.${encodeURIComponent(employeeId)}&period_start=eq.${startKey}&period_end=eq.${endKey}`;
     const existing = await readArray(await fetch(`${base}&select=id,status`, {
       headers: databaseHeaders(secretKey)

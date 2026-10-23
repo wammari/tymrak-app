@@ -28,7 +28,7 @@ export default async function handler(req, res) {
     const { supabaseUrl, secretKey } = authorization.configuration;
     const ids = `(${employeeIds.map(id => `"${id}"`).join(",")})`;
     const employees = await readArray(await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&is_active=eq.true&select=id,province`,
+      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&organization_id=eq.${authorization.organizationId}&is_active=eq.true&select=id,province`,
       { headers: databaseHeaders(secretKey) }
     ), "Approval employee validation failed");
     if (employees.length !== employeeIds.length) {

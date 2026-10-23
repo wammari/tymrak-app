@@ -54,7 +54,7 @@ function installManagerFetch(operation) {
       return new Response(JSON.stringify({ id: "manager-id", email: "manager@example.com" }));
     }
     if (String(url).includes("/rest/v1/user_roles")) {
-      return new Response(JSON.stringify([{ role: "manager" }]));
+      return new Response(JSON.stringify([{ role: "manager", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     }
     return operation(String(url), options, calls);
   };
@@ -100,7 +100,7 @@ test("ordinary employees cannot access employee-management APIs", async () => {
 test("a manager can list employees", async () => {
   const record = employee();
   installManagerFetch(async url => {
-    assert.match(url, /employees\?select=/);
+    assert.match(url, /employees\?organization_id=eq\.aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa&select=/);
     return new Response(JSON.stringify([record]));
   });
   const res = responseRecorder();
@@ -134,7 +134,7 @@ test("a manager can create an active employee and send an invitation", async () 
 for (const duplicateField of ["email", "username"]) {
   test(`duplicate ${duplicateField} is rejected before an invitation is sent`, async () => {
     const calls = installManagerFetch(async url => {
-      if (url.includes(`/employees?${duplicateField}=`)) return new Response('[{"id":"existing"}]');
+      if (url.includes(`&${duplicateField}=`)) return new Response('[{"id":"existing"}]');
       if (url.includes("/employees?")) return new Response("[]");
       throw new Error(`Unexpected URL ${url}`);
     });
@@ -217,3 +217,4 @@ test("employee list is the default Employees view and add/edit exposes mobile an
   assert.match(browserSource, /\["mobile","mobile"\]/);
   assert.match(browserSource, /\["hireDate","hire_date"\]/);
 });
+import {PostgrestResponse as Response} from "./_postgrest-response.mjs";
