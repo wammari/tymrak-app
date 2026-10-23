@@ -415,6 +415,7 @@ h2 {
 </section>
 <section class="card">
 
+<p>Location is checked when you clock in, clock out, or start/end a break. Allow browser location access. Your reported location must be inside an assigned workplace.</p>
 <h2>Work Summary</h2><p id="summaryScope">Today, including any active overnight shift.</p>
 
 <div class="summary-grid">
@@ -451,6 +452,7 @@ h2 {
 
 <script type="module">
 import { createPunchClient } from "./punch-client.js";
+import { capturePunchLocation } from "./geolocation.js";
 import { loadSupabaseConfiguration } from "./supabase-config.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
 const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
@@ -1060,7 +1062,7 @@ async function loadEmployee() {
                 : employee.username;
 
 
-        punchClient = createPunchClient({request:punchRequest,storage:localStorage,
+        punchClient = createPunchClient({request:punchRequest,storage:localStorage,captureLocation:capturePunchLocation,
             key:`tymrak-pending-punch:${deploymentConfiguration.supabaseUrl}:${employee.id}`,
             randomUUID:()=>crypto.randomUUID()});
         await loadTodaysPunches();

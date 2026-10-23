@@ -18,9 +18,9 @@ export default async function handler(req,res) {
     if(!userResponse.ok) {if(userResponse.status>=500) throw new Error('Auth unavailable');return res.status(401).json({error:'Session expired. Please sign in again.'});}
     const user=await userResponse.json();
     if(!uuid(user?.id)) return res.status(401).json({error:'Invalid session'});
-    const response=await fetch(`${config.supabaseUrl}/rest/v1/rpc/record_employee_punch`,{
+    const response=await fetch(`${config.supabaseUrl}/rest/v1/rpc/record_geofenced_punch`,{
       method:'POST',headers:activationServerHeaders(config.secretKey),body:JSON.stringify({
-        p_auth_user_id:user.id,...(req.method==='POST'?{p_punch_type:body.punchType,p_request_id:body.requestId,p_expected_last_id:body.expectedLastId}:{})
+        p_auth_user_id:user.id,...(req.method==='POST'?{p_punch_type:body.punchType,p_request_id:body.requestId,p_expected_last_id:body.expectedLastId,p_location:body.location??null}:{})
       })});
     if(!response.ok) {
       const details=await response.json().catch(()=>({}));
@@ -30,6 +30,8 @@ export default async function handler(req,res) {
     }
     const result=await response.json();
     if(result?.error) {
+      const locationErrors={location_required:'Allow location access and try again.',invalid_location:'Unable to verify your location. Try again with location services enabled.',stale_location:'Your location is too old. Try again for a fresh reading.',inaccurate_location:'Location accuracy is too low. Move near a window or outside and try again.',outside_geofence:'You are outside your assigned workplace area. Move inside the area and try again.',workplace_unassigned:'No active workplace is assigned to you. Please contact your manager.'};
+      if(locationErrors[result.error])return res.status(409).json({error:locationErrors[result.error],code:result.error});
       const unavailable=result.error==='employee_unavailable';
       return res.status(unavailable?403:409).json({error:unavailable?'This employee account is unavailable. Please contact your manager.':result.error==='future_punch'?'Your timecard contains a future-dated punch. Please contact your manager to correct it before clocking again.':'Your clock state changed or this punch is not allowed. Refresh and try again.',code:result.error});
     }
