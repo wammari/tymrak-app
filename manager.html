@@ -55,9 +55,14 @@
 </div><div class="form-actions"><button class="secondary" id="cancelForm" type="button">Cancel</button><button class="primary" id="saveEmployee" type="submit">Add Employee &amp; Send Invitation</button></div></div></form></section>
 </div>
 <script type="module">
+import { loadSupabaseConfiguration } from "./supabase-config.js";
+const deploymentConfiguration = await loadSupabaseConfiguration();
+const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
+const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
+
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
-const SUPABASE_URL="https://tsosredghislnehfyypi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY="sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
 let currentSession=null;let employees=[];let editingId=null;let timecards=[];let selectedPeriodKey=null;let currentPeriodKey=null;
 const $=id=>document.getElementById(id);

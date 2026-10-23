@@ -392,12 +392,15 @@ tbody tr:last-child td {
 
 
 <script type="module">
+import { loadSupabaseConfiguration } from "./supabase-config.js";
+const deploymentConfiguration = await loadSupabaseConfiguration();
+const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
+const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
 
-const SUPABASE_URL =
-    "https://tsosredghislnehfyypi.supabase.co";
 
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+
+
 
     let currentOvertimeRule = null;
 let employeeTimeZone = "America/Toronto";

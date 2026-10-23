@@ -415,7 +415,7 @@ h2 {
 </section>
 <section class="card">
 
-<h2>Today's Summary</h2>
+<h2>Work Summary</h2><p id="summaryScope">Today, including any active overnight shift.</p>
 
 <div class="summary-grid">
 
@@ -439,7 +439,7 @@ h2 {
 </section>
 <section class="card">
 
-<h2>Today's Punches</h2>
+<h2>Recent Punches</h2>
 
 <div id="punchList">
     <p class="loading">Loading punches...</p>
@@ -450,12 +450,16 @@ h2 {
 </main>
 
 <script type="module">
+import { createPunchClient } from "./punch-client.js";
+import { loadSupabaseConfiguration } from "./supabase-config.js";
+const deploymentConfiguration = await loadSupabaseConfiguration();
+const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
+const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
 
-const SUPABASE_URL =
-    "https://tsosredghislnehfyypi.supabase.co";
 
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+
+
 
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -507,6 +511,20 @@ let currentStatus =
     "not_clocked_in";
 
 let todayPunches = [];
+let lastPunchId = null;
+let workTimeZone = "America/Toronto";
+let punchClient = null;
+let punchBusy = false;
+async function punchRequest(method, body) {
+    const {data,error} = await supabase.auth.getSession();
+    if(error || !data.session) throw new Error("Session expired. Please sign in again.");
+    const response = await fetch("/api/employee-punch", {
+        method, cache:"no-store", headers:{Authorization:`Bearer ${data.session.access_token}`,
+        ...(body?{"Content-Type":"application/json"}:{})}, ...(body?{body:JSON.stringify(body)}:{})
+    });
+    const result = await response.json();
+    return {ok:response.ok,status:response.status,body:result};
+}
 
 
 function escapeHTML(value) {
@@ -522,6 +540,7 @@ function escapeHTML(value) {
 
 function showMessage(type, text) {
 
+    message.style.display = "block";
     message.className =
         "message " + type;
 
@@ -547,7 +566,8 @@ function updateClock() {
             {
                 hour: "2-digit",
                 minute: "2-digit",
-                second: "2-digit"
+                second: "2-digit",
+                timeZone: workTimeZone
             }
         );
 
@@ -555,6 +575,7 @@ function updateClock() {
         now.toLocaleDateString(
             [],
             {
+                timeZone: workTimeZone,
                 weekday: "long",
                 year: "numeric",
                 month: "long",
@@ -596,6 +617,10 @@ function createButton(
 function updateStatusDisplay() {
 
     buttonArea.innerHTML = "";
+    if (punchClient?.pending) {
+        buttonArea.appendChild(createButton("Retry Unconfirmed Punch", "clock-out", punchClient.pending.punchType));
+        return;
+    }
 
 
     if (
@@ -670,22 +695,6 @@ function updateStatusDisplay() {
 }
 
 
-function getTodayStartISO() {
-
-    const start =
-        new Date();
-
-    start.setHours(
-        0,
-        0,
-        0,
-        0
-    );
-
-    return start.toISOString();
-}
-
-
 function formatPunchType(type) {
 
     const labels = {
@@ -708,17 +717,10 @@ function formatPunchType(type) {
 
 
 function formatPunchTime(timestamp) {
-
-    return new Date(
-        timestamp
-    ).toLocaleTimeString(
-        [],
-        {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        }
-    );
+    return new Date(timestamp).toLocaleString([], {
+        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+        timeZone: workTimeZone
+    });
 }
 
 function formatDuration(totalSeconds) {
@@ -893,43 +895,19 @@ function determineStatus(lastPunch) {
 
 async function loadTodaysPunches() {
 
-    const {
-        data,
-        error
-    } =
-        await supabase
-            .from("punches")
-            .select(
-                "id,punch_type,punched_at"
-            )
-            .eq(
-                "employee_id",
-                employee.id
-            )
-            .gte(
-                "punched_at",
-                getTodayStartISO()
-            )
-            .order(
-                "punched_at",
-                {
-                    ascending: true
-                }
-            );
-
-
-    if (error) {
-        throw error;
-    }
-
+    const response = await punchRequest("GET");
+    if (!response.ok) throw new Error(response.body.error || "Unable to load punches");
+    const data = response.body.punches;
+    workTimeZone = response.body.timeZone;
+    lastPunchId = response.body.lastPunch?.id || null;
+    currentStatus = determineStatus(response.body.lastPunch);
+    document.getElementById("summaryScope").textContent =
+        `Work date ${response.body.workDate} (${workTimeZone}), including any active overnight shift.`;
 todayPunches = data || [];
     if (
         !data ||
         data.length === 0
     ) {
-
-        currentStatus =
-            "not_clocked_in";
 
         punchList.innerHTML =
             `<p class="empty">
@@ -944,8 +922,7 @@ calculateDailySummary([]);
 
 calculateDailySummary(data);
    
-    const lastPunch =
-        data[data.length - 1];
+    const lastPunch = response.body.lastPunch;
 
 
     currentStatus =
@@ -1083,6 +1060,9 @@ async function loadEmployee() {
                 : employee.username;
 
 
+        punchClient = createPunchClient({request:punchRequest,storage:localStorage,
+            key:`tymrak-pending-punch:${deploymentConfiguration.supabaseUrl}:${employee.id}`,
+            randomUUID:()=>crypto.randomUUID()});
         await loadTodaysPunches();
 
 
@@ -1114,111 +1094,26 @@ async function loadEmployee() {
 }
 
 
-async function recordPunch(
-    punchType,
-    button
-) {
-
-    if (!employee) {
+async function recordPunch(punchType, button) {
+    if (!employee || punchBusy) return;
+    if(punchType === "refresh") {
+        try { await loadTodaysPunches(); } catch(error) { showMessage("error",error.message); }
         return;
     }
-
-
+    punchBusy = true;
     clearMessage();
-
-
-    const allButtons =
-        buttonArea.querySelectorAll(
-            "button"
-        );
-
-
-    allButtons.forEach(
-        item => {
-            item.disabled = true;
-        }
-    );
-
-
-    const originalText =
-        button.textContent;
-
-
-    button.textContent =
-        "Recording...";
-
-
+    buttonArea.querySelectorAll("button").forEach(item=>item.disabled=true);
     try {
-
-        const {
-            error
-        } =
-            await supabase
-                .from("punches")
-                .insert({
-
-                    employee_id:
-                        employee.id,
-
-                    punch_type:
-                        punchType,
-
-                    source:
-                        "employee"
-                });
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        const successMessages = {
-
-            clock_in:
-                "✓ Clocked in successfully.",
-
-            break_start:
-                "✓ Break started.",
-
-            break_end:
-                "✓ Break ended.",
-
-            clock_out:
-                "✓ Clocked out successfully."
-        };
-
-
-        showMessage(
-            "success",
-            successMessages[punchType]
-        );
-
-
+        await punchClient.record(punchType,lastPunchId);
         await loadTodaysPunches();
-
-
+        showMessage("success","✓ Punch recorded successfully.");
     } catch (error) {
-
-        console.error(
-            "Punch error:",
-            error
-        );
-
-
-        showMessage(
-            "error",
-            error.message ||
-            "Unable to record your punch."
-        );
-
-
-        button.textContent =
-            originalText;
-
-
-        updateStatusDisplay();
-    }
+        showMessage("error",error.message);
+        if(!punchClient.pending) {
+            try { await loadTodaysPunches(); }
+            catch { buttonArea.replaceChildren(createButton("Refresh Clock State","clock-out","refresh")); }
+        } else updateStatusDisplay();
+    } finally { punchBusy=false; }
 }
 
 timecardButton.addEventListener(

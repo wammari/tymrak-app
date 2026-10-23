@@ -1,3 +1,4 @@
+import { getSupabaseTarget, getSiteUrl } from "./_deployment-config.js";
 const MANAGER_ROLES = new Set(["manager", "admin"]);
 
 async function getSafeSupabaseError(response) {
@@ -31,17 +32,13 @@ export function getBearerToken(req) {
 }
 
 export function getSupabaseConfiguration() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-
-  if (!supabaseUrl || !secretKey) {
-    return null;
-  }
-
-  return {
-    supabaseUrl: supabaseUrl.replace(/\/$/, ""),
-    secretKey
-  };
+  try {
+    const target = getSupabaseTarget();
+    getSiteUrl();
+    const secretKey = process.env.SUPABASE_SECRET_KEY;
+    if (!secretKey) return null;
+    return { supabaseUrl: target.supabaseUrl, secretKey };
+  } catch { return null; }
 }
 
 export async function requireManager(req) {
