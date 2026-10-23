@@ -2,7 +2,7 @@ name: TYMRAK tests
 
 on:
   pull_request:
-    branches: [main]
+    branches: [main, fix/basic-clock-release]
   push:
     branches: [main]
   workflow_dispatch:
