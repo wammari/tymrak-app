@@ -197,6 +197,21 @@ export async function requireManager(req) {
     };
   }
 
+  let employeeIds = null;
+  if (role === 'manager') {
+    const scopeResponse = await fetch(`${configuration.supabaseUrl}/rest/v1/rpc/manager_employee_scope`, {
+      method: 'POST',
+      headers: { apikey: configuration.secretKey, 'Content-Type': 'application/json',
+        ...(configuration.secretKey.startsWith('sb_secret_') ? {} : {Authorization: `Bearer ${configuration.secretKey}`}) },
+      body: JSON.stringify({p_manager_id: user.id})
+    });
+    if (!scopeResponse.ok) throw new Error('Manager workplace scope unavailable');
+    const scope = await scopeResponse.json();
+    if (scope.error || !Array.isArray(scope.employeeIds) || scope.employeeIds.some(id =>
+      typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))
+      throw new Error('Invalid manager workplace scope');
+    employeeIds = scope.employeeIds;
+  }
   return {
     ok: true,
     user: {
@@ -205,6 +220,7 @@ export async function requireManager(req) {
     },
     role,
     organizationId,
+    employeeIds,
     configuration
   };
 }

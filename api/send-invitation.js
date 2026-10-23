@@ -14,6 +14,7 @@ export default async function handler(req, res) {
   try {
     const authorization = await requireManager(req);
     if (!authorization.ok) return res.status(authorization.status).json({ error: authorization.error });
+    if (authorization.role !== 'admin') return res.status(403).json({error:'Ask your company administrator to add and assign employees to a workplace.'});
     const validation = validateEmployeeInput(req.body);
     if (validation.error) return res.status(400).json({ error: validation.error });
     const { supabaseUrl, secretKey } = authorization.configuration;

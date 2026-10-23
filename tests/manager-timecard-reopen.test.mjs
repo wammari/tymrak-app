@@ -9,7 +9,7 @@ function response() {
   return { statusCode: null, payload: null, setHeader() {}, status(code) { this.statusCode = code; return this; }, json(payload) { this.payload = payload; return this; } };
 }
 
-function environment(role = "manager") {
+function environment(role = "admin") {
   const originalFetch = global.fetch;
   const originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";

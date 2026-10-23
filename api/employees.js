@@ -1,5 +1,6 @@
 import { requireManager } from "./_manager-auth.js";
 import { databaseRows } from "./_database-pages.js";
+import {canManageEmployee, employeeScopeFilter} from './_manager-scope.js';
 import {
   EMPLOYEE_SELECT, databaseHeaders, findDuplicate,
   toEmployeeRecord, validateEmployeeInput
@@ -22,7 +23,7 @@ export default async function handler(req, res) {
 
     if (req.method === "GET") {
       const employees = await databaseRows(
-        `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT}&order=last_name.asc,first_name.asc,id.asc`,
+        `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}${employeeScopeFilter(authorization)}&select=${EMPLOYEE_SELECT}&order=last_name.asc,first_name.asc,id.asc`,
         databaseHeaders(secretKey)
       );
       if (!Array.isArray(employees)) throw new Error("Employee list returned invalid data");
@@ -31,10 +32,11 @@ export default async function handler(req, res) {
 
     const id = employeeId(req);
     if (!id) return res.status(400).json({ error: "A valid employee ID is required" });
+    if (!canManageEmployee(authorization, id)) return res.status(404).json({error:'Employee not found'});
     const validation = validateEmployeeInput(req.body);
     if (validation.error) return res.status(400).json({ error: validation.error });
     const duplicate = await findDuplicate({
-      supabaseUrl, secretKey, organizationId: authorization.organizationId, email: validation.input.email,
+      supabaseUrl, secretKey, organizationId: authorization.organizationId, scopeFilter: employeeScopeFilter(authorization), email: validation.input.email,
       username: validation.input.username, excludeId: id
     });
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });

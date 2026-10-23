@@ -9,7 +9,7 @@ function response() {
   return { statusCode: null, payload: null, setHeader() {}, status(code) { this.statusCode = code; return this; }, json(payload) { this.payload = payload; return this; } };
 }
 
-function installEnvironment(role = "manager") {
+function installEnvironment(role = "admin") {
   const originalFetch = global.fetch;
   const originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -85,7 +85,7 @@ test("manager timecards return a persisted approval as Approved", async () => {
   process.env.SUPABASE_SECRET_KEY = "server-secret";
   global.fetch = async url => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-id" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([{ id: "employee-1", first_name: "Ada", last_name: "Lovelace", province: "AB" }]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));

@@ -54,7 +54,7 @@ function installManagerFetch(operation) {
       return new Response(JSON.stringify({ id: "manager-id", email: "manager@example.com" }));
     }
     if (String(url).includes("/rest/v1/user_roles")) {
-      return new Response(JSON.stringify([{ role: "manager", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+      return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     }
     return operation(String(url), options, calls);
   };

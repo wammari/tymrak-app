@@ -91,3 +91,43 @@ test('activation gate refuses legacy and suspended companies and internal implem
  await denied('select tymrak_private.record_geofenced_punch($1::uuid)',[ub],/permission denied/);
  assert.equal((await db.query('select record_geofenced_punch($1::uuid) r',[ub])).rows[0].r.lastPunch,null);
 });
+
+async function workplaceSetup(){
+ // Rehearse inside the test's rollback transaction; omit only the migration's
+ // outer transaction markers so fixtures and DDL are rolled back together.
+ await db.exec(fs.readFileSync(new URL('../supabase/migrations/20261023220346_manager_workplace_scope.sql',import.meta.url),'utf8')
+  .replace(/^begin;$/m,'').replace(/^commit;$/m,''));
+ await db.query("insert into user_roles(auth_user_id,role,organization_id) values($1,'admin',$2),($3,'manager',$2)",[legacy,a,ua]);
+ const otherEmployee=crypto.randomUUID();
+ await db.query("insert into employees(id,is_active,invitation_status,province,organization_id) values($1,true,'Account Activated','ON',$2)",[otherEmployee,a]);
+ const wa=(await manage(legacy,config(ea))).workplaces[0];
+ const all=(await manage(legacy,config(otherEmployee,{name:'Second Office'}))).workplaces;
+ const wc=all.find(w=>w.id!==wa.id);
+ await db.query('insert into manager_workplaces(manager_id,workplace_id,organization_id) values($1,$2,$3),($4,$5,$3)',[ma,wa.id,a,ua,wc.id]);
+ return {wa,wc,otherEmployee};
+}
+async function scope(manager){return (await db.query('select manager_employee_scope($1::uuid) result',[manager])).rows[0].result;}
+test('same-company managers see only workplace employees and shared staff remain visible at both sites',async()=>{
+ const {wa,wc,otherEmployee}=await workplaceSetup();
+ assert.deepEqual((await scope(ma)).employeeIds,[ea]);
+ assert.deepEqual((await scope(ua)).employeeIds,[otherEmployee]);
+ assert.deepEqual((await manage(ma)).workplaces.map(w=>w.id),[wa.id]);
+ assert.equal((await manage(ma,config(otherEmployee,{id:wa.id}))).error,'employee_not_found');
+ assert.equal((await manage(ma,config(ea,{id:wc.id}))).error,'workplace_not_found');
+ await manage(legacy,config(otherEmployee,{id:wc.id,employeeIds:[otherEmployee,ea]}));
+ assert.deepEqual(new Set((await scope(ua)).employeeIds),new Set([otherEmployee,ea]));
+ assert.deepEqual((await scope(ma)).employeeIds,[ea]);
+ await db.query('delete from manager_workplaces where manager_id=$1',[ma]);
+ assert.deepEqual((await scope(ma)).employeeIds,[]);
+ assert.deepEqual((await manage(ma)).workplaces,[]);
+});
+test('workplace manager provisioning cannot cross companies and browser roles cannot grant themselves access',async()=>{
+ const {wa}=await workplaceSetup();
+ await denied('insert into manager_workplaces(manager_id,workplace_id,organization_id) values($1,$2,$3)',[mb,wa.id,a],/foreign key/);
+ const created=await manage(ma,config(ea,{name:'New managed site'}));
+ assert.equal(created.workplaces.length,2);
+ assert.equal((await manage(legacy)).workplaces.length,3);
+ await db.exec('set local role authenticated');
+ await denied('select manager_employee_scope($1::uuid)',[ma],/permission denied/);
+ await denied('insert into manager_workplaces(manager_id,workplace_id,organization_id) values($1,$2,$3)',[ma,wa.id,a],/permission denied/);
+});

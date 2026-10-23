@@ -3,6 +3,39 @@
 This draft is stacked on PR #26 (which depends on #25). It is not deployed.
 No production or staging rows have been changed by this work. No paid service is required.
 
+## Confirmed workplace access rule
+
+The owner confirmed that all existing employees belong to one company, that employees
+may work at multiple workplaces, and that managers must see only employees assigned
+to the workplaces they manage. The company name and manager-to-workplace mapping have
+not been supplied; no existing manager is automatically assigned all workplaces.
+
+Migration 20261023220346_manager_workplace_scope.sql adds server-controlled
+manager_workplaces assignments with same-company foreign keys. A regular manager's
+employee scope is resolved from live database assignments on every request. No assigned
+workplaces means an empty employee list. Removing an assignment removes access on the
+next request. A failed scope lookup never falls back to a company-wide list.
+Workplace deactivation affects clocking eligibility, while existing manager assignments
+continue to govern personnel access until explicitly removed.
+
+The restriction covers employee lists/updates, duplicate checks, invitation resending,
+timecards, approval/reopening and workplace lists/edits/employee reassignment. Managers
+cannot acquire hidden employees by submitting their IDs to a workplace. An employee
+assigned to two workplaces is visible to both assigned managers. Timecards include the
+visible employee's complete company timecard; this change restricts employee visibility,
+not individual punches to a particular location.
+
+Company administrators retain company-wide setup access. Adding new employees requires
+this administrator role, so regular managers cannot create unassigned employees outside
+their workplace scope. The Add Employee action is hidden for managers and its API is
+also protected. Managers can resend invitations for already assigned employees. Existing
+manager accounts are not automatically promoted to administrators. Before rollout,
+explicitly identify the company administrator and provision manager/workplace assignments
+through the reviewed server/database administration process. There is no browser endpoint
+for managers to grant themselves existing workplace access. Creating a new empty workplace
+as a manager assigns that newly created workplace to its creator; it does not expose any
+additional employees.
+
 ## Implemented boundary
 
 An organization is an employer/customer. Existing server-managed user_roles becomes

@@ -1,5 +1,6 @@
 import { requireManager } from "./_manager-auth.js";
 import { databaseRows } from "./_database-pages.js";
+import {employeeScopeFilter} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES, calculationStart, getCurrentPayPeriod, getPayPeriod, getPayPeriodDateKeys, periodFromKey, summarizeEmployee } from "./_manager-timecards.js";
 
@@ -51,7 +52,7 @@ export default async function handler(req, res) {
     const { startKey, endKey } = getPayPeriodDateKeys(period);
 
     const employees = await query({
-      url: `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}&is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc,id.asc`,
+      url: `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}${employeeScopeFilter(authorization)}&is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc,id.asc`,
       secretKey, stage: "employees_query", resource: "employees",
       queryName: "active_employee_timecard_fields"
     });

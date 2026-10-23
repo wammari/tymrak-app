@@ -24,6 +24,7 @@ test.beforeEach(()=>{
   const json=value=>new Response(JSON.stringify(value));
   if(url.pathname==='/auth/v1/user')return json({id:'manager-A'});
   if(url.pathname==='/rest/v1/user_roles')return json([membership]);
+  if(url.pathname==='/rest/v1/rpc/manager_employee_scope')return json({employeeIds:[empA]});
   if(url.pathname==='/auth/v1/invite')return json({id:'33333333-3333-4333-8333-333333333333'});
   if(url.pathname==='/rest/v1/employees'){
    if(options.method==='POST'){
@@ -34,6 +35,7 @@ test.beforeEach(()=>{
    let found=rows.filter(r=>url.searchParams.get('organization_id')===`eq.${r.organization_id}`);
    const id=url.searchParams.get('id');if(id?.startsWith('eq.'))found=found.filter(r=>id===`eq.${r.id}`);
    if(id?.startsWith('in.'))found=found.filter(r=>id.includes(r.id));
+   if(id==='is.null')found=[];
    if(url.searchParams.has('email')||url.searchParams.has('username'))return json([]);
    if(options.method==='PATCH')for(const row of found)Object.assign(row,JSON.parse(options.body));
    return json(found);
@@ -73,6 +75,7 @@ test('foreign employee IDs cannot resend invitations, approve or reopen periods'
  assert.equal(calls.some(c=>c.url.pathname==='/rest/v1/timecard_approvals'),false);
 });
 test('new employee company comes from the server membership and ignores submitted company/role fields',async()=>{
+ membership.role='admin';
  const result=await run(invitation,'POST',{...input,organization_id:companyB,organizationId:companyB,role:'admin'});
  assert.equal(result.code,201);const saved=rows.at(-1);assert.equal(saved.organization_id,companyA);assert.equal(saved.role,undefined);
 });
@@ -82,5 +85,29 @@ test('authorization joins the active company using database-owned membership, ne
  const roleCall=calls.find(c=>c.url.pathname==='/rest/v1/user_roles');
  assert.match(roleCall.url.searchParams.get('select'),/organizations!inner/);
  assert.equal(roleCall.url.searchParams.get('organization.is_active'),'eq.true');
+});
+test('same-company staff at another workplace are excluded from reads, edits, invitations and approvals',async()=>{
+ const other='44444444-4444-4444-8444-444444444444';
+ rows.push({id:other,organization_id:companyA,first_name:'Other',last_name:'Workplace',province:'ON',is_active:true});
+ const list=await run(employees,'GET');assert.deepEqual(list.body.employees.map(r=>r.id),[empA]);
+ assert.equal((await run(employees,'PATCH',input,{id:other})).code,404);
+ assert.equal((await run(resend,'POST',{id:other})).code,404);
+ assert.equal((await run(approvals,'POST',{employeeIds:[empA,other],period:'2026-09-2'})).code,400);
+ assert.equal((await run(reopen,'POST',{employeeId:other,period:'2026-09-2'})).code,404);
+ const cards=await run(timecards,'GET');assert.equal(cards.body.timecards.length,1);
+ assert.equal(calls.some(c=>c.url.pathname==='/auth/v1/invite'),false);
+});
+test('workplace managers cannot create unassigned employees or choose a company-wide role',async()=>{
+ const result=await run(invitation,'POST',{...input,role:'admin',organization_id:companyA});
+ assert.equal(result.code,403);assert.equal(calls.some(c=>c.url.pathname==='/auth/v1/invite'),false);
+});
+test('empty or failed live workplace scopes never fall back to company-wide employee visibility',async()=>{
+ const upstream=global.fetch;
+ global.fetch=async(url,options)=>String(url).endsWith('/rpc/manager_employee_scope')
+  ?new Response(JSON.stringify({employeeIds:[]})):upstream(url,options);
+ const empty=await run(employees,'GET');assert.equal(empty.code,200);assert.deepEqual(empty.body.employees,[]);
+ global.fetch=async(url,options)=>String(url).endsWith('/rpc/manager_employee_scope')
+  ?new Response('unavailable',{status:503}):upstream(url,options);
+ assert.equal((await run(employees,'GET')).code,500);
 });
 import {PostgrestResponse as Response} from "./_postgrest-response.mjs";
