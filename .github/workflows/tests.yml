@@ -2,7 +2,7 @@ name: TYMRAK tests
 
 on:
   pull_request:
-    branches: [main, fix/basic-clock-release, feature/manual-geofencing]
+    branches: [main, fix/basic-clock-release, feature/manual-geofencing, feature/company-isolation]
   push:
     branches: [main]
   workflow_dispatch:
@@ -27,3 +27,7 @@ jobs:
         run: npm ci
       - name: Run full test suite
         run: npm test
+      - name: Build Cloudflare candidate without deploying
+        run: npm run check:cloudflare
+      - name: Check Cloudflare local runtime with fake credentials
+        run: npm run test:cloudflare
