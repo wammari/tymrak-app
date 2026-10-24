@@ -1,14 +1,38 @@
 # Company isolation candidate
 
-This draft is stacked on PR #26 (which depends on #25). It is not deployed.
-No production or staging rows have been changed by this work. No paid service is required.
+This draft is stacked on PR #26 (which depends on #25). Production is unchanged.
+The company and workplace migrations were applied to isolated staging on 24 October 2026.
+No paid service was added.
 
 ## Confirmed workplace access rule
 
 The owner confirmed that all existing employees belong to one company, that employees
 may work at multiple workplaces, and that managers must see only employees assigned
-to the workplaces they manage. The company name and manager-to-workplace mapping have
-not been supplied; no existing manager is automatically assigned all workplaces.
+to the workplaces they manage. The owner supplied company name I Care Pharmacy and
+designated w.ammari@outlook.com as its company administrator and pharmacy manager.
+No other existing manager is automatically assigned workplaces.
+
+## Staging configuration — 24 October 2026
+
+Application commit 3ca8a2ef9b353abe4a11035a377bb9c9d5e97ebc is Ready on stable staging
+https://tymrak-staging.vercel.app, deployment AWpzat3DYowhMiuitdkcp4Q8EHmW.
+The public configuration was verified to target the staging Supabase project.
+The browser currently shows Manager Login, so authenticated UI acceptance is pending.
+
+The confirmed existing staging Auth account w.ammari@outlook.com now has the admin role
+for I Care Pharmacy and an explicit manager_workplaces link to the existing ICare Pharmacy
+workplace. Existing company test employees were mapped to the company. All three test
+employees and 22 punches were retained; no employee/workplace assignments were created.
+The owner clarified that these existing employees are test accounts and plans to invite
+two real pharmacy employees separately. Do not delete the tests or assume they are staff.
+
+All three company constraints were validated after the staging mapping. Live SQL checks
+confirmed the administrator's company/workplace access, denial of the old unassigned
+manager account, and denial of browser manager-assignment writes. Existing security
+advisor warnings about rls_auto_enable EXECUTE and leaked-password protection are unchanged;
+the service-only tables intentionally have no browser policies. Hosted manager UI,
+external-recipient invitation delivery and mobile geofence acceptance still require testing.
+No production role, company data, employee records, schema or deployment was changed.
 
 Migration 20261023220346_manager_workplace_scope.sql adds server-controlled
 manager_workplaces assignments with same-company foreign keys. A regular manager's
