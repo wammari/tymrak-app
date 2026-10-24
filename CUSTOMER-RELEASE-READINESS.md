@@ -1,14 +1,15 @@
 # Customer release readiness — 23 October 2026
 
-Status: staging candidate available; production unchanged; shared multi-company release blocked.
+Status: workplace-scoped candidate deployed to staging; production unchanged; customer launch gates remain open.
 This document supersedes historical deployment-status statements in BASIC-CLOCK-RELEASE.md.
 
 ## Evidence
 
 - Basic clock fixes: draft PR #25, commit f1e991cc5b549d9efb4c73b63255511823d93852.
 - Geofencing and free map: draft PR #26, application commit 55b158db2dc037a55d5c04a35c85bd1c423bba9d.
-- Stable staging https://tymrak-staging.vercel.app uses deployment 384WaFwo7iLQ4sSgrAURvqRDYa6m, Ready, application commit 55b158d.
-- Local suite: 117 passed, zero failed/skipped. Includes executable SQL and API/browser harness tests; map interaction uses Leaflet mocks.
+- Stable staging https://tymrak-staging.vercel.app uses deployment AWpzat3DYowhMiuitdkcp4Q8EHmW, Ready, application commit 3ca8a2e, as of 24 October 2026.
+- Local suite: 135 passed, zero failed/skipped; GitHub Actions run 40031800643 succeeded. Includes executable SQL and API/browser harness tests; map interaction uses Leaflet mocks.
+- Company and manager/workplace migrations are applied only to staging. I Care Pharmacy is configured with w.ammari@outlook.com as company administrator and explicitly linked to its pharmacy workplace. The three existing employees are test accounts; they and all 22 punches are retained. No employee workplace assignments or real-employee invitations were added. Authenticated manager UI acceptance remains pending.
 - User confirmed mobile clock-in, clock-out and password recovery on the earlier staging candidate. This does not establish acceptance of the newly added map/geofence flow.
 - Staging geofence migration applied; service-only RPC permissions and transactional inside/outside/retry/evidence assertions verified. Tests rolled back synthetic records.
 - Free map: Leaflet 1.9.4 pinned with SRI, OpenStreetMap tiles and visible attribution; no paid key, geocoding/autocomplete, account or billing setup. Manual coordinate fallback retained.
@@ -16,7 +17,7 @@ This document supersedes historical deployment-status statements in BASIC-CLOCK-
 
 ## Must fix before inviting unrelated companies
 
-1. Company isolation: never place unrelated customers in this database under the current manager authorization model. Separate deployments/databases can isolate a single-company pilot, but are not the shared SaaS implementation.
+1. Company/workplace isolation: draft PR #27 implements this boundary and is deployed to staging. Do not place unrelated customers in production until its reviewed migration/mapping, hosted negative-access acceptance, and retirement of old unscoped deployments are complete. See COMPANY-ISOLATION-RELEASE.md.
 2. Hosting: the observed Vercel account is Hobby. Vercel currently restricts Hobby to personal/non-commercial usage. Keep development on its existing account while evaluating commercially suitable free hosting; do not claim customer production can run there for free. No plan was upgraded. Cloudflare Workers is a candidate requiring compatibility and account/terms review, not an approved or deployed replacement.
 3. Recovery: verified manual database backup and a successful restore rehearsal are absent. A table CSV is not a full backup. Preserve schema, data, functions, grants, Auth and external storage/configuration as applicable. Do not put backup contents or credentials in GitHub. Supabase Free has no automatic project backup in this account.
 4. Email: establish production custom SMTP/sending-domain configuration and verify invitation and password recovery delivery to an address outside the project team. Current production configuration has not been verified. Supabase default SMTP is a test service, restricted to team recipients and two messages/hour; a successful recovery for the owner's address is insufficient evidence for customers.

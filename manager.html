@@ -99,7 +99,7 @@ $("nextPeriod").addEventListener("click",()=>{const next=periodKeyAfter(selected
 $("selectAllTimecards").addEventListener("change",event=>document.querySelectorAll(".employee-select:not(:disabled)").forEach(box=>box.checked=event.target.checked));
 $("saveApprove").addEventListener("click",approveSelectedTimecards);
 $("backToTimecards").addEventListener("click",()=>{$("timecardDetail").hidden=true;$("timecardSummary").hidden=false});
-async function initialize(){try{const data=await readResponse(await managerRequest("/api/manager-session"));$("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("loading").style.display="none";$("app").style.display="grid"}catch(_){await supabase.auth.signOut();window.location.replace("/manager-login.html")}}
+async function initialize(){try{const data=await readResponse(await managerRequest("/api/manager-session"));$("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("addEmployee").hidden=data.role!=="admin";$("loading").style.display="none";$("app").style.display="grid"}catch(_){await supabase.auth.signOut();window.location.replace("/manager-login.html")}}
 $("signOut").addEventListener("click",async()=>{await supabase.auth.signOut();window.location.replace("/manager-login.html")});supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT"&&currentSession)window.location.replace("/manager-login.html")});initialize();
 </script>
 </body>

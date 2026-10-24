@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import {canManageEmployee} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES, getPayPeriodDateKeys, periodFromKey } from "./_manager-timecards.js";
 
@@ -22,13 +23,14 @@ export default async function handler(req, res) {
     const employeeIds = [...new Set(Array.isArray(req.body?.employeeIds) ? req.body.employeeIds : [])]
       .filter(id => typeof id === "string" && ID_PATTERN.test(id));
     if (!employeeIds.length) return res.status(400).json({ error: "Select at least one employee to approve" });
+    if (employeeIds.some(id=>!canManageEmployee(authorization,id))) return res.status(400).json({error:'One or more selected employees are outside your workplaces'});
     const period = periodFromKey(req.body?.period, new Date(), "America/Toronto");
     if (!period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
     const { startKey, endKey } = getPayPeriodDateKeys(period);
     const { supabaseUrl, secretKey } = authorization.configuration;
     const ids = `(${employeeIds.map(id => `"${id}"`).join(",")})`;
     const employees = await readArray(await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&is_active=eq.true&select=id,province`,
+      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&organization_id=eq.${authorization.organizationId}&is_active=eq.true&select=id,province`,
       { headers: databaseHeaders(secretKey) }
     ), "Approval employee validation failed");
     if (employees.length !== employeeIds.length) {

@@ -84,14 +84,15 @@ export function toEmployeeRecord(input) {
   };
 }
 
-export async function findDuplicate({ supabaseUrl, secretKey, email, username, excludeId }) {
+export async function findDuplicate({ supabaseUrl, secretKey, organizationId, scopeFilter = '', email, username, excludeId }) {
+  if (!organizationId) throw new Error("Company membership required");
   const headers = databaseHeaders(secretKey);
   const filters = [
     ["email", "eq", email, "email"],
     ["username", "ilike", username, "username"]
   ];
   for (const [column, operator, value, label] of filters) {
-    let url = `${supabaseUrl}/rest/v1/employees?${column}=${operator}.${encodeURIComponent(value)}&select=id&limit=2`;
+    let url = `${supabaseUrl}/rest/v1/employees?organization_id=eq.${organizationId}${scopeFilter}&${column}=${operator}.${encodeURIComponent(value)}&select=id&limit=2`;
     if (excludeId) url += `&id=neq.${encodeURIComponent(excludeId)}`;
     const response = await fetch(url, { headers });
     if (!response.ok) throw new Error("Employee duplicate check failed");
