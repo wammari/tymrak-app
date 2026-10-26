@@ -31,3 +31,7 @@ jobs:
         run: npm run check:cloudflare
       - name: Check Cloudflare local runtime with fake credentials
         run: npm run test:cloudflare
+      - name: Check production bundle without deploying
+        run: npm run check:cloudflare:production
+      - name: Check production local runtime with fake credentials
+        run: npm run test:cloudflare:production

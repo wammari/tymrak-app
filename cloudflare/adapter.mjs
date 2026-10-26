@@ -31,7 +31,9 @@ async function readBody(request) {
   catch { throw {status: 400, message: 'Invalid JSON request'}; }
 }
 
-export function createWorker(routes) {
+export function createWorker(routes, {releaseEnvironment='staging'}={}) {
+  if (!['staging','production'].includes(releaseEnvironment)) throw new Error('Unknown release environment');
+  const projectRef = releaseEnvironment === 'production' ? 'tsosredghislnehfyypi' : 'ctztwqcsizwkrqgpgrgg';
   return { async fetch(request, env) {
     const url = new URL(request.url);
     if (!url.pathname.startsWith('/api/')) {
@@ -41,15 +43,21 @@ export function createWorker(routes) {
       }
       return env.ASSETS.fetch(request);
     }
-    // This candidate is deliberately staging-only. Bindings populate process.env
-    // through nodejs_compat; never copy per-request values into a shared global.
-    if (env.APP_ENV !== 'staging' || env.CLOUDFLARE_RELEASE_ENV !== 'staging' ||
+    // The entry point pins the environment: changing dashboard variables cannot
+    // turn staging into production. Never copy bindings into a shared global.
+    if (env.APP_ENV !== releaseEnvironment || env.CLOUDFLARE_RELEASE_ENV !== releaseEnvironment ||
         process.env.APP_ENV !== env.APP_ENV ||
-        env.SUPABASE_EXPECTED_PROJECT_REF !== 'ctztwqcsizwkrqgpgrgg' ||
-        env.SUPABASE_URL !== 'https://ctztwqcsizwkrqgpgrgg.supabase.co' ||
+        env.SUPABASE_EXPECTED_PROJECT_REF !== projectRef ||
+        env.SUPABASE_URL !== `https://${projectRef}.supabase.co` ||
         process.env.SUPABASE_URL !== env.SUPABASE_URL ||
-        process.env.SUPABASE_SECRET_KEY !== env.SUPABASE_SECRET_KEY) {
-      return json(503, {error: 'Staging configuration unavailable'});
+        process.env.SUPABASE_EXPECTED_PROJECT_REF !== env.SUPABASE_EXPECTED_PROJECT_REF ||
+        !env.SUPABASE_SECRET_KEY || !env.SUPABASE_PUBLISHABLE_KEY ||
+        process.env.SUPABASE_SECRET_KEY !== env.SUPABASE_SECRET_KEY ||
+        process.env.SUPABASE_PUBLISHABLE_KEY !== env.SUPABASE_PUBLISHABLE_KEY ||
+        process.env.SITE_URL !== env.SITE_URL ||
+        (releaseEnvironment === 'production' && (env.TYMRAK_RELEASE_READY !== 'true' ||
+          env.SITE_URL !== 'https://www.tymrak.com'))) {
+      return json(503, {error: 'Release configuration unavailable'});
     }
     const handler = Object.hasOwn(routes, url.pathname) ? routes[url.pathname] : null;
     if (!handler) return json(404, {error: 'Endpoint not found'});
