@@ -12,7 +12,7 @@ import sendInvitation from '../api/send-invitation.js';
 import resendInvitation from '../api/resend-invitation.js';
 import workplaceMapConfig from '../api/workplace-map-config.js';
 
-export default createWorker({
+export const routes = {
   '/api/public-config': publicConfig,
   '/api/complete-activation': completeActivation,
   '/api/employee-punch': employeePunch,
@@ -25,4 +25,5 @@ export default createWorker({
   '/api/send-invitation': sendInvitation,
   '/api/resend-invitation': resendInvitation,
   '/api/workplace-map-config': workplaceMapConfig
-});
+};
+export default createWorker(routes);

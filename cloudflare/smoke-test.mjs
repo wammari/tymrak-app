@@ -1,9 +1,12 @@
 // Uses fake credentials only. Runs client and local Worker in the same process tree.
 import {spawn} from 'node:child_process';
 import assert from 'node:assert/strict';
-const server=spawn(process.execPath,['node_modules/wrangler/bin/wrangler.js','dev','--local',
+const production=process.argv.includes('--production');
+const siteUrl=production?'https://www.tymrak.com':'https://tymrak-staging.local-test.workers.dev';
+const databaseUrl=production?'https://tsosredghislnehfyypi.supabase.co':'https://ctztwqcsizwkrqgpgrgg.supabase.co';
+const server=spawn(process.execPath,['node_modules/wrangler/bin/wrangler.js','dev','--local',...(production?['--config','wrangler.production.jsonc','--var','TYMRAK_RELEASE_READY:true']:[]),
   '--ip','127.0.0.1','--port','8787','--inspector-port','9229',
-  '--var','SITE_URL:https://tymrak-staging.local-test.workers.dev',
+  '--var',`SITE_URL:${siteUrl}`,
   '--var','SUPABASE_PUBLISHABLE_KEY:sb_publishable_local_test',
   '--var','SUPABASE_SECRET_KEY:sb_secret_local_test'],{stdio:['ignore','pipe','pipe'],detached:true});
 try {
@@ -23,8 +26,8 @@ try {
     assert.equal(response.status,status,path);
     if(path==='/api/public-config') {
       const body=await response.json();
-      assert.equal(body.siteUrl,'https://tymrak-staging.local-test.workers.dev');
-      assert.equal(body.supabaseUrl,'https://ctztwqcsizwkrqgpgrgg.supabase.co');
+      assert.equal(body.siteUrl,siteUrl);
+      assert.equal(body.supabaseUrl,databaseUrl);
       assert.doesNotMatch(JSON.stringify(body),/sb_secret/);
       assert.equal(response.headers.get('cache-control'),'no-store');
     }
