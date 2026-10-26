@@ -5,6 +5,8 @@
   "compatibility_date": "2026-10-24",
   "compatibility_flags": ["nodejs_compat"],
   "workers_dev": true,
+  "keep_vars": true,
+  "secrets": {"required": ["SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"]},
   "preview_urls": false,
   "build": { "command": "node cloudflare/build-assets.mjs" },
   "assets": {

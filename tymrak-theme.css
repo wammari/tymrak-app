@@ -2,7 +2,7 @@
 body{color:var(--ink);background-color:var(--bg)}
 /* Display the primary logo directly from the supplied brand board. No tracing,
    recolouring, regenerated lettering or bitmap edits. */
-.tymrak-brand-mark{position:relative;display:block;width:220px;max-width:100%;aspect-ratio:545/398;overflow:hidden;flex-shrink:0;clip-path:polygon(23% 0,100% 0,100% 100%,0 100%,0 64%,23% 64%)}
+.tymrak-brand-mark{position:relative;display:block;width:220px;max-width:100%;aspect-ratio:545/398;overflow:hidden;flex-shrink:0;mix-blend-mode:multiply;clip-path:polygon(23% 0,100% 0,100% 100%,0 100%,0 64%,23% 64%)}
 .tymrak-brand-mark img{position:absolute;display:block;width:281.834863%;max-width:none;height:auto;left:-27.522936%;top:-10.050251%}
 .auth-page .tymrak-brand-mark{margin:0 auto 24px;width:230px}
 .auth-page{background:radial-gradient(ellipse at top left,#f2e5cc 0,transparent 55%),var(--bg)}
