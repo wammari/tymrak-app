@@ -2,7 +2,7 @@ name: TYMRAK tests
 
 on:
   pull_request:
-    branches: [main, fix/basic-clock-release, feature/manual-geofencing, feature/company-isolation]
+    branches: [main, fix/basic-clock-release, feature/manual-geofencing, feature/company-isolation, feature/cloudflare-free-hosting]
   push:
     branches: [main]
   workflow_dispatch:
