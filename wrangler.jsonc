@@ -15,6 +15,7 @@
     "not_found_handling": "404-page"
   },
   "vars": {
+    "SITE_URL": "https://tymrak-staging.w-ammari.workers.dev",
     "APP_ENV": "staging",
     "CLOUDFLARE_RELEASE_ENV": "staging",
     "SUPABASE_URL": "https://ctztwqcsizwkrqgpgrgg.supabase.co",

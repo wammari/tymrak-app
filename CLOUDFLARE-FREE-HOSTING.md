@@ -25,8 +25,15 @@ It is stacked on company/workplace isolation PR #27, then #26 and #25.
 
 ## Account and staging setup
 
-No connected Cloudflare integration was found and no account was created. The owner
-must sign in/create their Cloudflare account and retain the Workers Free plan. Do not
+On 26 October 2026 the owner created/connected the Cloudflare Worker through their own
+browser, authorized the GitHub integration for this repository, selected the prepared
+branch, and renamed the Worker to tymrak-staging. Cloudflare displayed its address as
+https://tymrak-staging.w-ammari.workers.dev; SITE_URL is now pinned to that staging origin.
+The screenshots show an earlier failed main-branch build and manually created versions;
+they do not yet establish successful deployment of the application candidate. Runtime
+credentials and hosted acceptance are still pending. No production change is implied.
+
+No connected Cloudflare MCP integration was found. Retain the Workers Free plan. Do not
 paste credentials or server keys into chat, source control, or public build variables.
 Use the account's secure secret configuration and approved account authentication.
 
@@ -34,9 +41,15 @@ Use the account's secure secret configuration and approved account authenticatio
    and `npm run test:cloudflare` (local runtime, fake credentials only).
 2. In the owner's free Cloudflare account, create/link the staging Worker `tymrak-staging`.
    Do not connect main to automatic deployment. No custom domain or production routing yet.
+   In Settings > Builds use branch feature/cloudflare-free-hosting, root directory `/`,
+   build command `npm test && npm run build:cloudflare`, deploy command
+   `npx wrangler deploy`, and disable Preview builds. Workers Builds does not honor
+   custom build commands in the Wrangler configuration, so explicitly build the assets
+   in the dashboard command. Do not retry an old main-branch build to deploy this branch.
 3. Keep the checked-in staging project URL/ref and APP_ENV/CLOUDFLARE_RELEASE_ENV bindings.
-   Configure SITE_URL as the assigned stable staging Worker HTTPS origin, plus the staging
-   SUPABASE_PUBLISHABLE_KEY and SUPABASE_SECRET_KEY through secure account settings.
+   Keep the pinned SITE_URL above. Configure the staging SUPABASE_PUBLISHABLE_KEY and
+   SUPABASE_SECRET_KEY as runtime secrets through secure account settings (not build
+   variables). Secrets persist across Wrangler deployments; never add their values to vars.
    Never use the production Supabase key. Leave version preview URLs disabled.
 4. Add only that staging origin's activation/recovery callbacks in staging Supabase Auth.
    Check sending-domain/custom SMTP configuration and external recipient delivery.
