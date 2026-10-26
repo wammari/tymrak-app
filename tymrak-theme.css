@@ -1,0 +1,25 @@
+:root{--navy:#351b0c;--navy2:#603716;--green:#8d5316;--green-dark:#70400e;--bg:#fbf8f3;--ink:#35271e;--muted:#716254;--line:#e4d7c7;--brand-gold:#bd811b}
+body{color:var(--ink);background-color:var(--bg)}
+/* Display the primary logo directly from the supplied brand board. No tracing,
+   recolouring, regenerated lettering or bitmap edits. */
+.tymrak-brand-mark{position:relative;display:block;width:220px;max-width:100%;aspect-ratio:545/398;overflow:hidden;flex-shrink:0;clip-path:polygon(23% 0,100% 0,100% 100%,0 100%,0 64%,23% 64%)}
+.tymrak-brand-mark img{position:absolute;display:block;width:281.834863%;max-width:none;height:auto;left:-27.522936%;top:-10.050251%}
+.auth-page .tymrak-brand-mark{margin:0 auto 24px;width:230px}
+.auth-page{background:radial-gradient(ellipse at top left,#f2e5cc 0,transparent 55%),var(--bg)}
+.auth-page .card{border:1px solid var(--line);box-shadow:0 18px 50px #351b0c0d}
+.auth-page h1,.auth-page h2{color:var(--navy)}
+.header .tymrak-brand-mark{width:135px}
+.sidebar .tymrak-brand-mark{width:180px;background:#fbf8f3;border-radius:10px}
+.sidebar .logo{padding:0 0 24px}
+.brand-home{display:inline-block;margin-bottom:16px}.brand-home .tymrak-brand-mark{width:155px}
+button,.button{transition:background-color .15s,box-shadow .15s}
+input:focus,select:focus,textarea:focus{outline:3px solid #bd811b33;border-color:#9a6714}
+a:focus-visible,button:focus-visible{outline:3px solid #bd811b;outline-offset:4px}
+input[type=checkbox]{accent-color:#8d5316}
+.auth-page button,.auth-page .button,.primary,.clock-in,.break-end{background:#663710;color:#fff}
+.auth-page button:hover:not(:disabled),.primary:hover:not(:disabled),.clock-in:hover:not(:disabled){background:#452308}
+.clock-out{background:#351b0c}.break-start{background:#88540c}
+.protected{background:#f5e8cf;color:#71480b}
+.welcome{border-bottom:3px solid #bd811b}
+@media(max-width:600px){.auth-page .card{padding:26px 22px;margin:20px auto}.auth-page .tymrak-brand-mark{width:200px}.header .tymrak-brand-mark{width:110px}.header{gap:16px;flex-wrap:wrap}.header-actions{flex-wrap:wrap}}
+@media(prefers-reduced-motion:reduce){button,.button{transition:none}}
