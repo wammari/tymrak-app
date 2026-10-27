@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { resolveManagerScope, authorizedEmployees, requireEmployeeScope } from "../api/_tenant-authorization.js";
+import managerSessionHandler from "../api/manager-session.js";
 
 const A="11111111-1111-4111-8111-111111111111";
 const B="22222222-2222-4222-8222-222222222222";
@@ -29,4 +30,23 @@ test("manager sees assigned workplace employee only",async()=>{const a=mock();co
 test("admin sees all employees in own company",async()=>{const a=mock("admin");const scope=await resolveManagerScope(a);assert.deepEqual([...await authorizedEmployees(a,scope)],[E1,E2]);});
 test("inactive or unknown organization fails closed",async()=>{const a=mock("manager",B);assert.equal(await resolveManagerScope(a),null);});
 test("invalid employee identifier fails closed",async()=>{const a=mock();assert.equal(await requireEmployeeScope(a,["not-a-uuid"]),null);});
+
+test("manager session denies a manager without a valid company assignment",async()=>{
+ const priorEnv={...process.env};
+ process.env.SUPABASE_URL="https://example.invalid";
+ process.env.SUPABASE_SECRET_KEY="test-secret";
+ const oldFetch=globalThis.fetch;
+ globalThis.fetch=async url=>{
+  if(url.endsWith("/auth/v1/user"))return new Response(JSON.stringify({id:M,email:"manager@example.invalid"}));
+  if(url.includes("/user_roles?")&&url.includes("select=role,organization_id"))return new Response(JSON.stringify([{role:"manager",organization_id:null}]));
+  if(url.includes("/user_roles?"))return new Response(JSON.stringify([{role:"manager"}]));
+  throw new Error("Unexpected lookup");
+ };
+ const res={statusCode:0,payload:null,setHeader(){},status(code){this.statusCode=code;return this;},json(value){this.payload=value;return this;}};
+ try{
+  await managerSessionHandler({method:"GET",headers:{authorization:"Bearer test"}},res);
+  assert.equal(res.statusCode,403);
+  assert.equal(res.payload.error,"Company access denied");
+ }finally{globalThis.fetch=oldFetch;process.env=priorEnv;}
+});
 test.after(()=>{globalThis.fetch=originalFetch;});
