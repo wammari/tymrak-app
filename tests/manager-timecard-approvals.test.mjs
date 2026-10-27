@@ -43,6 +43,18 @@ function installEnvironment(role = "manager") {
   return { approvals, requests, restore() { global.fetch = originalFetch; process.env = originalEnv; } };
 }
 
+test("invalid ID in approval batch rejects all records without partial approval", async () => {
+  const environment = installEnvironment();
+  try {
+    const res = response();
+    await approvalHandler({ method: "POST", headers: { authorization: "Bearer manager" },
+      body: { employeeIds: ["44444444-4444-4444-8444-444444444444", { bad: "id" }], period: "2026-09-2" } }, res);
+    assert.equal(res.statusCode, 400);
+    assert.equal(environment.approvals.length, 0);
+    assert.equal(environment.requests.some(({ url }) => url.includes("/timecard_approvals")), false);
+  } finally { environment.restore(); }
+});
+
 test("ordinary employees cannot approve timecards", async () => {
   const environment = installEnvironment("employee");
   try {
