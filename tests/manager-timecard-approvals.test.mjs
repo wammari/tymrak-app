@@ -17,12 +17,16 @@ function installEnvironment(role = "manager") {
   const requests = [];
   global.fetch = async (url, options = {}) => {
     requests.push({ url, options });
-    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "approver-user-id", email: "manager@example.com" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role }]));
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333", email: "manager@example.com" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/organizations?")) return new Response(JSON.stringify([{id:"11111111-1111-4111-8111-111111111111"}]));
+    if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"},{employee_id:"55555555-5555-4555-8555-555555555555",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"},{id:"55555555-5555-4555-8555-555555555555",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?") && url.includes("is_active=eq.true") && url.includes("select=id")) {
       return new Response(JSON.stringify([
-        { id: "employee-1", province: "AB" },
-        { id: "employee-2", province: "ON" }
+        { id: "44444444-4444-4444-8444-444444444444", province: "AB" },
+        { id: "55555555-5555-4555-8555-555555555555", province: "ON" }
       ]));
     }
     if (url.includes("/timecard_approvals") && options.method === "POST") {
@@ -43,7 +47,7 @@ test("ordinary employees cannot approve timecards", async () => {
   const environment = installEnvironment("employee");
   try {
     const res = response();
-    await approvalHandler({ method: "POST", headers: { authorization: "Bearer employee" }, body: { employeeIds: ["employee-1"], period: "2026-09-2" } }, res);
+    await approvalHandler({ method: "POST", headers: { authorization: "Bearer employee" }, body: { employeeIds: ["44444444-4444-4444-8444-444444444444"], period: "2026-09-2" } }, res);
     assert.equal(res.statusCode, 403);
     assert.equal(environment.approvals.length, 0);
   } finally { environment.restore(); }
@@ -52,7 +56,7 @@ test("ordinary employees cannot approve timecards", async () => {
 test("manager approval persists canonical dates, approver, timestamp, and is idempotent", async () => {
   const environment = installEnvironment();
   try {
-    const request = { method: "POST", headers: { authorization: "Bearer manager" }, body: { employeeIds: ["employee-1", "employee-2"], period: "2026-09-2" } };
+    const request = { method: "POST", headers: { authorization: "Bearer manager" }, body: { employeeIds: ["44444444-4444-4444-8444-444444444444", "55555555-5555-4555-8555-555555555555"], period: "2026-09-2" } };
     const first = response();
     await approvalHandler(request, first);
     assert.equal(first.statusCode, 200);
@@ -61,7 +65,7 @@ test("manager approval persists canonical dates, approver, timestamp, and is ide
     for (const approval of environment.approvals) {
       assert.equal(approval.period_start, "2026-09-16");
       assert.equal(approval.period_end, "2026-09-30");
-      assert.equal(approval.approved_by, "approver-user-id");
+      assert.equal(approval.approved_by, "33333333-3333-4333-8333-333333333333");
       assert.equal(approval.status, "approved");
       assert.match(approval.approved_at, /^\d{4}-\d{2}-\d{2}T/);
     }
@@ -83,12 +87,16 @@ test("manager timecards return a persisted approval as Approved", async () => {
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "server-secret";
   global.fetch = async url => {
-    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-id" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
-    if (url.includes("/employees?")) return new Response(JSON.stringify([{ id: "employee-1", first_name: "Ada", last_name: "Lovelace", province: "AB" }]));
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/organizations?")) return new Response(JSON.stringify([{id:"11111111-1111-4111-8111-111111111111"}]));
+    if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"},{employee_id:"55555555-5555-4555-8555-555555555555",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"},{id:"55555555-5555-4555-8555-555555555555",organization_id:"11111111-1111-4111-8111-111111111111"}]));
+    if (url.includes("/employees?")) return new Response(JSON.stringify([{ id: "44444444-4444-4444-8444-444444444444", first_name: "Ada", last_name: "Lovelace", province: "AB" }]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));
-    if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify([{ id: "approval-1", employee_id: "employee-1", status: "approved", approved_by: "manager-id", approved_at: "2026-10-15T20:00:00Z", period_start: "2026-10-01", period_end: "2026-10-15" }]));
+    if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify([{ id: "approval-1", employee_id: "44444444-4444-4444-8444-444444444444", status: "approved", approved_by: "33333333-3333-4333-8333-333333333333", approved_at: "2026-10-15T20:00:00Z", period_start: "2026-10-01", period_end: "2026-10-15" }]));
     throw new Error(`Unexpected URL: ${url}`);
   };
   try {
@@ -96,7 +104,7 @@ test("manager timecards return a persisted approval as Approved", async () => {
     await timecardsHandler({ method: "GET", headers: { authorization: "Bearer manager" }, query: { period: "2026-10-1" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(res.payload.timecards[0].approvalStatus, "Approved");
-    assert.equal(res.payload.timecards[0].approval.approved_by, "manager-id");
+    assert.equal(res.payload.timecards[0].approval.approved_by, "33333333-3333-4333-8333-333333333333");
   } finally { global.fetch = originalFetch; process.env = originalEnv; }
 });
 
