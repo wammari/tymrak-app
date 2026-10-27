@@ -28,7 +28,11 @@ export async function resolveManagerScope(authorization) {
   if (assignment.role === "manager") {
     const mappings = await rows(authorization.configuration, "manager_workplaces",
       `manager_id=eq.${authorization.user.id}&organization_id=eq.${assignment.organization_id}&select=workplace_id`);
-    workplaces = new Set(mappings.map(x => x.workplace_id).filter(x => UUID.test(x || "")));
+    const activeWorkplaces = await rows(authorization.configuration, "workplaces",
+      `organization_id=eq.${assignment.organization_id}&is_active=eq.true&select=id`);
+    const activeIds = new Set(activeWorkplaces.map(w => w.id).filter(id => UUID.test(id || "")));
+    workplaces = new Set(mappings.map(x => x.workplace_id)
+      .filter(id => UUID.test(id || "") && activeIds.has(id)));
   }
   return { organizationId: assignment.organization_id, role: assignment.role, workplaces };
 }
