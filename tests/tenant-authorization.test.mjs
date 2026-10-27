@@ -19,6 +19,7 @@ function mock(role="manager", organization=A) {
    user_roles:[{role,organization_id:organization}],
    organizations:organization===A?[{id:A}]:[],
    manager_workplaces:[{workplace_id:W}],
+   workplaces:[{id:W}],
    employees:[{id:E1,organization_id:A},{id:E2,organization_id:A}],
    employee_workplaces:[{employee_id:E1,workplace_id:W},{employee_id:E2,workplace_id:X}]
   }[t]||[];
@@ -27,6 +28,20 @@ function mock(role="manager", organization=A) {
  return {ok:true,user:{id:M},configuration:{supabaseUrl:"https://example.invalid",secretKey:"test"}};
 }
 test("manager sees assigned workplace employee only",async()=>{const a=mock();const scope=await resolveManagerScope(a);assert.equal(scope.organizationId,A);assert.deepEqual([...await authorizedEmployees(a,scope)],[E1]);assert.equal(await requireEmployeeScope(a,[E2]),null);});
+test("inactive workplace cannot grant manager access",async()=>{
+ const a=mock();
+ const prior=globalThis.fetch;
+ globalThis.fetch=async url=>{
+  if(new URL(url).pathname.endsWith("/workplaces"))return {ok:true,json:async()=>[]};
+  return prior(url);
+ };
+ try{
+  const scope=await resolveManagerScope(a);
+  assert.deepEqual([...scope.workplaces],[]);
+  assert.deepEqual([...await authorizedEmployees(a,scope)],[]);
+  assert.equal(await requireEmployeeScope(a,[E1]),null);
+ }finally{globalThis.fetch=prior;}
+});
 test("admin sees all employees in own company",async()=>{const a=mock("admin");const scope=await resolveManagerScope(a);assert.deepEqual([...await authorizedEmployees(a,scope)],[E1,E2]);});
 test("inactive or unknown organization fails closed",async()=>{const a=mock("manager",B);assert.equal(await resolveManagerScope(a),null);});
 test("invalid employee identifier fails closed",async()=>{const a=mock();assert.equal(await requireEmployeeScope(a,["not-a-uuid"]),null);});
