@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { requireEmployeeScope } from "./_tenant-authorization.js";
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES, getPayPeriodDateKeys, periodFromKey } from "./_manager-timecards.js";
 
@@ -22,6 +23,7 @@ export default async function handler(req, res) {
     const employeeIds = [...new Set(Array.isArray(req.body?.employeeIds) ? req.body.employeeIds : [])]
       .filter(id => typeof id === "string" && ID_PATTERN.test(id));
     if (!employeeIds.length) return res.status(400).json({ error: "Select at least one employee to approve" });
+    if (!(await requireEmployeeScope(authorization, employeeIds))) return res.status(403).json({ error: "Employee access denied" });
     const period = periodFromKey(req.body?.period, new Date(), "America/Toronto");
     if (!period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
     const { startKey, endKey } = getPayPeriodDateKeys(period);
