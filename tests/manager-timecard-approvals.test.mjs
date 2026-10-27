@@ -21,6 +21,7 @@ function installEnvironment(role = "manager") {
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/organizations?")) return new Response(JSON.stringify([{id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"},{employee_id:"55555555-5555-4555-8555-555555555555",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"},{id:"55555555-5555-4555-8555-555555555555",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?") && url.includes("is_active=eq.true") && url.includes("select=id")) {
@@ -103,6 +104,7 @@ test("manager timecards return a persisted approval as Approved", async () => {
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/organizations?")) return new Response(JSON.stringify([{id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"},{employee_id:"55555555-5555-4555-8555-555555555555",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"},{id:"55555555-5555-4555-8555-555555555555",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([{ id: "44444444-4444-4444-8444-444444444444", first_name: "Ada", last_name: "Lovelace", province: "AB" }]));
