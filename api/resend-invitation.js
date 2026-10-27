@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { requireEmployeeScope } from "./_tenant-authorization.js";
 import {
   databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite
 } from "./_employee-management.js";
@@ -14,6 +15,7 @@ export default async function handler(req, res) {
     const id = typeof req.body?.id === "string" && /^[A-Za-z0-9-]{1,128}$/.test(req.body.id)
       ? req.body.id : null;
     if (!id) return res.status(400).json({ error: "A valid employee ID is required" });
+    if (!(await requireEmployeeScope(authorization, [id]))) return res.status(403).json({ error: "Employee access denied" });
     const { supabaseUrl, secretKey } = authorization.configuration;
     const lookup = await fetch(
       `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
