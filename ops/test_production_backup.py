@@ -33,6 +33,16 @@ class BackupTests(unittest.TestCase):
             self.assertNotIn('fake_secret_for_test',str(error.exception)+output.getvalue())
             self.assertIn('fake_secret_for_test',(backup.PRIVATE/'synthetic-failure.log').read_text())
 
+    def test_export_subprocess_requires_certificate_and_readonly(self):
+        with tempfile.TemporaryDirectory() as folder, patch.object(backup,'PRIVATE',Path(folder)/'private'):
+            script="import os,json;print(json.dumps({k:os.environ.get(k) for k in ['PGSSLMODE','PGSSLROOTCERT','PGOPTIONS','TYMRAK_BACKUP_DATABASE_URL']}))"
+            with patch.dict(os.environ,{'TYMRAK_BACKUP_DATABASE_URL':'synthetic-private-value'}):
+                result=json.loads(backup.run([sys.executable,'-c',script],'tls-environment',readonly=True,capture=True))
+            self.assertEqual(result['PGSSLMODE'],'verify-full')
+            self.assertEqual(result['PGSSLROOTCERT'],str(backup.DATABASE_CA))
+            self.assertIn('default_transaction_read_only=on',result['PGOPTIONS'])
+            self.assertIsNone(result['TYMRAK_BACKUP_DATABASE_URL'])
+
     def test_authenticated_encryption_roundtrip_and_tamper_rejection(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);private=root/'private';export=private/'export';export.mkdir(parents=True);(root/'ops').mkdir()

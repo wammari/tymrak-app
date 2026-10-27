@@ -14,6 +14,7 @@ from urllib.parse import urlsplit, urlunsplit, urlencode
 PROJECT = 'tsosredghislnehfyypi'
 CLI = ['npx', '--yes', 'supabase@2.122.0']
 ROOT = Path(__file__).resolve().parents[1]
+DATABASE_CA = ROOT / 'ops/supabase-production-ca.crt'
 PRIVATE = Path(os.environ.get('RUNNER_TEMP', tempfile.gettempdir())) / 'tymrak-private-backup'
 EXPORT = PRIVATE / 'export'
 LOCAL = PRIVATE / 'restore-project'
@@ -45,7 +46,7 @@ def checked_url(value):
     for valid, label in checks:
         if not valid:
             raise ConnectionConfigurationError('Check '+label)
-    return urlunsplit((p.scheme, p.netloc, p.path, urlencode({'sslmode':'verify-full','sslrootcert':'system','connect_timeout':'15'}), ''))
+    return urlunsplit((p.scheme, p.netloc, p.path, urlencode({'sslmode':'verify-full','sslrootcert':str(DATABASE_CA),'connect_timeout':'15'}), ''))
 
 def local_url(value):
     p = urlsplit(value)
@@ -53,17 +54,23 @@ def local_url(value):
         raise ValueError('Restore requires a disposable local database')
     return value
 
-def run(args, name, readonly=False, capture=False):
+def run(args, name, readonly=False, capture=False, output_path=None):
     PRIVATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     env = os.environ.copy()
     # Only export processes receive the remote credential. Local services never do.
     env.pop('TYMRAK_BACKUP_DATABASE_URL', None)
     if readonly:
         env['PGOPTIONS'] = '-c default_transaction_read_only=on'
+        env['PGSSLMODE'] = 'verify-full'
+        env['PGSSLROOTCERT'] = str(DATABASE_CA)
     else:
         env.pop('PGOPTIONS', None)
     with (PRIVATE / (name+'.log')).open('ab') as log:
-        result = subprocess.run(args, env=env, stdout=subprocess.PIPE if capture else log, stderr=log, check=False, timeout=900)
+        if output_path:
+            with output_path.open('wb') as output:
+                result = subprocess.run(args, env=env, stdout=output, stderr=log, check=False, timeout=900)
+        else:
+            result = subprocess.run(args, env=env, stdout=subprocess.PIPE if capture else log, stderr=log, check=False, timeout=900)
     if result.returncode:
         raise RuntimeError(name+' failed; detailed output stays in the encrypted archive')
     return result.stdout.decode() if capture else None
@@ -114,7 +121,12 @@ def export():
     EXPORT.mkdir(mode=0o700)
     before = inventory(url,True)
     for filename, flags in [('roles.sql',['--role-only']),('schema.sql',[]),('data.sql',['--data-only','--use-copy','--exclude','storage.buckets_vectors,storage.vector_indexes'])]:
-        run(CLI+['db','dump','--db-url',url,'--file',str(EXPORT/filename)]+flags,'export-'+filename,readonly=True)
+        # Use the pinned CLI's supported dump script locally so libpq uses the
+        # supplied CA and verify-full settings for every export connection.
+        script = PRIVATE / (filename+'.sh')
+        script.write_text(run(CLI+['db','dump','--db-url',url,'--dry-run']+flags,'prepare-'+filename,readonly=True,capture=True))
+        script.chmod(0o600)
+        run(['bash','--noprofile','--norc',str(script)],'export-'+filename,readonly=True,output_path=EXPORT/filename)
         if not (EXPORT/filename).stat().st_size:
             raise RuntimeError('Empty dump file')
     after = inventory(url,True)
