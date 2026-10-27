@@ -16,6 +16,9 @@ class BackupTests(unittest.TestCase):
         good=f'postgresql://postgres.{backup.PROJECT}:encoded%40password@aws-1-ca-central-1.pooler.supabase.com:5432/postgres'
         self.assertIn('sslmode=verify-full',backup.checked_url(good))
         self.assertIn('encoded%40password',backup.checked_url(good))
+        self.assertEqual(backup.checked_url(' \n'+good+'\r\n'),backup.checked_url(good))
+        with self.assertRaises(backup.ConnectionConfigurationError):
+            backup.checked_url(good.replace('@aws',' @aws'))
         for value in [good.replace(backup.PROJECT,'ctztwqcsizwkrqgpgrgg'),good.replace('.pooler.supabase.com','.pooler.supabase.com.evil.example'),good.replace('/postgres','/other'),good.replace('encoded%40password',''),good.replace(':5432',':6543')]:
             with self.assertRaises(ValueError):backup.checked_url(value)
         with self.assertRaises(ValueError):backup.local_url(good)

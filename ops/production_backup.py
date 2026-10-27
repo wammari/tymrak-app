@@ -26,6 +26,7 @@ class ConnectionConfigurationError(ValueError):
     pass
 
 def checked_url(value):
+    value = value.strip()
     if any(c.isspace() for c in value):
         raise ConnectionConfigurationError('Connection string contains whitespace')
     try:
