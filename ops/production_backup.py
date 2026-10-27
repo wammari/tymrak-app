@@ -22,12 +22,28 @@ TABLES_SQL = """select jsonb_agg(jsonb_build_array(schemaname,tablename) order b
 from pg_tables where schemaname='public' or (schemaname='auth' and tablename in ('users','identities'))
 or (schemaname='storage' and tablename in ('buckets','objects'))"""
 
+class ConnectionConfigurationError(ValueError):
+    pass
+
 def checked_url(value):
-    p = urlsplit(value)
+    if any(c.isspace() for c in value):
+        raise ConnectionConfigurationError('Connection string contains whitespace')
+    try:
+        p = urlsplit(value)
+        port = p.port
+    except ValueError:
+        raise ConnectionConfigurationError('Connection string cannot be parsed') from None
     direct = p.hostname == f'db.{PROJECT}.supabase.co' and p.username == 'postgres'
     pool = bool(p.hostname and p.hostname.endswith('.pooler.supabase.com')) and p.username == f'postgres.{PROJECT}'
-    if p.scheme not in ('postgres', 'postgresql') or not (direct or pool) or p.port not in (None, 5432) or p.path != '/postgres' or not p.password or p.fragment:
-        raise ValueError('Wrong backup target or incomplete connection string')
+    checks = [(p.scheme in ('postgres', 'postgresql'), 'URI scheme'),
+              (direct or pool, 'production hostname or username'),
+              (port in (None, 5432), 'session pooler port'),
+              (p.path == '/postgres', 'database path'),
+              (bool(p.password) and p.password != '[YOUR-PASSWORD]', 'password placeholder'),
+              (not p.fragment, 'unencoded fragment character')]
+    for valid, label in checks:
+        if not valid:
+            raise ConnectionConfigurationError('Check '+label)
     return urlunsplit((p.scheme, p.netloc, p.path, urlencode({'sslmode':'verify-full','sslrootcert':'system','connect_timeout':'15'}), ''))
 
 def local_url(value):
@@ -157,6 +173,10 @@ if __name__=='__main__':
     try:
         commands={'export':export,'restore':restore,'encrypt':encrypt,'cleanup':cleanup}
         commands[sys.argv[1]]()
+    except ConnectionConfigurationError as error:
+        # Only fixed labels from checked_url are safe to print, never URL fields.
+        print(str(error),file=sys.stderr)
+        sys.exit(1)
     except Exception as error:
         # Exception messages may contain credentials/row data; never echo them.
         print('Backup operation did not complete ('+type(error).__name__+'). No production migration was run.',file=sys.stderr)
