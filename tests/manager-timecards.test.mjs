@@ -184,7 +184,7 @@ test("Supabase failures log safe structured query diagnostics", async () => {
   console.error = (...values) => logs.push(values);
   global.fetch = async url => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/organizations?")) return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
