@@ -17,6 +17,7 @@ export async function resolveManagerScope(authorization) {
   const roles = await rows(authorization.configuration, "user_roles",
     `auth_user_id=eq.${authorization.user.id}&select=role,organization_id`);
   const allowed = roles.filter(r => ["manager", "admin"].includes(r.role) && UUID.test(r.organization_id || ""));
+  if (roles.length !== 1) return null;
   // Ambiguous or missing tenant assignment must never confer global access.
   if (allowed.length !== 1) return null;
   const assignment = allowed[0];
