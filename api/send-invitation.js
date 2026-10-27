@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { resolveManagerScope } from "./_tenant-authorization.js";
 import {
   databaseHeaders, findDuplicate, sendActivationInvite,
   toEmployeeRecord, validateEmployeeInput
@@ -17,6 +18,8 @@ export default async function handler(req, res) {
     const validation = validateEmployeeInput(req.body);
     if (validation.error) return res.status(400).json({ error: validation.error });
     const { supabaseUrl, secretKey } = authorization.configuration;
+    const scope = await resolveManagerScope(authorization);
+    if (!scope || scope.role !== "admin") return res.status(403).json({ error: "Company administrator access required" });
     const duplicate = await findDuplicate({
       supabaseUrl, secretKey, email: validation.input.email, username: validation.input.username
     });
@@ -26,6 +29,7 @@ export default async function handler(req, res) {
     const employee = {
       ...toEmployeeRecord(validation.input),
       auth_user_id: invite.id,
+      organization_id: scope.organizationId,
       invitation_status: "Invitation Sent",
       invited_at: new Date().toISOString()
     };
