@@ -14,14 +14,18 @@ function environment(role = "manager") {
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "server-secret";
   const approvals = [
-    { id: "approval-1", employee_id: "employee-1", period_start: "2026-09-16", period_end: "2026-09-30", work_timezone: "America/Edmonton", status: "approved", approved_by: "first-manager", approved_at: "2026-10-01T00:00:00Z" },
-    { id: "approval-2", employee_id: "employee-2", period_start: "2026-09-16", period_end: "2026-09-30", work_timezone: "America/Toronto", status: "approved", approved_by: "first-manager", approved_at: "2026-10-01T00:00:00Z" }
+    { id: "approval-1", employee_id: "44444444-4444-4444-8444-444444444444", period_start: "2026-09-16", period_end: "2026-09-30", work_timezone: "America/Edmonton", status: "approved", approved_by: "first-manager", approved_at: "2026-10-01T00:00:00Z" },
+    { id: "approval-2", employee_id: "55555555-5555-4555-8555-555555555555", period_start: "2026-09-16", period_end: "2026-09-30", work_timezone: "America/Toronto", status: "approved", approved_by: "first-manager", approved_at: "2026-10-01T00:00:00Z" }
   ];
   const audit = [];
   global.fetch = async (url, options = {}) => {
-    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "acting-manager", email: "manager@example.com" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role }]));
-    if (url.includes("/employees?") && url.includes("is_active=eq.true")) return new Response(JSON.stringify([{ id: "employee-1", province: "AB" }]));
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333", email: "manager@example.com" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/organizations?")) return new Response(JSON.stringify([{id:"11111111-1111-4111-8111-111111111111"}]));
+    if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"},{employee_id:"55555555-5555-4555-8555-555555555555",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"},{id:"55555555-5555-4555-8555-555555555555",organization_id:"11111111-1111-4111-8111-111111111111"}]));
+    if (url.includes("/employees?") && url.includes("is_active=eq.true")) return new Response(JSON.stringify([{ id: "44444444-4444-4444-8444-444444444444", province: "AB" }]));
     if (url.includes("/timecard_approvals?")) {
       let matches = approvals.filter(item => !url.includes("employee_id=eq.") || url.includes(`employee_id=eq.${item.employee_id}`));
       if (url.includes("employee_id=in.")) matches = matches.filter(item => url.includes(item.employee_id));
@@ -52,11 +56,11 @@ async function reopen(body, headers = { authorization: "Bearer manager" }) {
 
 test("unauthenticated and employee users cannot reopen a timecard", async () => {
   let env = environment();
-  try { assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" }, {})).statusCode, 401); }
+  try { assert.equal((await reopen({ employeeId: "44444444-4444-4444-8444-444444444444", period: "2026-09-2" }, {})).statusCode, 401); }
   finally { env.restore(); }
   env = environment("employee");
   try {
-    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 403);
+    assert.equal((await reopen({ employeeId: "44444444-4444-4444-8444-444444444444", period: "2026-09-2" })).statusCode, 403);
     assert.equal(env.approvals[0].status, "approved");
   } finally { env.restore(); }
 });
@@ -64,13 +68,13 @@ test("unauthenticated and employee users cannot reopen a timecard", async () => 
 test("manager reopens without a reason and records authenticated audit identity, time, and timezone", async () => {
   const env = environment();
   try {
-    const res = await reopen({ employeeId: "employee-1", period: "2026-09-2", managerId: "untrusted-user" });
+    const res = await reopen({ employeeId: "44444444-4444-4444-8444-444444444444", period: "2026-09-2", managerId: "untrusted-user" });
     assert.equal(res.statusCode, 200);
     assert.equal(env.approvals[0].status, "reopened");
     assert.equal(env.approvals[1].status, "approved");
     assert.deepEqual(env.audit.map(({ occurred_at, ...event }) => ({ ...event, hasTimestamp: /^\d{4}-\d{2}-\d{2}T/.test(occurred_at) })), [{
-      employee_id: "employee-1", period_start: "2026-09-16", period_end: "2026-09-30",
-      work_timezone: "America/Edmonton", action: "reopened", manager_user_id: "acting-manager",
+      employee_id: "44444444-4444-4444-8444-444444444444", period_start: "2026-09-16", period_end: "2026-09-30",
+      work_timezone: "America/Edmonton", action: "reopened", manager_user_id: "33333333-3333-4333-8333-333333333333",
       reopen_reason: null, hasTimestamp: true
     }]);
   } finally { env.restore(); }
@@ -79,7 +83,7 @@ test("manager reopens without a reason and records authenticated audit identity,
 test("blank optional reopen reason is normalized to null", async () => {
   const env = environment();
   try {
-    const res = await reopen({ employeeId: "employee-1", period: "2026-09-2", reason: "   " });
+    const res = await reopen({ employeeId: "44444444-4444-4444-8444-444444444444", period: "2026-09-2", reason: "   " });
     assert.equal(res.statusCode, 200);
     assert.equal(env.approvals[0].reopen_reason, null);
     assert.equal(env.audit[0].reopen_reason, null);
@@ -91,14 +95,14 @@ test("approved period locks, reopen unlocks, and re-approval locks it again", as
   const writable = () => env.approvals[0].status !== "approved";
   try {
     assert.equal(writable(), false);
-    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 200);
+    assert.equal((await reopen({ employeeId: "44444444-4444-4444-8444-444444444444", period: "2026-09-2" })).statusCode, 200);
     assert.equal(writable(), true);
     const res = response();
-    await approvalHandler({ method: "POST", headers: { authorization: "Bearer manager" }, body: { employeeIds: ["employee-1"], period: "2026-09-2" } }, res);
+    await approvalHandler({ method: "POST", headers: { authorization: "Bearer manager" }, body: { employeeIds: ["44444444-4444-4444-8444-444444444444"], period: "2026-09-2" } }, res);
     assert.equal(res.statusCode, 200);
     assert.equal(writable(), false);
     assert.equal(env.audit.at(-1).action, "re-approved");
-    assert.equal(env.audit.at(-1).manager_user_id, "acting-manager");
+    assert.equal(env.audit.at(-1).manager_user_id, "33333333-3333-4333-8333-333333333333");
   } finally { env.restore(); }
 });
 
@@ -165,7 +169,7 @@ for (const operation of ["approval_lookup", "reopen_update"]) {
       return underlyingFetch(url, options);
     };
     try {
-      const result = await reopen({ employeeId: "employee-1", period: "2026-09-2" });
+      const result = await reopen({ employeeId: "44444444-4444-4444-8444-444444444444", period: "2026-09-2" });
       assert.equal(result.statusCode, 500);
       assert.deepEqual(result.payload, { error: "Unable to reopen timecard" });
       assert.deepEqual(logs, [["Manager timecard database request failed", {
@@ -187,7 +191,7 @@ test("non-JSON database errors retain operation and HTTP status", async () => {
   global.fetch = async (url, options = {}) => url.includes("/timecard_approvals?") && options.method === "PATCH"
     ? new Response("private upstream error", { status: 503 }) : underlyingFetch(url, options);
   try {
-    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 500);
+    assert.equal((await reopen({ employeeId: "44444444-4444-4444-8444-444444444444", period: "2026-09-2" })).statusCode, 500);
     assert.deepEqual(logs[0][1], { operation: "reopen_update", status: 503, code: null, message: null });
   } finally { console.error = originalError; env.restore(); }
 });
