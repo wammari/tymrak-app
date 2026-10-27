@@ -47,6 +47,9 @@ jobs:
         if: steps.configuration.outputs.ready == 'true'
         run: |
           if [ ! -x /usr/lib/postgresql/17/bin/pg_dump ]; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl --fail --silent --show-error --location https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+            echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/tymrak-pgdg.list > /dev/null
             sudo apt-get update -qq
             sudo apt-get install -y postgresql-client-17
           fi
