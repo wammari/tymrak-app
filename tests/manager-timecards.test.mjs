@@ -23,6 +23,7 @@ async function withEnvironment(role, callback) {
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/organizations?")) return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([]));
@@ -153,6 +154,7 @@ test("API does not require an overtime rule for an employee with no punches", as
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/organizations?")) return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([
@@ -187,6 +189,7 @@ test("Supabase failures log safe structured query diagnostics", async () => {
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/organizations?")) return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]));
     if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
     if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?")) return new Response(JSON.stringify({
