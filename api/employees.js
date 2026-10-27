@@ -25,7 +25,7 @@ export default async function handler(req, res) {
     if (req.method === "GET") {
       const allowed = await authorizedEmployees(authorization, scope);
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/employees?organization_id=eq.${scope.organizationId}&select=${EMPLOYEE_SELECT},id&order=last_name.asc,first_name.asc`,
+        `${supabaseUrl}/rest/v1/employees?organization_id=eq.${scope.organizationId}&select=${EMPLOYEE_SELECT}&order=last_name.asc,first_name.asc`,
         { headers: databaseHeaders(secretKey) }
       );
       if (!response.ok) throw new Error("Employee list query failed");
