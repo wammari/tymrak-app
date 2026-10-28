@@ -54,6 +54,13 @@ def local_url(value):
         raise ValueError('Restore requires a disposable local database')
     return value
 
+def local_admin_url(value):
+    p = urlsplit(local_url(value))
+    if not p.password or '@' not in p.netloc:
+        raise ValueError('Local restore credential missing')
+    authority = 'supabase_admin:'+p.password+'@'+p.netloc.rsplit('@',1)[1]
+    return urlunsplit((p.scheme,authority,p.path,p.query,p.fragment))
+
 def run(args, name, readonly=False, capture=False, output_path=None):
     PRIVATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     env = os.environ.copy()
@@ -146,7 +153,7 @@ def restore():
     config.write_text(text)
     run(CLI+['start','--workdir',str(LOCAL)],'local-start')
     status = json.loads(run(CLI+['status','--workdir',str(LOCAL),'--output','json'],'local-status',capture=True))
-    url = local_url(status['DB_URL'])
+    url = local_admin_url(status['DB_URL'])
     # Only a validated loopback URL can reach this restore call.
     run(['psql','--no-psqlrc','--single-transaction','--set','ON_ERROR_STOP=1','--dbname',url,
          '--file',str(EXPORT/'roles.sql'),'--file',str(EXPORT/'schema.sql'),

@@ -23,6 +23,8 @@ class BackupTests(unittest.TestCase):
             with self.assertRaises(ValueError):backup.checked_url(value)
         with self.assertRaises(ValueError):backup.local_url(good)
         self.assertEqual(backup.local_url('postgresql://postgres:fake@127.0.0.1:54322/postgres'),'postgresql://postgres:fake@127.0.0.1:54322/postgres')
+        self.assertEqual(backup.local_admin_url('postgresql://postgres:fake@127.0.0.1:54322/postgres'),'postgresql://supabase_admin:fake@127.0.0.1:54322/postgres')
+        with self.assertRaises(ValueError):backup.local_admin_url(good)
 
     def test_subprocess_failure_does_not_echo_private_output(self):
         with tempfile.TemporaryDirectory() as folder, patch.object(backup,'PRIVATE',Path(folder)/'private'):
