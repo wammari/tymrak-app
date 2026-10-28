@@ -24,3 +24,11 @@ Status: **NOT APPROVED FOR PRODUCTION**. The PR is draft. No automatic productio
 - `requireManager` validates identity and role, while `resolveManagerScope` enforces a single active organization and workplace assignments. Each privileged endpoint must call the scope function before data access.
 - Company admin invitations currently create the Auth invitation **before** inserting the employee record; if persistence fails, the Auth account may be orphaned. Add compensation or reconciliation before general availability.
 - Avoid exposing test data or secret values in build logs, PR comments, or screenshots.
+
+## Independent review findings (2026-10-28)
+- **Browser staging/production isolation:** previously, staging `employee.html`, `timecard.html`, and `activate.html` pointed at the production Supabase project, while manager/login pages pointed at staging. The security branch now uses `client-supabase-config.js` on all seven Auth/timecard pages to select the project by hostname and reject unknown hosts. Automated hostname and page-coverage regression tests pass on commit `4a5d36f`; verify the actual deployed pages after Vercel builds this commit.
+- **Punch acceptance blocker:** the security branch's `employee.html` still uses a direct browser `punches.insert`, but read-only staging privilege inspection shows `authenticated` has SELECT and **no INSERT** on `public.punches`. Therefore do **not** claim clock-in/out works in staging based on API security tests. Coordinate the employee punch route with the separate geofence work and test with an authenticated staging employee before release.
+- **Staging deploy lag:** the most recent READY security-branch Vercel deployment observed was commit `0d75241`, older than the browser isolation fix and latest passing GitHub Actions run. Do not treat that READY deployment as proof of the new browser fix.
+- **Staging RLS read-only audit:** `employees` and `punches` have row-level security; `authenticated` has SELECT but no direct INSERT/UPDATE on these tables, and manager approval tables are service-role only. Server-side privileged endpoints still require full direct-ID and mixed-batch review.
+- **Migration proof:** the tenant prerequisite migration has not been validated against a clean production-like schema. Existing staging tables cannot substitute for first-time migration verification.
+
