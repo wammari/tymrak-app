@@ -1114,6 +1114,57 @@ async function loadEmployee() {
 }
 
 
+// Pilot location gate. This is a browser-side safeguard only; database-side
+// enforcement is required before geofencing can be considered secure.
+const PILOT_GEOFENCE = Object.freeze({
+    enabled: false, // Enable only after verified building coordinates and server checks.
+    latitude: null,
+    longitude: null,
+    radiusMeters: 50,
+    maxAccuracyMeters: 50
+});
+
+function distanceMeters(lat1, lon1, lat2, lon2) {
+    const radians = degrees => degrees * Math.PI / 180;
+    const dLat = radians(lat2 - lat1);
+    const dLon = radians(lon2 - lon1);
+    const a = Math.sin(dLat / 2) ** 2 +
+        Math.cos(radians(lat1)) * Math.cos(radians(lat2)) *
+        Math.sin(dLon / 2) ** 2;
+    return 6371000 * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+}
+
+async function verifyPunchLocation() {
+    if (!PILOT_GEOFENCE.enabled) return null;
+    if (!Number.isFinite(PILOT_GEOFENCE.latitude) ||
+        !Number.isFinite(PILOT_GEOFENCE.longitude)) {
+        throw new Error("Workplace location is not configured. Contact your administrator.");
+    }
+    if (!navigator.geolocation) {
+        throw new Error("Location services are unavailable on this device.");
+    }
+    const position = await new Promise((resolve, reject) => {
+        navigator.geolocation.getCurrentPosition(resolve, reject, {
+            enableHighAccuracy: true,
+            maximumAge: 0,
+            timeout: 15000
+        });
+    }).catch(() => {
+        throw new Error("Unable to verify your location. Enable location permission and retry.");
+    });
+    const { latitude, longitude, accuracy } = position.coords;
+    if (![latitude, longitude, accuracy].every(Number.isFinite) ||
+        accuracy > PILOT_GEOFENCE.maxAccuracyMeters) {
+        throw new Error("GPS accuracy is too low indoors. Move closer to a window and retry.");
+    }
+    const distance = distanceMeters(latitude, longitude,
+        PILOT_GEOFENCE.latitude, PILOT_GEOFENCE.longitude);
+    if (distance > PILOT_GEOFENCE.radiusMeters) {
+        throw new Error("Punch blocked: you are outside the authorized 50-metre workplace area.");
+    }
+    return { latitude, longitude, accuracy };
+}
+
 async function recordPunch(
     punchType,
     button
@@ -1150,6 +1201,11 @@ async function recordPunch(
 
     try {
 
+        // Capture a fresh sample for the pilot. The client check alone is not
+        // sufficient security; enforcement remains disabled until the server
+        // verifies the same sample and blocks direct punch inserts.
+        const verifiedLocation = await verifyPunchLocation();
+
         const {
             error
         } =
@@ -1164,7 +1220,12 @@ async function recordPunch(
                         punchType,
 
                     source:
-                        "employee"
+                        "employee",
+
+                    ...(verifiedLocation ? {
+                        float8: verifiedLocation.latitude,
+                        longitude: verifiedLocation.longitude
+                    } : {})
                 });
 
 

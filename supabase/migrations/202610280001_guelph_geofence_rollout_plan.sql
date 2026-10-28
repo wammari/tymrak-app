@@ -1,0 +1,23 @@
+-- Draft only. DO NOT APPLY until building coordinates are verified and
+-- all client punch paths are migrated to a controlled server endpoint.
+-- Existing punches and approval history must remain untouched.
+--
+-- Threat model: the browser can forge latitude/longitude and can call
+-- Supabase REST directly. A database distance check on client-supplied
+-- coordinates alone DOES NOT prove physical presence.
+--
+-- Proposed rollout:
+-- 1. Create server-managed workplace configuration keyed by company/site.
+-- 2. Authenticate the employee server-side and resolve company/site from
+--    server-controlled employee assignments (never trust supplied employee_id).
+-- 3. Require a fresh location sample, accuracy threshold, and distance <= 50 m.
+-- 4. Record the location and decision for audit; reject missing/poor readings.
+-- 5. Revoke direct authenticated INSERT on punches when the secure endpoint
+--    is deployed; ensure no alternate RPC or write policy bypasses it.
+-- 6. Preserve approved timecard protections, administrative adjustments,
+--    company isolation, and existing punch history.
+-- 7. Test Wi-Fi/mobile, indoor GPS, permission denied, out-of-range,
+--    forged employee IDs, missing coordinates, and replay attempts.
+--
+-- Coordinates are intentionally NOT guessed from a postal address.
+-- Browser-side geofencing remains disabled until the full rollout.
