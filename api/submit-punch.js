@@ -22,8 +22,24 @@ export default async function handler(req, res) {
     if (!/^[0-9a-f]{8}-[0-9a-f-]{27,}$/i.test(user?.id || "")) {
       return res.status(401).json({ error: "Invalid session" });
     }
-    // Identity is verified, but site configuration and tamper-resistant
-    // enforcement have not been deployed. Never fall back to direct insert.
+    const sample = req.body?.location;
+    const latitude = sample?.latitude;
+    const longitude = sample?.longitude;
+    const accuracy = sample?.accuracy;
+    const sampledAt = sample?.sampledAt;
+    if (![latitude, longitude, accuracy].every(Number.isFinite) ||
+        Math.abs(latitude) > 90 || Math.abs(longitude) > 180 ||
+        accuracy < 0 || typeof sampledAt !== "string" ||
+        !Number.isFinite(Date.parse(sampledAt)) ||
+        Math.abs(Date.now() - Date.parse(sampledAt)) > 30000) {
+      return res.status(400).json({ error: "Fresh, valid GPS coordinates are required" });
+    }
+    const allowedTypes = new Set(["clock_in", "clock_out", "break_start", "break_end"]);
+    if (!allowedTypes.has(req.body?.punchType)) {
+      return res.status(400).json({ error: "Invalid punch type" });
+    }
+    // Server-side employee-to-workplace resolution and database-side
+    // write lockout are not yet implemented. Refuse all writes until then.
     return res.status(503).json({
       error: "Secure workplace punch verification is not yet enabled"
     });
