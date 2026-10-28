@@ -160,6 +160,7 @@ def restore():
          '--command','SET session_replication_role = replica','--file',str(EXPORT/'data.sql')],'local-restore')
     manifest = json.loads((EXPORT/'manifest.json').read_text())
     restored = inventory(url)
+    (EXPORT/'restored-inventory.json').write_text(json.dumps(restored,indent=2))
     if restored != manifest['source_inventory']:
         raise RuntimeError('Restored records or public RLS policies do not match the source')
     manifest['restore_verified'] = True
