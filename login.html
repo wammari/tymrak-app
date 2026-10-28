@@ -185,11 +185,8 @@ Sign In
 
 <script type="module">
 
-const SUPABASE_URL =
-    "https://ctztwqcsizwkrqgpgrgg.supabase.co";
-
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable__NGh_dC6GYEQ487PvboXNQ_iMeCC-Ah";
+import { getClientSupabaseConfiguration } from "/client-supabase-config.js";
+const { url: SUPABASE_URL, publishableKey: SUPABASE_PUBLISHABLE_KEY } = getClientSupabaseConfiguration();
 
 
 import { createClient } from
