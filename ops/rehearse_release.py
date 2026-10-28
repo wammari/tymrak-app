@@ -32,7 +32,7 @@ def main():
         backup.run(['psql','--no-psqlrc','--quiet','--set','ON_ERROR_STOP=1','--dbname',url,'--file',str(path)],'migration-'+filename)
     # Only the disposable local administrator provisions synthetic Auth fixtures.
     admin = backup.local_admin_url(url)
-    result = backup.run(['psql','--no-psqlrc','--quiet','--set','ON_ERROR_STOP=1','--dbname',admin,
+    result = backup.run(['psql','--no-psqlrc','--quiet','--tuples-only','--no-align','--set','ON_ERROR_STOP=1','--dbname',admin,
                          '--file',str(backup.ROOT/'ops/rehearsal-acceptance.sql')],
                         'rehearsal-acceptance',capture=True)
     checks = json.loads(result.strip())
