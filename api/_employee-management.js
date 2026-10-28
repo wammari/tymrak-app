@@ -20,7 +20,7 @@ export function cleanString(value) {
 export function databaseHeaders(secretKey, prefer) {
   return {
     apikey: secretKey,
-    Authorization: `Bearer ${secretKey}`,
+    ...(secretKey.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${secretKey}` }),
     "Content-Type": "application/json",
     ...(prefer ? { Prefer: prefer } : {})
   };
