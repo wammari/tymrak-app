@@ -1201,8 +1201,10 @@ async function recordPunch(
 
     try {
 
-        // Do not record a punch if the pilot geofence check fails.
-        await verifyPunchLocation();
+        // Capture a fresh sample for the pilot. The client check alone is not
+        // sufficient security; enforcement remains disabled until the server
+        // verifies the same sample and blocks direct punch inserts.
+        const verifiedLocation = await verifyPunchLocation();
 
         const {
             error
@@ -1218,7 +1220,12 @@ async function recordPunch(
                         punchType,
 
                     source:
-                        "employee"
+                        "employee",
+
+                    ...(verifiedLocation ? {
+                        float8: verifiedLocation.latitude,
+                        longitude: verifiedLocation.longitude
+                    } : {})
                 });
 
 
