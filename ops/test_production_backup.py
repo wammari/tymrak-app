@@ -45,6 +45,13 @@ class BackupTests(unittest.TestCase):
             self.assertIn('default_transaction_read_only=on',result['PGOPTIONS'])
             self.assertIsNone(result['TYMRAK_BACKUP_DATABASE_URL'])
 
+    def test_security_inventory_uses_consistent_search_path(self):
+        with patch.object(backup,'run',return_value='{}') as runner:
+            self.assertEqual(backup.sql('synthetic-url','select 1','fixture'),{})
+        args=runner.call_args.args[0]
+        self.assertIn('--quiet',args)
+        self.assertTrue(args[-1].startswith('SET search_path = public, pg_catalog;'))
+
     def test_authenticated_encryption_roundtrip_and_tamper_rejection(self):
         with tempfile.TemporaryDirectory() as folder:
             root=Path(folder);private=root/'private';export=private/'export';export.mkdir(parents=True);(root/'ops').mkdir()

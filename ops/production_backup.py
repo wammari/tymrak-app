@@ -83,7 +83,8 @@ def run(args, name, readonly=False, capture=False, output_path=None):
     return result.stdout.decode() if capture else None
 
 def sql(url, query, name, readonly=False):
-    output = run(['psql','--no-psqlrc','--dbname',url,'--set','ON_ERROR_STOP=1','--tuples-only','--no-align','--command',query], name, readonly=readonly, capture=True)
+    query = "SET search_path = public, pg_catalog;"+query
+    output = run(['psql','--no-psqlrc','--quiet','--dbname',url,'--set','ON_ERROR_STOP=1','--tuples-only','--no-align','--command',query], name, readonly=readonly, capture=True)
     return json.loads(output.strip())
 
 def quoted(value):
@@ -154,8 +155,17 @@ def restore():
     run(CLI+['start','--workdir',str(LOCAL)],'local-start')
     status = json.loads(run(CLI+['status','--workdir',str(LOCAL),'--output','json'],'local-status',capture=True))
     url = local_admin_url(status['DB_URL'])
+    # Fresh CLI stacks grant browser roles broad privileges by default. Clear
+    # those local defaults before creating restored objects; the dump then
+    # supplies the source's explicit object grants and default privileges.
+    defaults = []
+    for owner in ('postgres','supabase_admin'):
+        for scope in ('',' IN SCHEMA public'):
+            for kind in ('TABLES','SEQUENCES','FUNCTIONS'):
+                defaults.append(f'ALTER DEFAULT PRIVILEGES FOR ROLE {owner}{scope} REVOKE ALL ON {kind} FROM anon, authenticated, service_role;')
     # Only a validated loopback URL can reach this restore call.
     run(['psql','--no-psqlrc','--single-transaction','--set','ON_ERROR_STOP=1','--dbname',url,
+         '--command',''.join(defaults),
          '--file',str(EXPORT/'roles.sql'),'--file',str(EXPORT/'schema.sql'),
          '--command','SET session_replication_role = replica','--file',str(EXPORT/'data.sql')],'local-restore')
     manifest = json.loads((EXPORT/'manifest.json').read_text())
