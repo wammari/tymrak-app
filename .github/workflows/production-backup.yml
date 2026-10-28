@@ -1,0 +1,81 @@
+name: Private production backup and restore check
+on:
+  push:
+    branches: [ops/production-backup]
+    paths:
+      - '.github/backup-request.json'
+      - '.github/workflows/production-backup.yml'
+      - 'ops/production_backup.py'
+      - 'ops/backup-recipient.pem'
+      - 'ops/supabase-production-ca.crt'
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: tymrak-production-backup
+  cancel-in-progress: false
+jobs:
+  backup:
+    if: github.repository == 'wammari/tymrak-app' && github.ref == 'refs/heads/ops/production-backup'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check target guards, encryption and log redaction
+        run: python3 -m unittest discover -s ops -p 'test_production_backup.py'
+      - name: Check secure configuration
+        id: configuration
+        env:
+          TYMRAK_BACKUP_DATABASE_URL: ${{ secrets.TYMRAK_BACKUP_DATABASE_URL }}
+        run: |
+          if [ -z "$TYMRAK_BACKUP_DATABASE_URL" ]; then
+            echo 'ready=false' >> "$GITHUB_OUTPUT"
+            echo 'Backup NOT RUN: add the TYMRAK_BACKUP_DATABASE_URL repository Actions secret, then rerun this workflow.' >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo 'ready=true' >> "$GITHUB_OUTPUT"
+          fi
+      - name: Check required local tools
+        if: steps.configuration.outputs.ready == 'true'
+        run: |
+          command -v psql
+          command -v docker
+          command -v openssl
+      - name: Select PostgreSQL 17 client tools
+        if: steps.configuration.outputs.ready == 'true'
+        run: |
+          if [ ! -x /usr/lib/postgresql/17/bin/pg_dump ]; then
+            sudo install -d /usr/share/postgresql-common/pgdg
+            sudo curl --fail --silent --show-error --location https://www.postgresql.org/media/keys/ACCC4CF8.asc -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc
+            echo 'deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] https://apt.postgresql.org/pub/repos/apt noble-pgdg main' | sudo tee /etc/apt/sources.list.d/tymrak-pgdg.list > /dev/null
+            sudo apt-get update -qq
+            sudo apt-get install -y postgresql-client-17
+          fi
+          echo '/usr/lib/postgresql/17/bin' >> "$GITHUB_PATH"
+      - name: Export production read only
+        id: export
+        if: steps.configuration.outputs.ready == 'true'
+        env:
+          TYMRAK_BACKUP_DATABASE_URL: ${{ secrets.TYMRAK_BACKUP_DATABASE_URL }}
+        run: python3 ops/production_backup.py export
+      - name: Restore only into disposable local Supabase
+        if: steps.export.outcome == 'success'
+        run: python3 ops/production_backup.py restore
+      - name: Encrypt export and private diagnostics
+        id: encryption
+        if: always() && steps.configuration.outputs.ready == 'true'
+        run: python3 ops/production_backup.py encrypt
+      - name: Retain encrypted backup briefly
+        if: always() && steps.encryption.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: tymrak-production-backup-${{ github.run_id }}
+          path: ${{ runner.temp }}/tymrak-production-backup.tar.gz.enc
+          if-no-files-found: error
+          retention-days: 1
+          compression-level: 0
+      - name: Remove plaintext and disposable restore database
+        if: always() && steps.configuration.outputs.ready == 'true'
+        run: python3 ops/production_backup.py cleanup
