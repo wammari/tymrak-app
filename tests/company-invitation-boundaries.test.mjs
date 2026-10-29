@@ -6,7 +6,7 @@ const MANAGER="33333333-3333-4333-8333-333333333333";
 const ORG="11111111-1111-4111-8111-111111111111";
 const valid={firstName:"Pilot",lastName:"Employee",email:"pilot@example.invalid",username:"pilot",province:"ON"};
 const response=()=>({statusCode:null,payload:null,setHeader(){},status(n){this.statusCode=n;return this;},json(p){this.payload=p;return this;}});
-function setup(role,organization=ORG){
+function setup(role,organization=ORG,saveFails=false){
  const oldFetch=globalThis.fetch,oldEnv={...process.env},calls=[];
  process.env.SUPABASE_URL="https://example.invalid";process.env.SUPABASE_SECRET_KEY="fixture-key";
  globalThis.fetch=async(raw,options={})=>{
@@ -18,7 +18,8 @@ function setup(role,organization=ORG){
   if(u.pathname.endsWith("/workplaces"))return new Response("[]");
   if(u.pathname.endsWith("/employees")&&method==="GET")return new Response("[]");
   if(u.pathname==="/auth/v1/invite")return new Response(JSON.stringify({id:"44444444-4444-4444-8444-444444444444"}));
-  if(u.pathname.endsWith("/employees")&&method==="POST")return new Response(JSON.stringify([{id:"55555555-5555-4555-8555-555555555555"}]));
+  if(u.pathname.endsWith("/employees")&&method==="POST")return saveFails?new Response("{}",{status:500}):new Response(JSON.stringify([{id:"55555555-5555-4555-8555-555555555555"}]));
+  if(u.pathname.startsWith("/auth/v1/admin/users/")&&method==="DELETE")return new Response(null,{status:204});
   throw new Error("Unexpected request: "+u.pathname);
  };
  return {calls,restore(){globalThis.fetch=oldFetch;process.env=oldEnv;}};
@@ -46,5 +47,16 @@ test("admin without organization cannot invite or create auth user",async()=>{
   const res=response();await inviteHandler(req(),res);
   assert.equal(res.statusCode,403);
   assert.equal(f.calls.some(x=>x.path==="/auth/v1/invite"),false);
+ }finally{f.restore();}
+});
+
+test("failed employee persistence cleans up newly invited Auth identity",async()=>{
+ const f=setup("admin",ORG,true);try{
+  const res=response();await inviteHandler(req(),res);
+  assert.equal(res.statusCode,500);
+  const invite=f.calls.find(x=>x.path==="/auth/v1/invite");
+  const cleanup=f.calls.find(x=>x.path==="/auth/v1/admin/users/44444444-4444-4444-8444-444444444444"&&x.method==="DELETE");
+  assert.ok(invite);
+  assert.ok(cleanup);
  }finally{f.restore();}
 });
