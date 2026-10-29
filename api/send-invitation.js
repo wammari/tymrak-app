@@ -38,7 +38,19 @@ export default async function handler(req, res) {
       headers: databaseHeaders(secretKey, "return=representation"),
       body: JSON.stringify(employee)
     });
-    if (!response.ok) throw new Error("Employee record could not be saved after invitation");
+    if (!response.ok) {
+      // Remove only the newly invited Auth identity when employee persistence fails.
+      try {
+        const cleanup = await fetch(
+          supabaseUrl + "/auth/v1/admin/users/" + encodeURIComponent(invite.id),
+          { method: "DELETE", headers: databaseHeaders(secretKey) }
+        );
+        if (!cleanup.ok) console.error("TYMRAK invitation cleanup failed", { status: cleanup.status });
+      } catch (cleanupError) {
+        console.error("TYMRAK invitation cleanup unavailable", { errorName: cleanupError?.name || "Error" });
+      }
+      throw new Error("Employee record could not be saved after invitation");
+    }
     const records = await response.json();
     return res.status(201).json({
       success: true,
