@@ -22,7 +22,8 @@ export default async function handler(req, res) {
       !location || typeof location !== "object" ||
       !Number.isFinite(location.latitude) || location.latitude < -90 || location.latitude > 90 ||
       !Number.isFinite(location.longitude) || location.longitude < -180 || location.longitude > 180 ||
-      !Number.isFinite(location.accuracy) || location.accuracy < 0 || location.accuracy > 100 ||\n      !Number.isFinite(location.capturedAt) || Math.abs(Date.now() - location.capturedAt) > 30000) {
+      !Number.isFinite(location.accuracy) || location.accuracy < 0 || location.accuracy > 100 ||
+      !Number.isFinite(location.capturedAt) || Math.abs(Date.now() - location.capturedAt) > 30000) {
     return res.status(400).json({ error: "Valid punch, location and request state are required" });
   }
 
