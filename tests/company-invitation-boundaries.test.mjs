@@ -50,13 +50,13 @@ test("admin without organization cannot invite or create auth user",async()=>{
  }finally{f.restore();}
 });
 
-test("failed employee persistence cleans up newly invited Auth identity",async()=>{
+test("failed employee persistence never deletes potentially existing Auth identity",async()=>{
  const f=setup("admin",ORG,true);try{
   const res=response();await inviteHandler(req(),res);
   assert.equal(res.statusCode,500);
   const invite=f.calls.find(x=>x.path==="/auth/v1/invite");
   const cleanup=f.calls.find(x=>x.path==="/auth/v1/admin/users/44444444-4444-4444-8444-444444444444"&&x.method==="DELETE");
   assert.ok(invite);
-  assert.ok(cleanup);
+  assert.equal(cleanup,undefined);
  }finally{f.restore();}
 });
