@@ -32,3 +32,9 @@ Status: **NOT APPROVED FOR PRODUCTION**. The PR is draft. No automatic productio
 - **Staging RLS read-only audit:** `employees` and `punches` have row-level security; `authenticated` has SELECT but no direct INSERT/UPDATE on these tables, and manager approval tables are service-role only. Server-side privileged endpoints still require full direct-ID and mixed-batch review.
 - **Migration proof:** the tenant prerequisite migration has not been validated against a clean production-like schema. Existing staging tables cannot substitute for first-time migration verification.
 
+
+## Launch-critical punch path verification (2026-10-29)
+- Inspected `employee.html` on PR #33: `recordPunch()` still performs browser `supabase.from("punches").insert({employee_id,punch_type,source:"employee"})` for clock in/out and breaks.
+- The previously recorded staging privileges show `authenticated` has no direct INSERT on `public.punches`; passing GitHub tests does **not** mean punches work.
+- **Release blocker:** implement and test an authenticated, tenant-safe punch submission path compatible with current geofence and approved-timecard protections. Do not simply grant broad INSERT or bypass geofencing. Test employee clock in/out and break transitions end-to-end in staging.
+- `complete-activation.js` authenticates the session and invokes `complete_employee_activation` through a server key. Independently verify the database RPC's owner/grants, authorization and tenant constraints before production.
