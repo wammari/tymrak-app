@@ -18,11 +18,11 @@ export default async function handler(req, res) {
   const body = req.body || {};
   const { punchType, requestId, expectedLastId, location } = body;
   if (!TYPES.has(punchType) || !UUID.test(requestId || "") ||
-      !(expectedLastId === null || UUID.test(expectedLastId || "")) ||
+      !(expectedLastId === null || (typeof expectedLastId === "string" && /^[0-9]+$/.test(expectedLastId))) ||
       !location || typeof location !== "object" ||
       !Number.isFinite(location.latitude) || location.latitude < -90 || location.latitude > 90 ||
       !Number.isFinite(location.longitude) || location.longitude < -180 || location.longitude > 180 ||
-      !Number.isFinite(location.accuracy) || location.accuracy < 0) {
+      !Number.isFinite(location.accuracy) || location.accuracy < 0 || location.accuracy > 100 ||\n      !Number.isFinite(location.capturedAt) || Math.abs(Date.now() - location.capturedAt) > 30000) {
     return res.status(400).json({ error: "Valid punch, location and request state are required" });
   }
 
@@ -44,7 +44,7 @@ export default async function handler(req, res) {
         p_punch_type: punchType,
         p_request_id: requestId,
         p_expected_last_id: expectedLastId,
-        p_location: { latitude: location.latitude, longitude: location.longitude, accuracy: location.accuracy }
+        p_location: { latitude: location.latitude, longitude: location.longitude, accuracyMetres: location.accuracy, capturedAt: location.capturedAt }
       })
     });
     if (!result.ok) throw new Error("Punch RPC unavailable");
