@@ -30,7 +30,9 @@ test("verified identity and geolocation are forwarded to geofenced RPC",async()=
   const f=setup();try{const r=res();await handler({method:"POST",headers:{authorization:"Bearer fixture"},body:{...payload,authUserId:"attacker"}},r);
     assert.equal(r.code,200);assert.equal(f.calls.length,2);
     const sent=JSON.parse(f.calls[1].opts.body);assert.equal(sent.p_auth_user_id,UUID);
-    assert.equal(sent.p_location.latitude,43.3);\n    assert.equal(sent.p_location.accuracyMetres,15);\n    assert.equal(sent.p_location.capturedAt,payload.location.capturedAt);
+    assert.equal(sent.p_location.latitude,43.3);
+    assert.equal(sent.p_location.accuracyMetres,15);
+    assert.equal(sent.p_location.capturedAt,payload.location.capturedAt);
     assert.ok(f.calls[1].url.endsWith("/rpc/record_geofenced_punch"));
     assert.equal(f.calls[1].opts.headers.apikey,"sb_secret_fixture");
     assert.equal(f.calls[1].opts.headers.Authorization,undefined);
