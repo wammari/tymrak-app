@@ -1163,11 +1163,20 @@ async function recordPunch(
         if (!navigator.geolocation) {
             throw new Error("Location access is required to record a punch.");
         }
-        const position = await new Promise((resolve, reject) => {
+        const requestPosition = () => new Promise((resolve, reject) => {
             navigator.geolocation.getCurrentPosition(resolve, reject, {
                 enableHighAccuracy: true, timeout: 15000, maximumAge: 0
             });
         });
+        let position = await requestPosition();
+        // Some mobile browsers return an old fix despite maximumAge: 0.
+        // Never relabel a stale fix as current or send it to the punch API.
+        if (!Number.isFinite(position.timestamp) || Math.abs(Date.now() - position.timestamp) > 20000) {
+            position = await requestPosition();
+        }
+        if (!Number.isFinite(position.timestamp) || Math.abs(Date.now() - position.timestamp) > 20000) {
+            throw new Error("Your device returned an outdated location. Please refresh location services and try again.");
+        }
         // Staging-only location diagnostics. Display the browser's actual reading
         // before the server validates the geofence; never substitute coordinates.
         if (window.location.hostname.startsWith("tymrak-staging")) {
