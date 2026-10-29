@@ -43,7 +43,7 @@ a{color:#795323}
     <input id="password" type="password" autocomplete="current-password" required>
     <button id="loginButton" type="submit">Sign in to Manager Portal</button>
   </form>
-  <div id="message" class="message" role="alert"></div>
+  <div id="message" class="message" role="alert"></div>\n  <a class="back" href="#" id="forgotPassword">Forgot password?</a>
   <a class="back" href="/">← Back to portal selection</a>
 </main>
 <script type="module">
@@ -64,6 +64,16 @@ async function verifyManager(accessToken) {
   if (!response.ok) throw new Error(data.error || "Manager access could not be verified");
 }
 
+document.getElementById("forgotPassword").addEventListener("click", async event => {
+  event.preventDefault();
+  const email = document.getElementById("email").value.trim();
+  if (!email) { message.textContent = "Enter your account email above, then select Forgot password."; message.className = "message error"; return; }
+  const { error } = await supabase.auth.resetPasswordForEmail(email, { redirectTo: "https://app.tymrak.com/reset-password.html" });
+  message.textContent = error ? error.message : "If this email is registered, password reset instructions will be sent shortly.";
+  message.className = error ? "message error" : "message";
+  message.style.display = "block";
+});
+
 form.addEventListener("submit", async event => {
   event.preventDefault();
   button.disabled = true;
@@ -82,7 +92,7 @@ form.addEventListener("submit", async event => {
     await supabase.auth.signOut();
     message.textContent = error.message === "Manager access required"
       ? "This account does not have Manager Portal access."
-      : error.message;
+      : error.message === "Invalid login credentials" ? "Email or password not recognized. Check your TYMRAK account email or use Forgot password." : error.message;
     message.className = "message error";
     button.disabled = false;
     button.textContent = "Sign in to Manager Portal";
