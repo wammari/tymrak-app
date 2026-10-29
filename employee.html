@@ -1177,12 +1177,11 @@ async function recordPunch(
             body: JSON.stringify({
                 punchType,
                 requestId: crypto.randomUUID(),
-                expectedLastId: latest?.[0]?.id || null,
+                expectedLastId: latest?.[0]?.id == null ? null : String(latest[0].id),
                 location: {
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy
-                }
+                    accuracy: position.coords.accuracy,\n                    capturedAt: position.timestamp\n                }
             })
         });
         const result = await response.json();
