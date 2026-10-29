@@ -1212,8 +1212,8 @@ async function recordPunch(
             const panel = document.getElementById("staging-location-diagnostics");
             if (panel) {
                 const outcome = response.ok && result?.success === true ? "ACCEPTED" : "REJECTED";
-                const code = typeof result?.error === "string" ? result.error :
-                    (typeof result?.code === "string" ? result.code : "No error code supplied");
+                const code = typeof result?.code === "string" ? result.code :
+                    (typeof result?.error === "string" ? result.error : "No error code supplied");
                 panel.textContent += " | Server result: " + outcome +
                     " (HTTP " + response.status + ")" +
                     (outcome === "REJECTED" ? " | Reason: " + code : "");
