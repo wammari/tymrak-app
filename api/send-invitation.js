@@ -39,16 +39,9 @@ export default async function handler(req, res) {
       body: JSON.stringify(employee)
     });
     if (!response.ok) {
-      // Remove only the newly invited Auth identity when employee persistence fails.
-      try {
-        const cleanup = await fetch(
-          supabaseUrl + "/auth/v1/admin/users/" + encodeURIComponent(invite.id),
-          { method: "DELETE", headers: databaseHeaders(secretKey) }
-        );
-        if (!cleanup.ok) console.error("TYMRAK invitation cleanup failed", { status: cleanup.status });
-      } catch (cleanupError) {
-        console.error("TYMRAK invitation cleanup unavailable", { errorName: cleanupError?.name || "Error" });
-      }
+      // Supabase invite may return an existing Auth user. Never delete that identity:
+      // a failed employee write must not destroy another account.
+      console.error("TYMRAK invitation employee persistence failed", { status: response.status });
       throw new Error("Employee record could not be saved after invitation");
     }
     const records = await response.json();
