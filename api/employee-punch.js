@@ -24,7 +24,17 @@ export default async function handler(req, res) {
       !Number.isFinite(location.longitude) || location.longitude < -180 || location.longitude > 180 ||
       !Number.isFinite(location.accuracy) || location.accuracy < 0 || location.accuracy > 100 ||
       !Number.isFinite(location.capturedAt) || Math.abs(Date.now() - location.capturedAt) > 30000) {
-    return res.status(400).json({ error: "Valid punch, location and request state are required" });
+    // Return a non-sensitive validation category so staging can diagnose rejected requests.
+    const reason = !TYPES.has(punchType) ? "invalid_punch_type" :
+      !UUID.test(requestId || "") ? "invalid_request_id" :
+      !(expectedLastId === null || (typeof expectedLastId === "string" && /^[0-9]+$/.test(expectedLastId))) ? "invalid_previous_punch_id" :
+      !location || typeof location !== "object" ? "missing_location" :
+      !Number.isFinite(location.latitude) || location.latitude < -90 || location.latitude > 90 ||
+      !Number.isFinite(location.longitude) || location.longitude < -180 || location.longitude > 180 ? "invalid_coordinates" :
+      !Number.isFinite(location.accuracy) || location.accuracy < 0 || location.accuracy > 100 ? "insufficient_location_accuracy" :
+      !Number.isFinite(location.capturedAt) || Math.abs(Date.now() - location.capturedAt) > 30000 ? "stale_location_timestamp" :
+      "invalid_request";
+    return res.status(400).json({ error: "Valid punch, location and request state are required", code: reason });
   }
 
   const { supabaseUrl, secretKey } = config;
