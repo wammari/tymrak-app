@@ -1168,6 +1168,27 @@ async function recordPunch(
                 enableHighAccuracy: true, timeout: 15000, maximumAge: 0
             });
         });
+        // Staging-only location diagnostics. Display the browser's actual reading
+        // before the server validates the geofence; never substitute coordinates.
+        if (window.location.hostname.startsWith("tymrak-staging")) {
+            let panel = document.getElementById("staging-location-diagnostics");
+            if (!panel) {
+                panel = document.createElement("div");
+                panel.id = "staging-location-diagnostics";
+                panel.setAttribute("role", "status");
+                panel.style.cssText = "margin:12px 0;padding:12px;border:1px solid #b69b68;border-radius:8px;background:#fff8ea;color:#352717;font-size:13px;overflow-wrap:anywhere;";
+                buttonArea.parentNode.insertBefore(panel, buttonArea.nextSibling);
+            }
+            const latitude = Number(position.coords.latitude);
+            const longitude = Number(position.coords.longitude);
+            const accuracy = Number(position.coords.accuracy);
+            const captured = new Date(position.timestamp);
+            panel.textContent = "STAGING LOCATION CHECK — Safari/browser reported: " +
+                latitude.toFixed(6) + ", " + longitude.toFixed(6) +
+                " | Accuracy: " + accuracy.toFixed(1) + " m" +
+                " | Captured: " + (Number.isNaN(captured.getTime()) ? "unknown" : captured.toLocaleTimeString()) +
+                " | These are the coordinates sent to Tymrak for geofence validation.";
+        }
         const response = await fetch("/api/employee-punch", {
             method: "POST",
             headers: {
