@@ -1181,7 +1181,9 @@ async function recordPunch(
                 location: {
                     latitude: position.coords.latitude,
                     longitude: position.coords.longitude,
-                    accuracy: position.coords.accuracy,\n                    capturedAt: position.timestamp\n                }
+                    accuracy: position.coords.accuracy,
+                    capturedAt: position.timestamp
+                }
             })
         });
         const result = await response.json();
