@@ -4,7 +4,7 @@ on:
   pull_request:
     branches: [main]
   push:
-    branches: [main]
+    branches: [main, security/company-boundaries-staging]
   workflow_dispatch:
 
 permissions:
