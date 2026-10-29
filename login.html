@@ -309,7 +309,7 @@ form.addEventListener(
 
             showMessage(
                 "error",
-                error.message ||
+                (error.message === "Invalid login credentials" ? "Email or password not recognized. Check the email used for your TYMRAK invitation, or select Forgot password to set a new password." : error.message) ||
                 "Unable to sign in."
             );
 
@@ -355,7 +355,7 @@ document.getElementById(
                         email,
                         {
                             redirectTo:
-                                "https://tymrak.vercel.app/reset-password.html"
+                                "https://app.tymrak.com/reset-password.html"
                         }
                     );
 
