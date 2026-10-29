@@ -14,6 +14,8 @@ function setup(role,organization=ORG){
   if(u.pathname==="/auth/v1/user")return new Response(JSON.stringify({id:MANAGER,email:"manager@example.invalid"}));
   if(u.pathname.endsWith("/user_roles"))return new Response(JSON.stringify(u.searchParams.get("select")==="role"?[{role}]:[{role,organization_id:organization}]));
   if(u.pathname.endsWith("/organizations"))return new Response(JSON.stringify([{id:ORG}]));
+  if(u.pathname.endsWith("/manager_workplaces"))return new Response("[]");
+  if(u.pathname.endsWith("/workplaces"))return new Response("[]");
   if(u.pathname.endsWith("/employees")&&method==="GET")return new Response("[]");
   if(u.pathname==="/auth/v1/invite")return new Response(JSON.stringify({id:"44444444-4444-4444-8444-444444444444"}));
   if(u.pathname.endsWith("/employees")&&method==="POST")return new Response(JSON.stringify([{id:"55555555-5555-4555-8555-555555555555"}]));
