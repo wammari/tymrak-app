@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { resolveManagerScope, authorizedEmployees } from "./_tenant-authorization.js";
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES, calculationStart, getCurrentPayPeriod, getPayPeriod, getPayPeriodDateKeys, periodFromKey, summarizeEmployee } from "./_manager-timecards.js";
 
@@ -51,6 +52,9 @@ export default async function handler(req, res) {
     const authorization = await requireManager(req);
     if (!authorization.ok) return res.status(authorization.status).json({ error: authorization.error });
     const { supabaseUrl, secretKey } = authorization.configuration;
+    const scope = await resolveManagerScope(authorization);
+    if (!scope) return res.status(403).json({ error: "Company access denied" });
+    const allowed = await authorizedEmployees(authorization, scope);
     const current = getCurrentPayPeriod(new Date(), "America/Toronto");
     const requested = Array.isArray(req.query?.period) ? req.query.period[0] : req.query?.period;
     const period = requested ? periodFromKey(requested, new Date(), "America/Toronto") : current;
@@ -58,7 +62,7 @@ export default async function handler(req, res) {
     const { startKey, endKey } = getPayPeriodDateKeys(period);
 
     const employees = await query({
-      url: `${supabaseUrl}/rest/v1/employees?is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc`,
+      url: `${supabaseUrl}/rest/v1/employees?organization_id=eq.${scope.organizationId}&is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc`,
       secretKey, stage: "employees_query", resource: "employees",
       queryName: "active_employee_timecard_fields"
     });
@@ -67,15 +71,16 @@ export default async function handler(req, res) {
       secretKey, stage: "overtime_rules_query", resource: "overtime_rules",
       queryName: "default_jurisdiction_rules"
     });
-    const employeeIds = employees.map(employee => employee.id);
+    const scopedEmployees = employees.filter(employee => allowed.has(employee.id));
+    const employeeIds = scopedEmployees.map(employee => employee.id);
     let punches = [];
     let approvals = [];
     if (employeeIds.length) {
-      const earliest = Math.min(...employees.map(employee => {
+      const earliest = Math.min(...scopedEmployees.map(employee => {
         const zone = PROVINCE_TIME_ZONES[employee.province] || "America/Toronto";
         return calculationStart(getPayPeriod(period.year, period.month, period.half, zone), 0, zone).getTime();
       }));
-      const latest = Math.max(...employees.map(employee => {
+      const latest = Math.max(...scopedEmployees.map(employee => {
         const zone = PROVINCE_TIME_ZONES[employee.province] || "America/Toronto";
         return getPayPeriod(period.year, period.month, period.half, zone).end.getTime();
       })) + 24 * 60 * 60 * 1000;
@@ -91,7 +96,7 @@ export default async function handler(req, res) {
         queryName: "employee_period_approvals"
       });
     }
-    const cards = employees.map(employee => {
+    const cards = scopedEmployees.map(employee => {
       const employeePunches = punches.filter(punch => punch.employee_id === employee.id);
       const applicable = rules.filter(rule => rule.province_code === employee.province && rule.effective_from <= endKey && (!rule.effective_to || rule.effective_to >= startKey));
       // A rule is not needed to truthfully render an active employee with no time.

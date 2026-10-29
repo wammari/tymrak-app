@@ -192,11 +192,8 @@ Sign In
 
 <script type="module">
 
-const SUPABASE_URL =
-    "https://tsosredghislnehfyypi.supabase.co";
-
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+import { getClientSupabaseConfiguration } from "/client-supabase-config.js";
+const { url: SUPABASE_URL, publishableKey: SUPABASE_PUBLISHABLE_KEY } = getClientSupabaseConfiguration();
 
 
 import { createClient } from
@@ -355,7 +352,7 @@ document.getElementById(
                         email,
                         {
                             redirectTo:
-                                "https://tymrak.vercel.app/reset-password.html"
+                                `${window.location.origin}/reset-password.html`
                         }
                     );
 

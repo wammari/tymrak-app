@@ -49,8 +49,8 @@ a{color:#795323}
 <script type="module">
 import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-const SUPABASE_URL = "https://tsosredghislnehfyypi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+import { getClientSupabaseConfiguration } from "/client-supabase-config.js";
+const { url: SUPABASE_URL, publishableKey: SUPABASE_PUBLISHABLE_KEY } = getClientSupabaseConfiguration();
 const supabase = createClient(SUPABASE_URL, SUPABASE_PUBLISHABLE_KEY);
 const form = document.getElementById("loginForm");
 const button = document.getElementById("loginButton");

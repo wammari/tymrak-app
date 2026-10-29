@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { resolveManagerScope } from "./_tenant-authorization.js";
 import {
   databaseHeaders, findDuplicate, sendActivationInvite,
   toEmployeeRecord, validateEmployeeInput
@@ -17,6 +18,8 @@ export default async function handler(req, res) {
     const validation = validateEmployeeInput(req.body);
     if (validation.error) return res.status(400).json({ error: validation.error });
     const { supabaseUrl, secretKey } = authorization.configuration;
+    const scope = await resolveManagerScope(authorization);
+    if (!scope || scope.role !== "admin") return res.status(403).json({ error: "Company administrator access required" });
     const duplicate = await findDuplicate({
       supabaseUrl, secretKey, email: validation.input.email, username: validation.input.username
     });
@@ -26,6 +29,7 @@ export default async function handler(req, res) {
     const employee = {
       ...toEmployeeRecord(validation.input),
       auth_user_id: invite.id,
+      organization_id: scope.organizationId,
       invitation_status: "Invitation Sent",
       invited_at: new Date().toISOString()
     };
@@ -34,7 +38,12 @@ export default async function handler(req, res) {
       headers: databaseHeaders(secretKey, "return=representation"),
       body: JSON.stringify(employee)
     });
-    if (!response.ok) throw new Error("Employee record could not be saved after invitation");
+    if (!response.ok) {
+      // Supabase invite may return an existing Auth user. Never delete that identity:
+      // a failed employee write must not destroy another account.
+      console.error("TYMRAK invitation employee persistence failed", { status: response.status });
+      throw new Error("Employee record could not be saved after invitation");
+    }
     const records = await response.json();
     return res.status(201).json({
       success: true,

@@ -19,8 +19,13 @@ async function withEnvironment(role, callback) {
   const calls = [];
   global.fetch = async (url, options = {}) => {
     calls.push({ url, options });
-    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "user-1", email: "manager@example.com" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role }]));
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333", email: "manager@example.com" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/organizations?")) return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     throw new Error(`Unexpected URL: ${url}`);
@@ -145,10 +150,15 @@ test("API does not require an overtime rule for an employee with no punches", as
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "server-only-secret";
   global.fetch = async url => {
-    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/organizations?")) return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([
-      { id: "employee-1", first_name: "No", last_name: "Punches", province: "YT" }
+      { id: "44444444-4444-4444-8444-444444444444", first_name: "No", last_name: "Punches", province: "YT" }
     ]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));
@@ -175,8 +185,13 @@ test("Supabase failures log safe structured query diagnostics", async () => {
   process.env.SUPABASE_SECRET_KEY = "server-secret-must-not-be-logged";
   console.error = (...values) => logs.push(values);
   global.fetch = async url => {
-    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager", organization_id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/organizations?")) return new Response(JSON.stringify([{ id: "11111111-1111-4111-8111-111111111111" }]));
+    if (url.includes("/manager_workplaces?")) return new Response(JSON.stringify([{workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/workplaces?")) return new Response(JSON.stringify([{id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employee_workplaces?")) return new Response(JSON.stringify([{employee_id:"44444444-4444-4444-8444-444444444444",workplace_id:"66666666-6666-4666-8666-666666666666"}]));
+    if (url.includes("/employees?") && url.includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     if (url.includes("/employees?")) return new Response(JSON.stringify({
       code: "42703", message: "column employees.province does not exist"
     }), { status: 400 });

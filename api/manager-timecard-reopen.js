@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { requireEmployeeScope } from "./_tenant-authorization.js";
 import { databaseHeaders } from "./_employee-management.js";
 import { getPayPeriodDateKeys, periodFromKey } from "./_manager-timecards.js";
 
@@ -38,6 +39,7 @@ export default async function handler(req, res) {
     if (typeof employeeId !== "string" || !ID_PATTERN.test(employeeId)) {
       return res.status(400).json({ error: "Select a valid employee" });
     }
+    if (!(await requireEmployeeScope(authorization, [employeeId]))) return res.status(403).json({ error: "Employee access denied" });
     const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
     if (reason.length > 1000) return res.status(400).json({ error: "Reopen reason must be 1000 characters or fewer" });
     const period = periodFromKey(req.body?.period, new Date(), "America/Toronto");

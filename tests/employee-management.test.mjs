@@ -28,7 +28,7 @@ function request(method, body = {}, query = {}) {
 
 function employee(overrides = {}) {
   return {
-    id: "employee-1", first_name: "Ada", last_name: "Lovelace",
+    id: "44444444-4444-4444-8444-444444444444", first_name: "Ada", last_name: "Lovelace",
     email: "ada@example.com", username: "ada", mobile: null,
     position: "Engineer", department: "Technology", province: "AB",
     hire_date: null, invitation_status: "Invitation Sent",
@@ -50,11 +50,13 @@ function installManagerFetch(operation) {
   global.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
     if (String(url).endsWith("/auth/v1/user")) {
-      return new Response(JSON.stringify({ id: "manager-id", email: "manager@example.com" }));
+      return new Response(JSON.stringify({ id: "33333333-3333-4333-8333-333333333333", email: "manager@example.com" }));
     }
     if (String(url).includes("/rest/v1/user_roles")) {
-      return new Response(JSON.stringify([{ role: "manager" }]));
+      return new Response(JSON.stringify([{ role: "admin", organization_id: "11111111-1111-4111-8111-111111111111" }]));
     }
+    if (String(url).includes("/rest/v1/organizations?")) return new Response(JSON.stringify([{id:"11111111-1111-4111-8111-111111111111"}]));
+    if (String(url).includes("/rest/v1/employees?") && String(url).includes("select=id,organization_id")) return new Response(JSON.stringify([{id:"44444444-4444-4444-8444-444444444444",organization_id:"11111111-1111-4111-8111-111111111111"}]));
     return operation(String(url), options, calls);
   };
   return calls;
@@ -75,7 +77,7 @@ test("anonymous users cannot access any employee-management API", async () => {
   for (const [handler, req] of [
     [employeesHandler, { method: "GET", headers: {}, query: {} }],
     [invitationHandler, { method: "POST", headers: {}, body: input() }],
-    [resendHandler, { method: "POST", headers: {}, body: { id: "employee-1" } }]
+    [resendHandler, { method: "POST", headers: {}, body: { id: "44444444-4444-4444-8444-444444444444" } }]
   ]) {
     let called = false;
     global.fetch = async () => { called = true; throw new Error("must not fetch"); };
@@ -99,7 +101,7 @@ test("ordinary employees cannot access employee-management APIs", async () => {
 test("a manager can list employees", async () => {
   const record = employee();
   installManagerFetch(async url => {
-    assert.match(url, /employees\?select=/);
+    assert.match(url, /employees\?organization_id=eq\./);
     return new Response(JSON.stringify([record]));
   });
   const res = responseRecorder();
@@ -111,13 +113,13 @@ test("a manager can list employees", async () => {
 test("a manager can create an active employee and send an invitation", async () => {
   const calls = installManagerFetch(async (url, options) => {
     if (url.includes("/employees?") && options.method !== "POST") return new Response("[]");
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1" }));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-44444444-4444-4444-8444-444444444444" }));
     if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
       const body = JSON.parse(options.body);
       assert.equal(body.is_active, true);
       assert.equal(body.mobile, "+1 403 555 0100");
       assert.equal(body.hire_date, "2026-10-01");
-      assert.equal(body.auth_user_id, "auth-employee-1");
+      assert.equal(body.auth_user_id, "auth-44444444-4444-4444-8444-444444444444");
       assert.equal(body.invitation_status, "Invitation Sent");
       return new Response(JSON.stringify([employee()]));
     }
@@ -162,32 +164,32 @@ test("a manager edits exactly one employee and can save inactive status", async 
     throw new Error(`Unexpected URL ${url}`);
   });
   const res = responseRecorder();
-  await employeesHandler(request("PATCH", input({ isActive: false }), { id: "employee-1" }), res);
+  await employeesHandler(request("PATCH", input({ isActive: false }), { id: "44444444-4444-4444-8444-444444444444" }), res);
   assert.equal(res.statusCode, 200);
-  assert.match(patchUrl, /employees\?id=eq\.employee-1/);
+  assert.match(patchUrl, /employees\?id=eq\.44444444-4444-4444-8444-444444444444/);
   assert.equal(res.payload.employee.is_active, false);
 });
 
 test("resending an invitation updates by ID and never creates an employee", async () => {
   const calls = installManagerFetch(async (url, options) => {
-    if (url.includes("/employees?id=eq.employee-1") && !options.method) {
-      return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
+    if (url.includes("/employees?id=eq.44444444-4444-4444-8444-444444444444") && !options.method) {
+      return new Response(JSON.stringify([employee({ auth_user_id: "auth-44444444-4444-4444-8444-444444444444" })]));
     }
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1" }));
-    if (url.includes("/employees?id=eq.employee-1") && options.method === "PATCH") {
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-44444444-4444-4444-8444-444444444444" }));
+    if (url.includes("/employees?id=eq.44444444-4444-4444-8444-444444444444") && options.method === "PATCH") {
       return new Response(JSON.stringify([employee()]));
     }
     throw new Error(`Unexpected URL ${url}`);
   });
   const res = responseRecorder();
-  await resendHandler(request("POST", { id: "employee-1" }), res);
+  await resendHandler(request("POST", { id: "44444444-4444-4444-8444-444444444444" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
 });
 
 test("activated employees cannot be resent an activation invitation", async () => {
   const calls = installManagerFetch(async url => {
-    if (url.includes("/employees?id=eq.employee-1")) {
+    if (url.includes("/employees?id=eq.44444444-4444-4444-8444-444444444444")) {
       return new Response(JSON.stringify([employee({
         invitation_status: "Account Activated", activated_at: "2026-10-02T00:00:00Z"
       })]));
@@ -195,7 +197,7 @@ test("activated employees cannot be resent an activation invitation", async () =
     throw new Error(`Unexpected URL ${url}`);
   });
   const res = responseRecorder();
-  await resendHandler(request("POST", { id: "employee-1" }), res);
+  await resendHandler(request("POST", { id: "44444444-4444-4444-8444-444444444444" }), res);
   assert.equal(res.statusCode, 409);
   assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
 });

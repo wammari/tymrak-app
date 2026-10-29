@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { resolveManagerScope, authorizedEmployees, requireEmployeeScope } from "./_tenant-authorization.js";
 import {
   EMPLOYEE_SELECT, databaseHeaders, findDuplicate,
   toEmployeeRecord, validateEmployeeInput
@@ -18,20 +19,24 @@ export default async function handler(req, res) {
     const authorization = await requireManager(req);
     if (!authorization.ok) return res.status(authorization.status).json({ error: authorization.error });
     const { supabaseUrl, secretKey } = authorization.configuration;
+    const scope = await resolveManagerScope(authorization);
+    if (!scope) return res.status(403).json({ error: "Company access denied" });
 
     if (req.method === "GET") {
+      const allowed = await authorizedEmployees(authorization, scope);
       const response = await fetch(
-        `${supabaseUrl}/rest/v1/employees?select=${EMPLOYEE_SELECT}&order=last_name.asc,first_name.asc`,
+        `${supabaseUrl}/rest/v1/employees?organization_id=eq.${scope.organizationId}&select=${EMPLOYEE_SELECT}&order=last_name.asc,first_name.asc`,
         { headers: databaseHeaders(secretKey) }
       );
       if (!response.ok) throw new Error("Employee list query failed");
       const employees = await response.json();
       if (!Array.isArray(employees)) throw new Error("Employee list returned invalid data");
-      return res.status(200).json({ employees });
+      return res.status(200).json({ employees: employees.filter(employee => allowed.has(employee.id)) });
     }
 
     const id = employeeId(req);
     if (!id) return res.status(400).json({ error: "A valid employee ID is required" });
+    if (!(await requireEmployeeScope(authorization, [id]))) return res.status(403).json({ error: "Employee access denied" });
     const validation = validateEmployeeInput(req.body);
     if (validation.error) return res.status(400).json({ error: validation.error });
     const duplicate = await findDuplicate({
@@ -41,7 +46,7 @@ export default async function handler(req, res) {
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });
 
     const response = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT}`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${scope.organizationId}&select=${EMPLOYEE_SELECT}`,
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),

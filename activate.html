@@ -171,8 +171,8 @@ Activate My Account
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
 
-const SUPABASE_URL = "https://tsosredghislnehfyypi.supabase.co";
-const SUPABASE_PUBLISHABLE_KEY = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+import { getClientSupabaseConfiguration } from "/client-supabase-config.js";
+const { url: SUPABASE_URL, publishableKey: SUPABASE_PUBLISHABLE_KEY } = getClientSupabaseConfiguration();
 
 // Invitation sessions stay in memory and never consume or overwrite the normal
 // login/recovery client's saved session. URL processing is explicit below.

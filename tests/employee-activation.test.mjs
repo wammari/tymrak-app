@@ -83,7 +83,8 @@ test("unknown RPC result and Auth outage do not report success",async()=>{
 
 const html=fs.readFileSync(new URL("../activate.html",import.meta.url),"utf8");
 const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1]
-  .replace(/import \{ createClient \} from\s*"[^"]+";/,"");
+  .replace(/import \{ createClient \} from\s*"[^"]+";/,"")
+  .replace(/import \{ getClientSupabaseConfiguration \} from\s*"[^"]+";/,"");
 async function page({hash="#type=invite&access_token=invite-token&refresh_token=refresh",search="",failures=0,setError=null,userMismatch=false,updateError=null,sessionMissing=false}={}) {
   const elements=Object.fromEntries(["activationForm","activateButton","message","password","confirmPassword","passwordFields","activationDescription"]
     .map(id=>[id,{style:{},value:"correct-password",disabled:false,hidden:false,textContent:"",
@@ -93,6 +94,7 @@ async function page({hash="#type=invite&access_token=invite-token&refresh_token=
   const session={user,access_token:"invite-token"};
   const context={
     URLSearchParams,document:{getElementById:id=>elements[id],title:"Activate"},
+    getClientSupabaseConfiguration(){return {url:"https://staging.example.invalid",publishableKey:"test-publishable-key"};},
     window:{location:{search,hash,pathname:"/activate.html"},history:{replaceState(){}}},
     createClient(_url,_key,options){config=options;return{auth:{
       async setSession(){sets++;return{error:setError,data:{session}};},

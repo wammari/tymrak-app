@@ -1,0 +1,55 @@
+# PR #33 release checklist (company/workplace boundaries)
+
+Status: **NOT APPROVED FOR PRODUCTION**. The PR is draft. No automatic production rollout.
+
+## Current release evidence (2026-10-29)
+- GitHub Actions run #139 passed on commit 011edc6dd89ef3164fba6cb02f8c6b162b09ba50.
+- Vercel staging deployment dpl_B9GbNQE299WcP7mFLjfRVzFKFwsN is READY at that exact commit. The deployed browser and API have **not** yet undergone authenticated end-to-end smoke testing.
+- Employee browser punches now call authenticated /api/employee-punch; the API verifies the session and calls the tenant-aware geofenced RPC. The earlier direct-browser-insert blocker has been addressed in code and regression tests; actual GPS acceptance remains unverified.
+- Invitation failure compensation was changed to **never delete** an Auth identity that might pre-exist. A failed employee insert may leave an invited Auth identity requiring reconciliation; this is safer than destructive deletion, but reconciliation is still a follow-up.
+- Production read-only schema inspection confirms employees.id, employees.auth_user_id and user_roles.auth_user_id are UUID, matching the migration's composite FK columns. This is **not** a clean-schema migration test.
+- **No production DDL or app release authorized by these checks alone.** Before release: prove clean first-time migration, verify a recoverable backup, decide and verify test-account tenant mappings, test authenticated punches/geofence and cross-tenant denials, then perform database-first rollout and smoke tests.
+
+## Confirmed
+- Existing production employee records (four) and manager role (one) are test-only, per owner.
+- Staging Alpha/Beta manager logins and separated employee views were manually verified.
+- Automated cross-company and migration contract tests passed (GitHub Actions run #81).
+- Existing staging database accepts the structural prerequisite migration; this does **not** test first-time creation on the older production schema.
+- Production is missing tenant tables and `organization_id` columns. The migration deliberately does not backfill existing test accounts.
+- The marketing website is a separate Vercel project/branch; its recent Ready deployments do not validate the time-tracking production app.
+
+## Blockers / safe sequence
+1. **Complete security inventory** of every serverless endpoint and database RPC that can read/write employees, punches, approvals, roles, workplace mappings or invitations. Test direct-ID and mixed-batch attacks. A passing test suite alone does not establish completeness.
+2. **First-time schema validation:** verify migration in an isolated production-like schema, including all FK/index assumptions and RLS behavior. Do not claim the existing staging migration replay proves this.
+3. **Account treatment:** existing production test users will have NULL organization IDs after the structural migration and manager login will fail closed. Before app deployment, explicitly plan either retaining test accounts in a designated test organization or retiring them safely. Never automatically delete or reassign.
+4. **Backup:** confirm recoverable production database backup and a restoration procedure before any DDL.
+5. **Database first:** apply reviewed forward-only tenant prerequisite migration to production; verify tables, FK constraints, RLS, service-role SELECT, and organization mappings.
+6. **App second:** deploy security branch only after database and test-account mapping are verified; run authenticated smoke tests for manager login, clock in/out, timecards, approvals, invitations and cross-company denials.
+7. **Rollback:** preserve previous app deployment for immediate application rollback. Database migration is forward-only; do not attempt destructive SQL rollback. If app rollback occurs, assess compatibility of old app with added nullable columns/tables.
+8. **Go/no-go:** inspect current PR head CI, staging deployment, API coverage and migration proof. Explicitly record release decision before merging.
+
+## Security notes
+- `requireManager` validates identity and role, while `resolveManagerScope` enforces a single active organization and workplace assignments. Each privileged endpoint must call the scope function before data access.
+- Company admin invitations currently create the Auth invitation **before** inserting the employee record; if persistence fails, the Auth account may be orphaned. Add compensation or reconciliation before general availability.
+- Avoid exposing test data or secret values in build logs, PR comments, or screenshots.
+
+## Independent review findings (2026-10-28)
+- **Browser staging/production isolation:** previously, staging `employee.html`, `timecard.html`, and `activate.html` pointed at the production Supabase project, while manager/login pages pointed at staging. The security branch now uses `client-supabase-config.js` on all seven Auth/timecard pages to select the project by hostname and reject unknown hosts. Automated hostname and page-coverage regression tests pass on commit `4a5d36f`; verify the actual deployed pages after Vercel builds this commit.
+- **Punch acceptance blocker:** the security branch's `employee.html` still uses a direct browser `punches.insert`, but read-only staging privilege inspection shows `authenticated` has SELECT and **no INSERT** on `public.punches`. Therefore do **not** claim clock-in/out works in staging based on API security tests. Coordinate the employee punch route with the separate geofence work and test with an authenticated staging employee before release.
+- **Staging deploy blocked:** the most recent READY security-branch Vercel deployment observed was commit `0d75241`, older than the browser isolation fix and latest passing GitHub Actions run. A preview deployment attempt for the latest tested security branch returned **403 Forbidden: no permission to create a Preview Deployment for `tymrak-staging`**. No deployment was created. An authorized project owner must restore preview deployment permission or deploy the approved staging branch; then verify the actual browser pages.
+- **Staging RLS read-only audit:** `employees` and `punches` have row-level security; `authenticated` has SELECT but no direct INSERT/UPDATE on these tables, and manager approval tables are service-role only. Server-side privileged endpoints still require full direct-ID and mixed-batch review.
+- **Migration proof:** the tenant prerequisite migration has not been validated against a clean production-like schema. Existing staging tables cannot substitute for first-time migration verification.
+
+
+## Launch-critical punch path verification (2026-10-29)
+- Inspected `employee.html` on PR #33: `recordPunch()` still performs browser `supabase.from("punches").insert({employee_id,punch_type,source:"employee"})` for clock in/out and breaks.
+- The previously recorded staging privileges show `authenticated` has no direct INSERT on `public.punches`; passing GitHub tests does **not** mean punches work.
+- **Release blocker:** implement and test an authenticated, tenant-safe punch submission path compatible with current geofence and approved-timecard protections. Do not simply grant broad INSERT or bypass geofencing. Test employee clock in/out and break transitions end-to-end in staging.
+- `complete-activation.js` authenticates the session and invokes `complete_employee_activation` through a server key. Independently verify the database RPC's owner/grants, authorization and tenant constraints before production.
+
+## Verified staging punch RPC contract (read-only inspection)
+- Staging defines `public.record_employee_punch(p_auth_user_id uuid, p_punch_type text, p_request_id uuid, p_expected_last_id text)` as a SECURITY DEFINER RPC. Neither `authenticated` nor `anon` has EXECUTE; only a trusted server route may invoke it.
+- The function checks exactly one active, activated employee linked to the authenticated user ID; validates punch transitions; uses an idempotency request UUID and expected previous punch ID; and relies on existing approval-lock triggers. A NULL punch type returns current punch state.
+- **Do not pass a browser-supplied auth user ID as authority**. A future server route must verify the bearer token through Supabase Auth and supply the verified `user.id` itself.
+- **Geofencing unresolved:** the non-geofenced RPC must not become an unrestricted substitute for geofenced recording. Review the overloaded `record_geofenced_punch` functions and workplace enforcement before connecting the employee UI.
+- Current `employee.html` does not send an idempotency UUID, expected previous punch ID or verified geolocation. Replacing its direct INSERT requires coordinated UI, API and staging E2E tests.

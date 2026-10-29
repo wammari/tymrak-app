@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import { resolveManagerScope } from "./_tenant-authorization.js";
 
 export default async function handler(req, res) {
   if (req.method !== "GET") {
@@ -15,10 +16,13 @@ export default async function handler(req, res) {
         .json({ error: authorization.error });
     }
 
+    const scope = await resolveManagerScope(authorization);
+    if (!scope) return res.status(403).json({ error: "Company access denied" });
+
     return res.status(200).json({
       authorized: true,
       user: authorization.user,
-      role: authorization.role
+      role: scope.role
     });
   } catch (error) {
     console.error("Manager session verification failed", {
