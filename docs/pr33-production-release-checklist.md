@@ -2,6 +2,14 @@
 
 Status: **NOT APPROVED FOR PRODUCTION**. The PR is draft. No automatic production rollout.
 
+## Current release evidence (2026-10-29)
+- GitHub Actions run #139 passed on commit 011edc6dd89ef3164fba6cb02f8c6b162b09ba50.
+- Vercel staging deployment dpl_B9GbNQE299WcP7mFLjfRVzFKFwsN is READY at that exact commit. The deployed browser and API have **not** yet undergone authenticated end-to-end smoke testing.
+- Employee browser punches now call authenticated /api/employee-punch; the API verifies the session and calls the tenant-aware geofenced RPC. The earlier direct-browser-insert blocker has been addressed in code and regression tests; actual GPS acceptance remains unverified.
+- Invitation failure compensation was changed to **never delete** an Auth identity that might pre-exist. A failed employee insert may leave an invited Auth identity requiring reconciliation; this is safer than destructive deletion, but reconciliation is still a follow-up.
+- Production read-only schema inspection confirms employees.id, employees.auth_user_id and user_roles.auth_user_id are UUID, matching the migration's composite FK columns. This is **not** a clean-schema migration test.
+- **No production DDL or app release authorized by these checks alone.** Before release: prove clean first-time migration, verify a recoverable backup, decide and verify test-account tenant mappings, test authenticated punches/geofence and cross-tenant denials, then perform database-first rollout and smoke tests.
+
 ## Confirmed
 - Existing production employee records (four) and manager role (one) are test-only, per owner.
 - Staging Alpha/Beta manager logins and separated employee views were manually verified.
