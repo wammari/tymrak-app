@@ -1147,28 +1147,48 @@ async function recordPunch(
 
     try {
 
-        const {
-            error
-        } =
-            await supabase
-                .from("punches")
-                .insert({
-
-                    employee_id:
-                        employee.id,
-
-                    punch_type:
-                        punchType,
-
-                    source:
-                        "employee"
-                });
-
-
-        if (error) {
-            throw error;
+        const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+        if (sessionError || !sessionData?.session?.access_token) {
+            throw new Error("Your session expired. Please sign in again.");
         }
-
+        // Capture the previous punch ID to reject stale or out-of-order requests.
+        const { data: latest, error: latestError } = await supabase
+            .from("punches")
+            .select("id")
+            .eq("employee_id", employee.id)
+            .order("punched_at", { ascending: false })
+            .order("id", { ascending: false })
+            .limit(1);
+        if (latestError) throw latestError;
+        if (!navigator.geolocation) {
+            throw new Error("Location access is required to record a punch.");
+        }
+        const position = await new Promise((resolve, reject) => {
+            navigator.geolocation.getCurrentPosition(resolve, reject, {
+                enableHighAccuracy: true, timeout: 15000, maximumAge: 0
+            });
+        });
+        const response = await fetch("/api/employee-punch", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                Authorization: "Bearer " + sessionData.session.access_token
+            },
+            body: JSON.stringify({
+                punchType,
+                requestId: crypto.randomUUID(),
+                expectedLastId: latest?.[0]?.id || null,
+                location: {
+                    latitude: position.coords.latitude,
+                    longitude: position.coords.longitude,
+                    accuracy: position.coords.accuracy
+                }
+            })
+        });
+        const result = await response.json();
+        if (!response.ok || result?.success !== true) {
+            throw new Error(result?.error || "Unable to record your punch.");
+        }
 
         const successMessages = {
 
