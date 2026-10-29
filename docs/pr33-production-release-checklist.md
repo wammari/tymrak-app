@@ -38,3 +38,10 @@ Status: **NOT APPROVED FOR PRODUCTION**. The PR is draft. No automatic productio
 - The previously recorded staging privileges show `authenticated` has no direct INSERT on `public.punches`; passing GitHub tests does **not** mean punches work.
 - **Release blocker:** implement and test an authenticated, tenant-safe punch submission path compatible with current geofence and approved-timecard protections. Do not simply grant broad INSERT or bypass geofencing. Test employee clock in/out and break transitions end-to-end in staging.
 - `complete-activation.js` authenticates the session and invokes `complete_employee_activation` through a server key. Independently verify the database RPC's owner/grants, authorization and tenant constraints before production.
+
+## Verified staging punch RPC contract (read-only inspection)
+- Staging defines `public.record_employee_punch(p_auth_user_id uuid, p_punch_type text, p_request_id uuid, p_expected_last_id text)` as a SECURITY DEFINER RPC. Neither `authenticated` nor `anon` has EXECUTE; only a trusted server route may invoke it.
+- The function checks exactly one active, activated employee linked to the authenticated user ID; validates punch transitions; uses an idempotency request UUID and expected previous punch ID; and relies on existing approval-lock triggers. A NULL punch type returns current punch state.
+- **Do not pass a browser-supplied auth user ID as authority**. A future server route must verify the bearer token through Supabase Auth and supply the verified `user.id` itself.
+- **Geofencing unresolved:** the non-geofenced RPC must not become an unrestricted substitute for geofenced recording. Review the overloaded `record_geofenced_punch` functions and workplace enforcement before connecting the employee UI.
+- Current `employee.html` does not send an idempotency UUID, expected previous punch ID or verified geolocation. Replacing its direct INSERT requires coordinated UI, API and staging E2E tests.
