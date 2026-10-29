@@ -1208,6 +1208,17 @@ async function recordPunch(
             })
         });
         const result = await response.json();
+        if (window.location.hostname.startsWith("tymrak-staging")) {
+            const panel = document.getElementById("staging-location-diagnostics");
+            if (panel) {
+                const outcome = response.ok && result?.success === true ? "ACCEPTED" : "REJECTED";
+                const code = typeof result?.error === "string" ? result.error :
+                    (typeof result?.code === "string" ? result.code : "No error code supplied");
+                panel.textContent += " | Server result: " + outcome +
+                    " (HTTP " + response.status + ")" +
+                    (outcome === "REJECTED" ? " | Reason: " + code : "");
+            }
+        }
         if (!response.ok || result?.success !== true) {
             throw new Error(result?.error || "Unable to record your punch.");
         }
