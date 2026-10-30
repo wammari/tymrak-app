@@ -154,7 +154,8 @@ export async function requireManager(req) {
       )}&select=role`,
       {
         headers: {
-          apikey: secretKey
+          apikey: secretKey,
+          Authorization: `Bearer ${secretKey}`
         }
       }
     );
