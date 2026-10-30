@@ -36,9 +36,9 @@ $('searchAddress').addEventListener('click',async()=>{
  const version=++searchVersion;$('searchAddress').disabled=true;$('addressResults').replaceChildren();$('searchStatus').textContent='Finding address…';
  try{const results=await searchAddress($('address').value);if(version!==searchVersion)return;
  $('searchStatus').textContent=results.length?'Choose the correct address, then review the pin.':'No matching address found. Include the city and country, or choose the location on the map.';
- for(const result of results){const button=document.createElement('button');button.type='button';button.textContent=result.label;button.addEventListener('click',async()=>{
+ for(const result of results){const button=document.createElement('button');button.type='button';button.textContent=result.label+(result.precision==='area'?' — Street or area match; verify building':'');button.addEventListener('click',async()=>{
  if(version!==searchVersion)return;button.disabled=true;try{const picker=await ensureMap();if(version!==searchVersion)return;
- $('latitude').value=result.latitude;$('longitude').value=result.longitude;$('address').value=result.label.slice(0,300);picker.setPosition(result.latitude,result.longitude);clearSearch();$('searchStatus').textContent='Address located. Verify the building, radius and employees, then save.';
+ $('latitude').value=result.latitude;$('longitude').value=result.longitude;if(result.precision==='address')$('address').value=result.label.slice(0,300);picker.setPosition(result.latitude,result.longitude);clearSearch();$('searchStatus').textContent=result.precision==='area'?'Street or area match only; the building number was not found. Your entered address is unchanged. Zoom in and move the pin to the exact building before saving.':'Address located. Verify the building, radius and employees, then save.';
  }catch{$('searchStatus').textContent='The map could not load. Try again; your saved workplace has not changed.';}finally{button.disabled=false;}});$('addressResults').append(button);}
  }catch(error){if(version===searchVersion)$('searchStatus').textContent=error.message;}finally{$('searchAddress').disabled=false;}
 });

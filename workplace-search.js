@@ -18,7 +18,8 @@ export function createAddressSearch({fetcher=fetch,now=Date.now}={}) {
     const coords=feature.geometry?.coordinates,p=feature.properties||{};
     if(feature.geometry?.type!=='Point'||!Array.isArray(coords)||!validPosition(coords[1],coords[0]))return [];
     const label=[p.name,[p.housenumber,p.street].filter(Boolean).join(' '),p.city||p.town||p.village,p.state,p.postcode,p.country].filter(v=>typeof v==='string'&&v.trim()).join(', ').slice(0,600);
-    return label?[{latitude:coords[1],longitude:coords[0],label}]:[];
+    const hasHouseNumber=typeof p.housenumber==='string'&&p.housenumber.trim()!=='';
+    return label?[{latitude:coords[1],longitude:coords[0],label,precision:hasHouseNumber?'address':'area'}]:[];
    });
    if(cache.size>=20)cache.delete(cache.keys().next().value);cache.set(cacheKey,results);return results;
   }catch(error){if(error.name==='AbortError')throw new Error('Address search timed out. Try again or choose the location on the map.');throw error;}
