@@ -72,6 +72,17 @@ export async function requireManager(req) {
     };
   }
 
+  const expectedProjectHost = "tsosredghislnehfyypi.supabase.co";
+  let configuredHost;
+  try {
+    configuredHost = new URL(configuration.supabaseUrl).hostname;
+  } catch {
+    return { ok: false, status: 500, error: "Manager authentication server configuration is invalid" };
+  }
+  if (configuredHost !== expectedProjectHost) {
+    console.error("Manager Supabase project mismatch", { stage: "configuration", configuredHost });
+    return { ok: false, status: 500, error: "Manager authentication is connected to the wrong database project" };
+  }
   const { supabaseUrl, secretKey, publishableKey } = configuration;
   console.info("Manager authorization configuration available", {
     stage: "configuration"
