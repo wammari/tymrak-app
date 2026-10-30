@@ -33,7 +33,7 @@ export function getBearerToken(req) {
 export function getSupabaseConfiguration() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const secretKey = process.env.SUPABASE_SECRET_KEY;
-  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+  const publishableKey = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6"; // Verified production project public key; avoid stale Vercel value.
 
   if (!supabaseUrl || !secretKey) {
     return null;
@@ -114,7 +114,7 @@ export async function requireManager(req) {
     return {
       ok: false,
       status: 401,
-      error: "Invalid or expired session"
+      error: authError.code === "invalid_api_key" ? "Manager authentication API key rejected" : `Session verification failed (Supabase HTTP ${userResponse.status}${authError.code ? `, ${authError.code}` : ""})`
     };
   }
 
