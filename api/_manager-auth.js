@@ -33,6 +33,7 @@ export function getBearerToken(req) {
 export function getSupabaseConfiguration() {
   const supabaseUrl = process.env.SUPABASE_URL;
   const secretKey = process.env.SUPABASE_SECRET_KEY;
+  const publishableKey = process.env.SUPABASE_PUBLISHABLE_KEY || "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
 
   if (!supabaseUrl || !secretKey) {
     return null;
@@ -40,7 +41,8 @@ export function getSupabaseConfiguration() {
 
   return {
     supabaseUrl: supabaseUrl.replace(/\/$/, ""),
-    secretKey
+    secretKey,
+    publishableKey
   };
 }
 
@@ -70,7 +72,7 @@ export async function requireManager(req) {
     };
   }
 
-  const { supabaseUrl, secretKey } = configuration;
+  const { supabaseUrl, secretKey, publishableKey } = configuration;
   console.info("Manager authorization configuration available", {
     stage: "configuration"
   });
@@ -79,7 +81,7 @@ export async function requireManager(req) {
   try {
     userResponse = await fetch(`${supabaseUrl}/auth/v1/user`, {
       headers: {
-        apikey: secretKey,
+        apikey: publishableKey,
         Authorization: `Bearer ${accessToken}`
       }
     });
