@@ -1,4 +1,5 @@
 import { requireManager } from "./_manager-auth.js";
+import {canManageEmployee} from './_manager-scope.js';
 import {
   databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite
 } from "./_employee-management.js";
@@ -14,9 +15,10 @@ export default async function handler(req, res) {
     const id = typeof req.body?.id === "string" && /^[A-Za-z0-9-]{1,128}$/.test(req.body.id)
       ? req.body.id : null;
     if (!id) return res.status(400).json({ error: "A valid employee ID is required" });
+    if (!canManageEmployee(authorization, id)) return res.status(404).json({error:'Employee not found'});
     const { supabaseUrl, secretKey } = authorization.configuration;
     const lookup = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
       { headers: databaseHeaders(secretKey) }
     );
     if (!lookup.ok) throw new Error("Employee lookup failed");
@@ -33,7 +35,7 @@ export default async function handler(req, res) {
       lastName: employee.last_name, username: employee.username
     });
     const update = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT}`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT}`,
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),

@@ -1,3 +1,4 @@
+import "./_test-environment.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import handler from "../api/manager-timecards.js";
@@ -20,7 +21,8 @@ async function withEnvironment(role, callback) {
   global.fetch = async (url, options = {}) => {
     calls.push({ url, options });
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "user-1", email: "manager@example.com" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role }]));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/rpc/manager_employee_scope")) return new Response(JSON.stringify({employeeIds:[]}));
     if (url.includes("/employees?")) return new Response(JSON.stringify([]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     throw new Error(`Unexpected URL: ${url}`);
@@ -146,7 +148,7 @@ test("API does not require an overtime rule for an employee with no punches", as
   process.env.SUPABASE_SECRET_KEY = "server-only-secret";
   global.fetch = async url => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([
       { id: "employee-1", first_name: "No", last_name: "Punches", province: "YT" }
     ]));
@@ -176,7 +178,7 @@ test("Supabase failures log safe structured query diagnostics", async () => {
   console.error = (...values) => logs.push(values);
   global.fetch = async url => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
-    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     if (url.includes("/employees?")) return new Response(JSON.stringify({
       code: "42703", message: "column employees.province does not exist"
     }), { status: 400 });
@@ -230,3 +232,4 @@ test("overnight punches are paired before grouping on the clock-in date", () => 
   assert.equal(shift.workedMilliseconds, 8 * 3600000);
   assert.equal(shift.missingPunch, false);
 });
+import {PostgrestResponse as Response} from "./_postgrest-response.mjs";

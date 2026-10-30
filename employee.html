@@ -15,9 +15,9 @@
 
 body {
     font-family: Arial, sans-serif;
-    background: #fff8ed;
+    background: #fbf8f3;
     margin: 0;
-    color: #1b120e;
+    color: #351b0c;
 }
 
 .header {
@@ -35,7 +35,7 @@ body {
 }
 
 .tagline {
-    color: #b78b46;
+    color: #8d5316;
     font-size: 13px;
     font-weight: bold;
 }
@@ -46,8 +46,8 @@ body {
 }
 .logout {
     background: white;
-    border: 1px solid #1b120e;
-    color: #1b120e;
+    border: 1px solid #351b0c;
+    color: #351b0c;
     padding: 10px 18px;
     border-radius: 7px;
     cursor: pointer;
@@ -73,7 +73,7 @@ body {
 }
 
 .employee-info {
-    color: #667085;
+    color: #716254;
     margin-bottom: 25px;
 }
 
@@ -90,13 +90,13 @@ body {
 
 .live-date {
     margin-top: 8px;
-    color: #667085;
+    color: #716254;
     font-size: 17px;
 }
 
 .status-label {
     margin-top: 25px;
-    color: #667085;
+    color: #716254;
     font-size: 14px;
 }
 
@@ -143,11 +143,11 @@ body {
 }
 
 .clock-in {
-    background: #b78b46;
+    background: #8d5316;
 }
 
 .clock-out {
-    background: #1b120e;
+    background: #351b0c;
 }
 
 .break-start {
@@ -155,7 +155,7 @@ body {
 }
 
 .break-end {
-    background: #b78b46;
+    background: #8d5316;
 }
 
 .punch-button:disabled {
@@ -202,13 +202,13 @@ h2 {
 }
 
 .summary-label {
-    color: #667085;
+    color: #716254;
     font-size: 14px;
     margin-bottom: 10px;
 }
 
 .summary-value {
-    color: #1b120e;
+    color: #351b0c;
     font-size: 26px;
     font-weight: bold;
 }
@@ -236,7 +236,7 @@ h2 {
 }
 
 .timecard-subtitle {
-    color: #667085;
+    color: #716254;
     font-size: 14px;
 }
 
@@ -262,7 +262,7 @@ h2 {
 
 .timecard-table th {
     text-align: left;
-    color: #667085;
+    color: #716254;
     font-size: 12px;
     font-weight: bold;
     padding: 12px 10px;
@@ -327,7 +327,7 @@ h2 {
 
 .empty,
 .loading {
-    color: #667085;
+    color: #716254;
 }
 
 @media (max-width: 600px) {
@@ -351,15 +351,15 @@ h2 {
 
 </style>
 
+<meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css">
 </head>
 
-<body>
+<body class="workspace-page">
 
 <header class="header">
 
 <div>
-    <div class="logo" aria-label="TYMRAK — Time. Tracked Right.">TYMRAK<small style="display:block;color:#efbd64;font-size:10px;letter-spacing:.12em;margin-top:4px">TIME. TRACKED RIGHT.</small></div>
-    <div class="tagline">TIME. TRACKED RIGHT.</div>
+    <span class="tymrak-brand-mark"><img src="/tymrak-brand-board.png" alt="TYMRAK — Time. Tracked Right." width="1536" height="1024"></span>
 </div>
 
 <div class="header-actions">
@@ -415,7 +415,8 @@ h2 {
 </section>
 <section class="card">
 
-<h2>Today's Summary</h2>
+<p>Location is checked when you clock in, clock out, or start/end a break. Allow browser location access. Your reported location must be inside an assigned workplace.</p>
+<h2>Work Summary</h2><p id="summaryScope">Today, including any active overnight shift.</p>
 
 <div class="summary-grid">
 
@@ -439,7 +440,7 @@ h2 {
 </section>
 <section class="card">
 
-<h2>Today's Punches</h2>
+<h2>Recent Punches</h2>
 
 <div id="punchList">
     <p class="loading">Loading punches...</p>
@@ -450,12 +451,17 @@ h2 {
 </main>
 
 <script type="module">
+import { createPunchClient } from "./punch-client.js";
+import { capturePunchLocation } from "./geolocation.js";
+import { loadSupabaseConfiguration } from "./supabase-config.js";
+const deploymentConfiguration = await loadSupabaseConfiguration();
+const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
+const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
 
-const SUPABASE_URL =
-    "https://tsosredghislnehfyypi.supabase.co";
 
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+
+
 
 import { createClient } from
 "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -507,6 +513,20 @@ let currentStatus =
     "not_clocked_in";
 
 let todayPunches = [];
+let lastPunchId = null;
+let workTimeZone = "America/Toronto";
+let punchClient = null;
+let punchBusy = false;
+async function punchRequest(method, body) {
+    const {data,error} = await supabase.auth.getSession();
+    if(error || !data.session) throw new Error("Session expired. Please sign in again.");
+    const response = await fetch("/api/employee-punch", {
+        method, cache:"no-store", headers:{Authorization:`Bearer ${data.session.access_token}`,
+        ...(body?{"Content-Type":"application/json"}:{})}, ...(body?{body:JSON.stringify(body)}:{})
+    });
+    const result = await response.json();
+    return {ok:response.ok,status:response.status,body:result};
+}
 
 
 function escapeHTML(value) {
@@ -522,6 +542,7 @@ function escapeHTML(value) {
 
 function showMessage(type, text) {
 
+    message.style.display = "block";
     message.className =
         "message " + type;
 
@@ -547,7 +568,8 @@ function updateClock() {
             {
                 hour: "2-digit",
                 minute: "2-digit",
-                second: "2-digit"
+                second: "2-digit",
+                timeZone: workTimeZone
             }
         );
 
@@ -555,6 +577,7 @@ function updateClock() {
         now.toLocaleDateString(
             [],
             {
+                timeZone: workTimeZone,
                 weekday: "long",
                 year: "numeric",
                 month: "long",
@@ -596,6 +619,10 @@ function createButton(
 function updateStatusDisplay() {
 
     buttonArea.innerHTML = "";
+    if (punchClient?.pending) {
+        buttonArea.appendChild(createButton("Retry Unconfirmed Punch", "clock-out", punchClient.pending.punchType));
+        return;
+    }
 
 
     if (
@@ -670,22 +697,6 @@ function updateStatusDisplay() {
 }
 
 
-function getTodayStartISO() {
-
-    const start =
-        new Date();
-
-    start.setHours(
-        0,
-        0,
-        0,
-        0
-    );
-
-    return start.toISOString();
-}
-
-
 function formatPunchType(type) {
 
     const labels = {
@@ -708,17 +719,10 @@ function formatPunchType(type) {
 
 
 function formatPunchTime(timestamp) {
-
-    return new Date(
-        timestamp
-    ).toLocaleTimeString(
-        [],
-        {
-            hour: "2-digit",
-            minute: "2-digit",
-            second: "2-digit"
-        }
-    );
+    return new Date(timestamp).toLocaleString([], {
+        month: "short", day: "numeric", hour: "2-digit", minute: "2-digit",
+        timeZone: workTimeZone
+    });
 }
 
 function formatDuration(totalSeconds) {
@@ -893,43 +897,19 @@ function determineStatus(lastPunch) {
 
 async function loadTodaysPunches() {
 
-    const {
-        data,
-        error
-    } =
-        await supabase
-            .from("punches")
-            .select(
-                "id,punch_type,punched_at"
-            )
-            .eq(
-                "employee_id",
-                employee.id
-            )
-            .gte(
-                "punched_at",
-                getTodayStartISO()
-            )
-            .order(
-                "punched_at",
-                {
-                    ascending: true
-                }
-            );
-
-
-    if (error) {
-        throw error;
-    }
-
+    const response = await punchRequest("GET");
+    if (!response.ok) throw new Error(response.body.error || "Unable to load punches");
+    const data = response.body.punches;
+    workTimeZone = response.body.timeZone;
+    lastPunchId = response.body.lastPunch?.id || null;
+    currentStatus = determineStatus(response.body.lastPunch);
+    document.getElementById("summaryScope").textContent =
+        `Work date ${response.body.workDate} (${workTimeZone}), including any active overnight shift.`;
 todayPunches = data || [];
     if (
         !data ||
         data.length === 0
     ) {
-
-        currentStatus =
-            "not_clocked_in";
 
         punchList.innerHTML =
             `<p class="empty">
@@ -944,8 +924,7 @@ calculateDailySummary([]);
 
 calculateDailySummary(data);
    
-    const lastPunch =
-        data[data.length - 1];
+    const lastPunch = response.body.lastPunch;
 
 
     currentStatus =
@@ -1083,6 +1062,9 @@ async function loadEmployee() {
                 : employee.username;
 
 
+        punchClient = createPunchClient({request:punchRequest,storage:localStorage,captureLocation:capturePunchLocation,
+            key:`tymrak-pending-punch:${deploymentConfiguration.supabaseUrl}:${employee.id}`,
+            randomUUID:()=>crypto.randomUUID()});
         await loadTodaysPunches();
 
 
@@ -1114,111 +1096,26 @@ async function loadEmployee() {
 }
 
 
-async function recordPunch(
-    punchType,
-    button
-) {
-
-    if (!employee) {
+async function recordPunch(punchType, button) {
+    if (!employee || punchBusy) return;
+    if(punchType === "refresh") {
+        try { await loadTodaysPunches(); } catch(error) { showMessage("error",error.message); }
         return;
     }
-
-
+    punchBusy = true;
     clearMessage();
-
-
-    const allButtons =
-        buttonArea.querySelectorAll(
-            "button"
-        );
-
-
-    allButtons.forEach(
-        item => {
-            item.disabled = true;
-        }
-    );
-
-
-    const originalText =
-        button.textContent;
-
-
-    button.textContent =
-        "Recording...";
-
-
+    buttonArea.querySelectorAll("button").forEach(item=>item.disabled=true);
     try {
-
-        const {
-            error
-        } =
-            await supabase
-                .from("punches")
-                .insert({
-
-                    employee_id:
-                        employee.id,
-
-                    punch_type:
-                        punchType,
-
-                    source:
-                        "employee"
-                });
-
-
-        if (error) {
-            throw error;
-        }
-
-
-        const successMessages = {
-
-            clock_in:
-                "✓ Clocked in successfully.",
-
-            break_start:
-                "✓ Break started.",
-
-            break_end:
-                "✓ Break ended.",
-
-            clock_out:
-                "✓ Clocked out successfully."
-        };
-
-
-        showMessage(
-            "success",
-            successMessages[punchType]
-        );
-
-
+        await punchClient.record(punchType,lastPunchId);
         await loadTodaysPunches();
-
-
+        showMessage("success","✓ Punch recorded successfully.");
     } catch (error) {
-
-        console.error(
-            "Punch error:",
-            error
-        );
-
-
-        showMessage(
-            "error",
-            error.message ||
-            "Unable to record your punch."
-        );
-
-
-        button.textContent =
-            originalText;
-
-
-        updateStatusDisplay();
-    }
+        showMessage("error",error.message);
+        if(!punchClient.pending) {
+            try { await loadTodaysPunches(); }
+            catch { buttonArea.replaceChildren(createButton("Refresh Clock State","clock-out","refresh")); }
+        } else updateStatusDisplay();
+    } finally { punchBusy=false; }
 }
 
 timecardButton.addEventListener(

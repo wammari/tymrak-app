@@ -1,0 +1,17 @@
+node_modules/
+.env*
+!.env.example
+.cloudflare-assets/
+.wrangler/
+.dev.vars*
+
+# Private backup output and recovery keys must never enter the repository.
+backups/
+*.enc
+*.tar.gz
+*_Recovery_Key.pem
+/roles.sql
+/schema.sql
+/data.sql
+ops/__pycache__/
+supabase/.temp/
