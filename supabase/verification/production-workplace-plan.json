@@ -9,5 +9,14 @@
   "longitude": null,
   "mapPinVerified": false,
   "productionActivationReady": false,
-  "notes": "Owner corrected the address to 11 Speedvale Ave E on October 30, superseding the earlier 1 Speedvale entry and Hamilton test address. On-site testing is deferred at the owner's request. Confirm the exact building pin before preparing the executable production mapping. Preserve existing employee and punch histories."
+  "notes": "Owner corrected the address to 11 Speedvale Ave E on October 30. The free in-app lookup returned a numbered pharmacy match and filled a candidate pin. The candidate pin is review-only and has not been saved to a workplace or activated in production. On-site testing is deferred at the owner's request. Confirm the exact building pin before preparing the executable production mapping. Preserve existing employee and punch histories.",
+  "candidateMapPin": {
+    "latitude": 43.5585125,
+    "longitude": -80.2676337,
+    "source": "Authenticated staging app Photon/OpenStreetMap address search",
+    "matchedLabel": "I.D.A., 11 Speedvale Avenue East, Guelph, Ontario, N1H 1J3, Canada",
+    "observedOn": "2026-10-30",
+    "ownerVerified": false,
+    "onSiteTestPassed": false
+  }
 }
