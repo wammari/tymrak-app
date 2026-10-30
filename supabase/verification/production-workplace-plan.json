@@ -1,0 +1,13 @@
+{
+  "purpose": "Review-only production workplace plan; not consumed automatically by the application or a migration",
+  "company": "I Care Pharmacy",
+  "companyAdministratorEmail": "w.ammari@outlook.com",
+  "address": "1 Speedvale Ave E, Guelph, Ontario, Canada",
+  "addressConfirmedByOwnerOn": "2026-10-30",
+  "radiusMetres": 50,
+  "latitude": null,
+  "longitude": null,
+  "mapPinVerified": false,
+  "productionActivationReady": false,
+  "notes": "Supersedes the Hamilton test address and the earlier 11 Speedvale address. Confirm the exact building pin before preparing the executable production mapping. Preserve existing employee and punch histories."
+}

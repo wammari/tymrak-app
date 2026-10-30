@@ -16,7 +16,7 @@ Backup/restore verification: https://github.com/wammari/tymrak-app/actions/runs/
 
 ## Release gates still open
 
-1. Confirm pharmacy address/pin/radius: staging lists 2 Sparrow Court, Hamilton; PR #35 names 11 Speedvale Ave E, Guelph. Neither is promoted automatically.
+1. The owner confirmed **1 Speedvale Ave E, Guelph** on October 30. This supersedes the Hamilton staging address and PR #35's 11 Speedvale address. The production plan uses the previously requested 50 m radius. Verify the building's exact map pin and indoor/outside GPS behavior before activation; coordinates have not been assumed or copied from staging. See `supabase/verification/production-workplace-plan.json`.
 2. Prepare and review production I Care Pharmacy ownership, Outlook administrator and workplace mapping using production IDs. Preserve all test histories and validate required-company constraints after assignment.
 3. Confirm production Auth redirect allowlist for app.tymrak.com and external invitation/recovery email delivery. No real employee recipients have been supplied in this thread.
 4. Restore hosting visibility/access: Vercel project listing succeeded, but deployment listing for the app returned HTTP 403 on October 30. No Vercel CLI was installed for the mapped fallback. GitHub can show build checks; it does not prove the live deployment matches this candidate.
