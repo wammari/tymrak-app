@@ -175,7 +175,7 @@ export async function requireManager(req) {
       status: roleResponse.status,
       ...roleError
     });
-    throw new Error("Manager role lookup failed");
+    return { ok: false, status: 502, error: `Manager role lookup failed (Supabase HTTP ${roleResponse.status}${roleError.code ? `, ${roleError.code}` : ""})` };
   }
 
   let roleRecords;
@@ -188,7 +188,7 @@ export async function requireManager(req) {
       status: roleResponse.status,
       errorName: error?.name || "Error"
     });
-    throw error;
+    return { ok: false, status: 502, error: "Manager role lookup returned an invalid response" };
   }
   const role = Array.isArray(roleRecords) ? roleRecords[0]?.role : null;
   const authorized = MANAGER_ROLES.has(role);
