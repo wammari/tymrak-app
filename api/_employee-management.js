@@ -128,7 +128,7 @@ export async function sendActivationInvite(configuration, employee) {
   if (!response.ok) {
     const alreadyRegistered = response.status === 422 && /already (been )?registered|already exists|already registered/i.test([data?.msg, data?.message, data?.error_description].filter(Boolean).join(" "));
     const error = new Error(alreadyRegistered
-      ? "This email already has a sign-in account but no employee profile. No invitation was sent. An administrator must verify account ownership before linking it; do not delete or recreate the account."
+      ? "This email already has a sign-in account. No invitation was sent. An administrator must verify account ownership and the employee account link before retrying; do not delete or recreate the account."
       : (data?.msg || data?.message || "Unable to send activation invitation"));
     error.status = alreadyRegistered ? 409 : response.status;
     throw error;

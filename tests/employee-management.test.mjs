@@ -238,6 +238,20 @@ test("activated employees cannot be resent an activation invitation", async () =
   assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
 });
 
+test("an existing Auth conflict on resend preserves the linked profile and reports the conflict accurately", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes('/employees?')) return new Response(JSON.stringify([employee({auth_user_id:'original-user'})]));
+    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({message:'User already registered'}),{status:422});
+    throw new Error('Unexpected write after Auth conflict');
+  });
+  const res=responseRecorder();
+  await resendHandler(request('POST',{id:'employee-1'}),res);
+  assert.equal(res.statusCode,409);
+  assert.match(res.payload.error,/verify account ownership/);
+  assert.doesNotMatch(res.payload.error,/no employee profile/);
+  assert.equal(calls.some(call=>['PATCH','DELETE'].includes(call.options.method)),false);
+});
+
 test("invitation creation never reports success for missing, ambiguous or incorrectly linked saved profiles", async () => {
   for (const saved of [[], {}, [employee(), employee()], [employee({auth_user_id:'different-user'})]]) {
     installManagerFetch(async (url, options) => {
