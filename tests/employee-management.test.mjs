@@ -286,6 +286,26 @@ test("invitation creation never reports success for missing, ambiguous or incorr
   }
 });
 
+test("an invitation sent before a failed employee write requires reconciliation, never blind retry", async () => {
+  const calls = installManagerFetch(async (url, options) => {
+    if (url.includes("/employees?")) return new Response("[]");
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({id:"auth-employee-1"}));
+    if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
+      return new Response(JSON.stringify({message:"database temporarily unavailable"}), {status:503});
+    }
+    throw new Error("Unexpected request");
+  });
+  const res = responseRecorder();
+  await invitationHandler(request("POST", input()), res);
+  assert.equal(res.statusCode, 500);
+  assert.notEqual(res.payload.success, true);
+  assert.match(res.payload.error, /invitation may have been sent/i);
+  assert.match(res.payload.error, /Do not retry or resend/i);
+  assert.doesNotMatch(res.payload.error, /database temporarily unavailable/i);
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/invite")).length, 1);
+  assert.equal(calls.filter(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")).length, 1);
+});
+
 test("an unlinked employee cannot receive a misleading resend", async () => {
   const calls = installManagerFetch(async () => new Response(JSON.stringify([employee({auth_user_id:null})])));
   const res = responseRecorder();
