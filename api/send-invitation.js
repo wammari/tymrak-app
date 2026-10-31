@@ -7,6 +7,7 @@ import {
 export const validateInvitationInput = validateEmployeeInput;
 
 export default async function handler(req, res) {
+  let inviteIssued = false;
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method not allowed" });
@@ -24,6 +25,7 @@ export default async function handler(req, res) {
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });
 
     const invite = await sendActivationInvite(authorization.configuration, validation.input);
+    inviteIssued = true;
     const employee = {
       ...toEmployeeRecord(validation.input),
       organization_id: authorization.organizationId,
@@ -48,7 +50,12 @@ export default async function handler(req, res) {
       employee: records[0]
     });
   } catch (error) {
-    console.error("TYMRAK invitation operation failed", { errorName: error?.name || "Error" });
+    console.error("TYMRAK invitation operation failed", { errorName: error?.name || "Error", inviteIssued });
+    if (inviteIssued) {
+      return res.status(500).json({
+        error: "An invitation may have been sent, but the employee profile could not be verified. Do not retry or resend. Contact your administrator to reconcile the invitation and account link."
+      });
+    }
     return res.status(error?.status >= 400 && error.status < 500 ? error.status : 500)
       .json({ error: error?.status ? error.message : "Unable to add employee" });
   }
