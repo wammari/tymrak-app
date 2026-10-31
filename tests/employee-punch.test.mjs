@@ -79,3 +79,26 @@ test('unsupported methods fail closed before authentication or database calls',a
   assert.equal(headers['Cache-Control'],'no-store');
  }
 });
+
+test('geofence failures are reported safely without claiming a completed punch',async()=>{
+ setup();
+ const cases=[
+  ['location_required',/location access/i],
+  ['invalid_location',/verify your location/i],
+  ['stale_location',/too old/i],
+  ['inaccurate_location',/accuracy is too low/i],
+  ['outside_geofence',/outside your assigned workplace/i],
+  ['workplace_unassigned',/no active workplace/i]
+ ];
+ for(const [code,message] of cases){
+  let calls=0;
+  global.fetch=async()=>calls++===0?Response.json({id:user}):Response.json({error:code});
+  const response=res();
+  await handler(req(body()),response);
+  assert.equal(calls,2);
+  assert.equal(response.code,409);
+  assert.equal(response.body.code,code);
+  assert.match(response.body.error,message);
+  assert.equal(response.body.success,undefined);
+ }
+});
