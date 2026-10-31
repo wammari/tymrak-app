@@ -1,3 +1,4 @@
+import { getSiteUrl } from "./_deployment-config.js";
 export const EMPLOYEE_SELECT = [
   "id", "first_name", "last_name", "email", "username", "mobile",
   "position", "department", "province", "hire_date", "invitation_status",
@@ -20,7 +21,7 @@ export function cleanString(value) {
 export function databaseHeaders(secretKey, prefer) {
   return {
     apikey: secretKey,
-    Authorization: `Bearer ${secretKey}`,
+    ...(secretKey.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${secretKey}` }),
     "Content-Type": "application/json",
     ...(prefer ? { Prefer: prefer } : {})
   };
@@ -83,14 +84,15 @@ export function toEmployeeRecord(input) {
   };
 }
 
-export async function findDuplicate({ supabaseUrl, secretKey, email, username, excludeId }) {
+export async function findDuplicate({ supabaseUrl, secretKey, organizationId, scopeFilter = '', email, username, excludeId }) {
+  if (!organizationId) throw new Error("Company membership required");
   const headers = databaseHeaders(secretKey);
   const filters = [
     ["email", "eq", email, "email"],
     ["username", "ilike", username, "username"]
   ];
   for (const [column, operator, value, label] of filters) {
-    let url = `${supabaseUrl}/rest/v1/employees?${column}=${operator}.${encodeURIComponent(value)}&select=id&limit=2`;
+    let url = `${supabaseUrl}/rest/v1/employees?organization_id=eq.${organizationId}${scopeFilter}&${column}=${operator}.${encodeURIComponent(value)}&select=id&limit=2`;
     if (excludeId) url += `&id=neq.${encodeURIComponent(excludeId)}`;
     const response = await fetch(url, { headers });
     if (!response.ok) throw new Error("Employee duplicate check failed");
@@ -102,8 +104,7 @@ export async function findDuplicate({ supabaseUrl, secretKey, email, username, e
 }
 
 export function activationRedirect() {
-  const siteUrl = (process.env.SITE_URL || "https://tymrak.vercel.app").replace(/\/$/, "");
-  return `${siteUrl}/activate.html`;
+  return `${getSiteUrl()}/activate.html`;
 }
 
 export async function sendActivationInvite(configuration, employee) {

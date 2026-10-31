@@ -1,3 +1,5 @@
+import { getPublicConfiguration } from "./_deployment-config.js";
+import { databaseHeaders } from "./_employee-management.js";
 const MANAGER_ROLES = new Set(["manager", "admin"]);
 
 async function getSafeSupabaseError(response) {
@@ -31,19 +33,12 @@ export function getBearerToken(req) {
 }
 
 export function getSupabaseConfiguration() {
-  const supabaseUrl = process.env.SUPABASE_URL;
-  const secretKey = process.env.SUPABASE_SECRET_KEY;
-  const publishableKey = "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6"; // Verified production project public key; avoid stale Vercel value.
-
-  if (!supabaseUrl || !secretKey) {
-    return null;
-  }
-
-  return {
-    supabaseUrl: supabaseUrl.replace(/\/$/, ""),
-    secretKey,
-    publishableKey
-  };
+  try {
+    const target = getPublicConfiguration();
+    const secretKey = process.env.SUPABASE_SECRET_KEY;
+    if (!secretKey) return null;
+    return { supabaseUrl: target.supabaseUrl, secretKey, publishableKey: target.supabasePublishableKey };
+  } catch { return null; }
 }
 
 export async function requireManager(req) {
@@ -72,17 +67,6 @@ export async function requireManager(req) {
     };
   }
 
-  const expectedProjectHost = "tsosredghislnehfyypi.supabase.co";
-  let configuredHost;
-  try {
-    configuredHost = new URL(configuration.supabaseUrl).hostname;
-  } catch {
-    return { ok: false, status: 500, error: "Manager authentication server configuration is invalid" };
-  }
-  if (configuredHost !== expectedProjectHost) {
-    console.error("Manager Supabase project mismatch", { stage: "configuration", configuredHost });
-    return { ok: false, status: 500, error: "Manager authentication is connected to the wrong database project" };
-  }
   const { supabaseUrl, secretKey, publishableKey } = configuration;
   console.info("Manager authorization configuration available", {
     stage: "configuration"
@@ -114,7 +98,7 @@ export async function requireManager(req) {
     return {
       ok: false,
       status: 401,
-      error: authError.code === "invalid_api_key" ? "Manager authentication API key rejected" : `Session verification failed (Supabase HTTP ${userResponse.status}${authError.code ? `, ${authError.code}` : ""})`
+      error: "Invalid or expired session"
     };
   }
 
@@ -151,12 +135,9 @@ export async function requireManager(req) {
     roleResponse = await fetch(
       `${supabaseUrl}/rest/v1/user_roles?auth_user_id=eq.${encodeURIComponent(
         user.id
-      )}&select=role`,
+      )}&select=role,organization_id,organization:organizations!inner(is_active)&organization.is_active=eq.true`,
       {
-        headers: {
-          apikey: secretKey,
-          Authorization: `Bearer ${secretKey}`
-        }
+        headers: databaseHeaders(secretKey)
       }
     );
   } catch (error) {
@@ -176,7 +157,7 @@ export async function requireManager(req) {
       status: roleResponse.status,
       ...roleError
     });
-    return { ok: false, status: 502, error: `Manager role lookup failed (Supabase HTTP ${roleResponse.status}${roleError.code ? `, ${roleError.code}` : ""})` };
+    return { ok: false, status: 502, error: `Manager role lookup failed (Supabase HTTP ${roleResponse.status})` };
   }
 
   let roleRecords;
@@ -191,8 +172,12 @@ export async function requireManager(req) {
     });
     return { ok: false, status: 502, error: "Manager role lookup returned an invalid response" };
   }
-  const role = Array.isArray(roleRecords) ? roleRecords[0]?.role : null;
-  const authorized = MANAGER_ROLES.has(role);
+  const membership = Array.isArray(roleRecords) && roleRecords.length === 1 ? roleRecords[0] : null;
+  const role = membership?.role;
+  const organizationId = membership?.organization_id;
+  const authorized = MANAGER_ROLES.has(role) &&
+    typeof organizationId === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(organizationId) &&
+    membership?.organization?.is_active === true;
 
   console.info("Manager role lookup completed", {
     stage: "authorization_decision",
@@ -206,10 +191,25 @@ export async function requireManager(req) {
     return {
       ok: false,
       status: 403,
-      error: "Manager access required"
+      error: "Manager access requires an active company membership"
     };
   }
 
+  let employeeIds = null;
+  if (role === 'manager') {
+    const scopeResponse = await fetch(`${configuration.supabaseUrl}/rest/v1/rpc/manager_employee_scope`, {
+      method: 'POST',
+      headers: { apikey: configuration.secretKey, 'Content-Type': 'application/json',
+        ...(configuration.secretKey.startsWith('sb_secret_') ? {} : {Authorization: `Bearer ${configuration.secretKey}`}) },
+      body: JSON.stringify({p_manager_id: user.id})
+    });
+    if (!scopeResponse.ok) throw new Error('Manager workplace scope unavailable');
+    const scope = await scopeResponse.json();
+    if (scope.error || !Array.isArray(scope.employeeIds) || scope.employeeIds.some(id =>
+      typeof id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))
+      throw new Error('Invalid manager workplace scope');
+    employeeIds = scope.employeeIds;
+  }
   return {
     ok: true,
     user: {
@@ -217,6 +217,8 @@ export async function requireManager(req) {
       email: user.email || ""
     },
     role,
+    organizationId,
+    employeeIds,
     configuration
   };
 }
