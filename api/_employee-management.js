@@ -90,7 +90,7 @@ export async function findDuplicate({ supabaseUrl, secretKey, organizationId, sc
   const filters = [
     ["email", "eq", email, "email"],
     // Escape SQL LIKE wildcards so valid usernames containing "_" compare literally.
-    ["username", "ilike", username.replace(/[\\%_]/g, "\\    ["username", "ilike", username, "username"]"), "username"]
+    ["username", "ilike", username.replace(/[\\%_]/g, "\\$&"), "username"]
   ];
   for (const [column, operator, value, label] of filters) {
     let url = `${supabaseUrl}/rest/v1/employees?organization_id=eq.${organizationId}${scopeFilter}&${column}=${operator}.${encodeURIComponent(value)}&select=id&limit=2`;
