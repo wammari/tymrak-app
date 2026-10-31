@@ -126,7 +126,7 @@ export async function sendActivationInvite(configuration, employee) {
   );
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const alreadyRegistered = response.status === 422 && /already (been )?registered|already exists|already registered/i.test([data?.msg, data?.message, data?.error_description].filter(Boolean).join(" "));
+    const alreadyRegistered = [400, 422].includes(response.status) && /already (been )?registered|already exists|user_already_exists/i.test([data?.msg, data?.message, data?.error_description, data?.error, data?.code].filter(Boolean).join(" "));
     const error = new Error(alreadyRegistered
       ? "This email already has a sign-in account. No invitation was sent. An administrator must verify account ownership and the employee account link before retrying; do not delete or recreate the account."
       : (data?.msg || data?.message || "Unable to send activation invitation"));
