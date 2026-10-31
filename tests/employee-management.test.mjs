@@ -180,6 +180,25 @@ test("existing confirmed Auth user is not silently linked or reinvited", async (
   assert.equal(calls.filter(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")).length, 0);
 });
 
+
+test("existing Auth identity errors from either Supabase status are safe conflicts", async () => {
+  for (const [status, body] of [
+    [400, { code: "user_already_exists" }],
+    [422, { message: "A user with this email address has already been registered" }]
+  ]) {
+    const calls = installManagerFetch(async (url) => {
+      if (url.includes("/employees?")) return new Response("[]");
+      if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify(body), { status });
+      throw new Error("Unexpected request after invitation conflict");
+    });
+    const res = responseRecorder();
+    await invitationHandler(request("POST", input({ email: "existing@example.com" })), res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.payload.error, /verify account ownership/);
+    assert.equal(calls.some(call => call.url.endsWith("/rest/v1/employees") && call.options.method === "POST"), false);
+  }
+});
+
 test("a manager edits exactly one employee and can save inactive status", async () => {
   let patchUrl;
   installManagerFetch(async (url, options) => {
