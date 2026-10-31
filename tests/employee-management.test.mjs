@@ -166,6 +166,20 @@ for (const duplicateField of ["email", "username"]) {
   });
 }
 
+
+test("existing confirmed Auth user is not silently linked or reinvited", async () => {
+  const calls = installManagerFetch(async (url, options) => {
+    if (url.includes("/employees?")) return new Response("[]");
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({msg:"A user with this email address has already been registered"}), {status:422});
+    throw new Error("Unexpected write after Auth conflict");
+  });
+  const res = responseRecorder();
+  await invitationHandler(request("POST", input({email:"existing@example.com"})), res);
+  assert.equal(res.statusCode, 409);
+  assert.match(res.payload.error, /verify account ownership/);
+  assert.equal(calls.filter(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")).length, 0);
+});
+
 test("a manager edits exactly one employee and can save inactive status", async () => {
   let patchUrl;
   installManagerFetch(async (url, options) => {
