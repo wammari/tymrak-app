@@ -48,4 +48,29 @@ The invitation API previously accepted an empty or ambiguous successful database
 
 All **160 application tests** pass locally after these changes, including missing/ambiguous profile responses, identity mismatches, missing links and concurrent activation. No hosted email was sent by these tests.
 
-The connected Supabase tools expose database queries but not hosted Auth redirect or SMTP configuration. The production Auth configuration dashboard currently presents its sign-in screen, so those settings and external email delivery remain unverified until secure dashboard sign-in is completed. No Auth settings were changed.
+The connected Supabase tools expose database queries but not hosted Auth redirect or SMTP configuration. The dashboard initially required sign-in. The owner completed it on October 31; the verified configuration and targeted corrections are recorded below. External delivery acceptance remains pending.
+
+## Hosted Auth configuration — October 31
+
+The owner completed dashboard sign-in. Production project `tsosredghislnehfyypi` has Site URL `https://app.tymrak.com` and custom SMTP enabled at `smtp.resend.com`, port 465, sender name TYMRAK. The stored SMTP password was not revealed or replaced. Staging project `ctztwqcsizwkrqgpgrgg` also has Resend SMTP enabled on port 465, sender name TYMRAK Staging, and Site URL `https://tymrak-staging.vercel.app`. Its stable activation and reset callback URLs are already allowlisted.
+
+Two production **Auth configuration** corrections were saved through the dashboard:
+
+1. Added only `https://app.tymrak.com/activate.html` to the redirect list. The existing reset callback and legacy Vercel entry were preserved. The dashboard confirmed one added URL and a total of three. The live activation page exists and correctly rejects a visit without an invitation token.
+2. Replaced the hardcoded `https://tymrak.vercel.app/password-recovery.html` hostname in the recovery email template with `{{ .SiteURL }}/password-recovery.html`. The original ConfirmationURL wrapper, subject, copy and recovery flow were preserved. The canonical live bridge exists and rejects a visit without a recovery URL. A dashboard reload verified that the updated template persisted and Save changes was disabled.
+
+These checks verify stored configuration and public routes, **not** a delivered email or successful password update. No test recovery email or real employee invitation was sent. No employee, punch, company, role or workplace data was changed; no migration, merge or production application deployment occurred. The legacy Vercel redirect entry still needs retirement during the reviewed cutover after canonical invitation/recovery acceptance. The release still requires company/admin/workplace mapping, a fresh verified backup and deferred on-site GPS acceptance.
+
+Rollback for the narrow configuration changes, only if required by a confirmed regression: remove the exact activation callback just added and restore the recovery template host to `https://tymrak.vercel.app/password-recovery.html`; do not alter SMTP credentials or other redirect entries.
+
+## Reviewable company bootstrap
+
+`ops/review-company-bootstrap.sql` is a separate review/rehearsal script, not an automatic migration. It always ends with **ROLLBACK**, and it has not been run against production. It requires the rehearsed release schema, the reviewed inventory of four employees/four Auth users/43 punches, empty company/workplace/assignment tables and exactly the expected confirmed Outlook legacy manager membership. Any inventory or ownership drift stops it before company creation.
+
+Inside its rolled-back transaction it resolves the administrator by confirmed email, creates I Care Pharmacy, maps the four owner-confirmed legacy test employees to that company and makes the existing manager its company administrator. It prepares the candidate 11 Speedvale address with a 50 m workplace that remains **inactive** and grants no employee workplace assignments. Employee fields (other than the intended company/update timestamp), all punches and all Auth records are hash-checked for preservation. No real pilot employee names/emails are included. Activation/assignment requires the reviewed exact pin and deferred on-site test.
+
+Three database-backed tests prove the intended temporary mapping, complete rollback/history preservation, inventory-drift rejection and refusal to overwrite an existing company. This makes the intended production mapping concrete for later approval; it does not authorize a cutover or bypass remaining hosted/email/GPS acceptance.
+
+The full application suite passes **163 tests** after adding the bootstrap review tests. The deployed application runtime remains commit `6e55fc3`; this follow-up changes only review SQL, tests and release documentation.
+
+Integration verification: the concurrently published literal-underscore username duplicate fix and its test at `452c338` were reviewed and preserved. With that fix plus the three bootstrap review tests, the full local suite passes **164 tests**. No earlier release-branch commit was overwritten.
