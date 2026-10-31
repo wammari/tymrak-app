@@ -2,6 +2,22 @@
 
 This candidate combines the tested clock/geofence/company/workplace stack, the verified backup and migration rehearsal, production Worker preparation, and the current main branch's approved portal homepage. The current marketing site is not changed by this branch. Automatic Vercel deployment is disabled for `release/customer-candidate`. Production Worker routes remain empty, previews remain disabled and `TYMRAK_RELEASE_READY` remains false.
 
+## Current status — October 31
+
+This section supersedes the older snapshot counts and hosted-state observations in the historical notes below.
+
+- Hosted runtime `39bacc2` is READY at the stable staging branch alias: https://tymrak-staging-git-release-customer-candidate-wammari.vercel.app/ . Its public configuration identifies staging and the staging database. The branch-specific Preview SITE_URL and two exact activation/reset callbacks are saved. Subsequent published runtime-equivalent commits add tests only.
+- Authenticated administrator and employee read acceptance passed: three company test employees, manager summary/detail, employee clock state and personal timecard, invitation form without sending, workplace assignment controls and free numbered-address search/map selection.
+- Actual staging database scope functions returned exactly the expected staff for both restricted-manager company fixtures and the pharmacy administrator. Unknown manager denied; privileged scope/workplace functions and trigger helpers deny direct browser invocation. Restricted-manager HTTP/browser session acceptance remains separate.
+- Five deployed geofence RPC rejection cases passed. A synthetic service-role clock-in, identical-result retry and clock-out at the saved staging centre produced exactly two temporary punches, receipts and location verifications, then rolled back. Follow-up found no punches/receipts added that day for the test employee. This does not establish physical GPS acceptance.
+- The saved staging workplace was independently changed to 11 Speedvale Avenue East, Guelph, 50 m, three assignments, centre `43.5584418124796 / -80.267497094979`. Preserve it. The earlier unsaved Photon candidate in the production review plan is different; neither pin is proof of an on-site test.
+- Fresh read-only backup/restore verification passed: https://github.com/wammari/tymrak-app/actions/runs/41228493414 . The encrypted artifact digest, export file hashes and restored inventory were verified locally. Snapshot: four employees, four Auth users, 47 punches, two manager memberships, zero Storage objects. Encrypted evidence is retained privately; recovery credentials are not in the repository.
+- The refreshed rollback-only bootstrap guard requires that 47-punch snapshot and two reviewed manager memberships. It promotes only the owner-designated confirmed Outlook administrator inside the rolled-back review. The other existing activated test manager membership remains unchanged and has no automatic company/workplace scope. Other role changes or inventory drift stop the review.
+- `ops/rehearse_release.py` now reviews this concrete bootstrap in the already verified loopback restore after the five unchanged release migrations and rollback-only access tests. It checks the temporary mapping report and original record hashes. It never applies the setup to production.
+- Production still lacks the company/workplace/geofence schema. External email/activation/recovery completion, restricted-manager HTTP/browser checks, on-site inside/outside phone GPS tests, production credential/runtime preparation and explicit cutover approval remain open. No production business-data write, migration, merge, application deployment, real invitation or paid-service change was made by this follow-up.
+
+The latest application suite has 167 passing tests, including four bootstrap review tests. Seven Python operations guard tests pass. The earlier counts below describe prior verification steps.
+
 ## Integration decisions
 
 - Preserve the approved portal homepage byte-for-byte from main commit `57368a2645596494e6d0aefe86441a9653efd712`. Keep the existing tested brown/gold application styles and approved logo assets.
@@ -65,11 +81,11 @@ Rollback for the narrow configuration changes, only if required by a confirmed r
 
 ## Reviewable company bootstrap
 
-`ops/review-company-bootstrap.sql` is a separate review/rehearsal script, not an automatic migration. It always ends with **ROLLBACK**, and it has not been run against production. It requires the rehearsed release schema, the reviewed inventory of four employees/four Auth users/43 punches, empty company/workplace/assignment tables and exactly the expected confirmed Outlook legacy manager membership. Any inventory or ownership drift stops it before company creation.
+`ops/review-company-bootstrap.sql` is a separate review/rehearsal script, not an automatic migration. It always ends with **ROLLBACK**, and it has not been run against production. It requires the rehearsed release schema, the reviewed inventory of four employees/four Auth users/47 punches, empty company/workplace/assignment tables and two existing manager memberships. The confirmed Outlook identity is the only proposed company administrator; the second activated test manager stays unchanged without a company or workplace assignment. Any inventory, membership or ownership drift stops it before company creation.
 
 Inside its rolled-back transaction it resolves the administrator by confirmed email, creates I Care Pharmacy, maps the four owner-confirmed legacy test employees to that company and makes the existing manager its company administrator. It prepares the candidate 11 Speedvale address with a 50 m workplace that remains **inactive** and grants no employee workplace assignments. Employee fields (other than the intended company/update timestamp), all punches and all Auth records are hash-checked for preservation. No real pilot employee names/emails are included. Activation/assignment requires the reviewed exact pin and deferred on-site test.
 
-Three database-backed tests prove the intended temporary mapping, complete rollback/history preservation, inventory-drift rejection and refusal to overwrite an existing company. This makes the intended production mapping concrete for later approval; it does not authorize a cutover or bypass remaining hosted/email/GPS acceptance.
+Four database-backed tests prove the intended temporary mapping, complete rollback/history preservation, inventory-drift rejection, refusal to overwrite an existing company and refusal of an unreviewed second administrator. This makes the intended production mapping concrete for later approval; it does not authorize a cutover or bypass remaining hosted/email/GPS acceptance.
 
 The full application suite passes **163 tests** after adding the bootstrap review tests. The deployed application runtime remains commit `6e55fc3`; this follow-up changes only review SQL, tests and release documentation.
 
