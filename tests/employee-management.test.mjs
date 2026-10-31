@@ -5,6 +5,7 @@ import test from "node:test";
 import employeesHandler from "../api/employees.js";
 import invitationHandler from "../api/send-invitation.js";
 import resendHandler from "../api/resend-invitation.js";
+import { findDuplicate } from "../api/_employee-management.js";
 
 const originalEnv = { ...process.env };
 const originalFetch = global.fetch;
@@ -70,6 +71,25 @@ test.beforeEach(() => {
 test.afterEach(() => {
   global.fetch = originalFetch;
   process.env = { ...originalEnv };
+});
+
+test("username duplicate checks treat underscore as a literal character", async () => {
+  const urls = [];
+  global.fetch = async url => {
+    urls.push(String(url));
+    return new Response("[]");
+  };
+  const duplicate = await findDuplicate({
+    supabaseUrl: "https://example.supabase.co",
+    secretKey: "sb_secret_test",
+    organizationId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    email: "ada@example.com",
+    username: "ada_test"
+  });
+  assert.equal(duplicate, null);
+  assert.equal(urls.length, 2);
+  assert.match(urls[0], /&email=eq\.ada%40example\.com/);
+  assert.ok(urls[1].includes("username=ilike.ada%5C_test"), urls[1]);
 });
 
 test("anonymous users cannot access any employee-management API", async () => {
