@@ -38,6 +38,17 @@ def main():
     checks = json.loads(result.strip())
     if checks.get('all_checks_passed') is not True:
         raise RuntimeError('Rehearsal acceptance failed')
+    # Review the real legacy company/admin mapping only in this loopback restore.
+    # The SQL itself always rolls back; it must never become a hosted backfill.
+    review_result = backup.run(['psql','--no-psqlrc','--quiet','--tuples-only','--no-align','--set','ON_ERROR_STOP=1','--dbname',admin,
+                               '--file',str(backup.ROOT/'ops/review-company-bootstrap.sql')],
+                              'company-bootstrap-review',capture=True)
+    company_review = json.loads(review_result.strip())
+    expected_review = {'company_count':1,'company_employee_count':4,'administrator_count':1,'quarantined_manager_count':1,
+                       'inactive_workplace_count':1,'employee_assignments':0,
+                       'punches':manifest['source_inventory']['public.punches']['count'],'will_commit':False}
+    if company_review != expected_review:
+        raise RuntimeError('Company bootstrap review failed')
     after = backup.inventory(admin)
     # The fixture transaction rolls back. New company columns must remain
     # quarantined, and every original field/row must match its export hash.
@@ -54,7 +65,7 @@ def main():
     report = {'project_ref':backup.PROJECT,'migration_sha256':hashes,'all_checks_passed':True,
               'legacy_records_preserved':True,'fixtures_rolled_back':True,
               'production_unchanged':True,'production_workplace_confirmation_required':True,
-              'acceptance':checks,'post_migration_inventory':after}
+              'acceptance':checks,'company_bootstrap_review':company_review,'post_migration_inventory':after}
     (backup.EXPORT/'rehearsal-report.json').write_text(json.dumps(report,indent=2))
     print('Local migration rehearsal passed; legacy records preserved and synthetic fixtures rolled back.')
 
