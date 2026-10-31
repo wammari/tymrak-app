@@ -1,6 +1,7 @@
 """Apply release changes only to the already verified disposable local restore."""
 import hashlib
 import json
+import re
 import sys
 import production_backup as backup
 
@@ -15,6 +16,26 @@ MIGRATIONS = [
 def connection():
     status = json.loads(backup.run(backup.CLI+['status','--workdir',str(backup.LOCAL),'--output','json'],'rehearsal-status',capture=True))
     return backup.local_url(status['DB_URL'])
+
+def local_bootstrap_review(url, manifest):
+    # Only an ephemeral copy may follow a newer verified restore's punch count.
+    # Never rewrite the reviewed production SQL or infer production approval.
+    backup.local_url(url)
+    if manifest.get('project_ref') != backup.PROJECT or manifest.get('restore_verified') is not True:
+        raise ValueError('A verified production restore manifest is required')
+    count = manifest['source_inventory']['public.punches']['count']
+    if type(count) is not int or count < 0:
+        raise ValueError('Invalid verified snapshot punch count')
+    source = (backup.ROOT/'ops/review-company-bootstrap.sql').read_text()
+    sql, replacements = re.subn(r'(or \(select count\(\*\) from public\.punches\)<>)\d+( then)',
+                                lambda match:match[1]+str(count)+match[2],source)
+    if replacements != 1 or not sql.rstrip().lower().endswith('rollback;'):
+        raise ValueError('Unrecognized rollback-only bootstrap review')
+    path = backup.PRIVATE/'company-bootstrap-local-review.sql'
+    path.write_text(sql)
+    result = backup.run(['psql','--no-psqlrc','--quiet','--tuples-only','--no-align','--set','ON_ERROR_STOP=1','--dbname',url,
+                         '--file',str(path)],'company-bootstrap-review',capture=True)
+    return json.loads(result.strip())
 
 def main():
     manifest = json.loads((backup.EXPORT/'manifest.json').read_text())
@@ -40,10 +61,7 @@ def main():
         raise RuntimeError('Rehearsal acceptance failed')
     # Review the real legacy company/admin mapping only in this loopback restore.
     # The SQL itself always rolls back; it must never become a hosted backfill.
-    review_result = backup.run(['psql','--no-psqlrc','--quiet','--tuples-only','--no-align','--set','ON_ERROR_STOP=1','--dbname',admin,
-                               '--file',str(backup.ROOT/'ops/review-company-bootstrap.sql')],
-                              'company-bootstrap-review',capture=True)
-    company_review = json.loads(review_result.strip())
+    company_review = local_bootstrap_review(admin,manifest)
     expected_review = {'company_count':1,'company_employee_count':4,'administrator_count':1,'quarantined_manager_count':1,
                        'inactive_workplace_count':1,'employee_assignments':0,
                        'punches':manifest['source_inventory']['public.punches']['count'],'will_commit':False}
@@ -65,7 +83,10 @@ def main():
     report = {'project_ref':backup.PROJECT,'migration_sha256':hashes,'all_checks_passed':True,
               'legacy_records_preserved':True,'fixtures_rolled_back':True,
               'production_unchanged':True,'production_workplace_confirmation_required':True,
-              'acceptance':checks,'company_bootstrap_review':company_review,'post_migration_inventory':after}
+              'acceptance':checks,'company_bootstrap_review':company_review,
+              'company_review_guard_source':'verified_disposable_restore_manifest',
+              'company_bootstrap_source_sha256':hashlib.sha256((backup.ROOT/'ops/review-company-bootstrap.sql').read_bytes()).hexdigest(),
+              'post_migration_inventory':after}
     (backup.EXPORT/'rehearsal-report.json').write_text(json.dumps(report,indent=2))
     print('Local migration rehearsal passed; legacy records preserved and synthetic fixtures rolled back.')
 
