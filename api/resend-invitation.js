@@ -30,12 +30,18 @@ export default async function handler(req, res) {
     if (employee.invitation_status === "Account Activated" || employee.activated_at) {
       return res.status(409).json({ error: "Activated employees cannot be sent another activation invitation" });
     }
-    await sendActivationInvite(authorization.configuration, {
+    if (!employee.auth_user_id) {
+      return res.status(409).json({ error: "This employee's account link needs repair before another invitation can be sent" });
+    }
+    const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
       lastName: employee.last_name, username: employee.username
     });
+    if (invite.id !== employee.auth_user_id) {
+      return res.status(409).json({ error: "The invitation returned a different account. The existing employee account link was preserved; contact your administrator" });
+    }
     const update = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT}`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&auth_user_id=eq.${encodeURIComponent(employee.auth_user_id)}&activated_at=is.null&invitation_status=neq.Account%20Activated&select=${EMPLOYEE_SELECT}`,
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),

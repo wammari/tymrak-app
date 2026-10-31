@@ -120,7 +120,7 @@ test("a manager can create an active employee and send an invitation", async () 
       assert.equal(body.hire_date, "2026-10-01");
       assert.equal(body.auth_user_id, "auth-employee-1");
       assert.equal(body.invitation_status, "Invitation Sent");
-      return new Response(JSON.stringify([employee()]));
+      return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
     }
     throw new Error(`Unexpected URL ${url}`);
   });
@@ -176,6 +176,9 @@ test("resending an invitation updates by ID and never creates an employee", asyn
     }
     if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1" }));
     if (url.includes("/employees?id=eq.employee-1") && options.method === "PATCH") {
+      assert.match(url, /auth_user_id=eq\.auth-employee-1/);
+      assert.match(url, /activated_at=is\.null/);
+      assert.match(url, /invitation_status=neq\.Account%20Activated/);
       return new Response(JSON.stringify([employee()]));
     }
     throw new Error(`Unexpected URL ${url}`);
@@ -199,6 +202,58 @@ test("activated employees cannot be resent an activation invitation", async () =
   await resendHandler(request("POST", { id: "employee-1" }), res);
   assert.equal(res.statusCode, 409);
   assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
+});
+
+test("invitation creation never reports success for missing, ambiguous or incorrectly linked saved profiles", async () => {
+  for (const saved of [[], {}, [employee(), employee()], [employee({auth_user_id:'different-user'})]]) {
+    installManagerFetch(async (url, options) => {
+      if (url.includes('/employees?')) return new Response('[]');
+      if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1'}));
+      if (options.method === 'POST') return new Response(JSON.stringify(saved));
+      throw new Error('Unexpected request');
+    });
+    const res = responseRecorder();
+    await invitationHandler(request('POST', input()), res);
+    assert.equal(res.statusCode, 500);
+    assert.notEqual(res.payload.success, true);
+  }
+});
+
+test("an unlinked employee cannot receive a misleading resend", async () => {
+  const calls = installManagerFetch(async () => new Response(JSON.stringify([employee({auth_user_id:null})])));
+  const res = responseRecorder();
+  await resendHandler(request('POST', {id:'employee-1'}), res);
+  assert.equal(res.statusCode, 409);
+  assert.match(res.payload.error, /link needs repair/);
+  assert.equal(calls.some(call => call.url.includes('/auth/v1/invite')), false);
+});
+
+test("resend preserves the employee identity when Auth returns a different user", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes('/employees?')) return new Response(JSON.stringify([employee({auth_user_id:'original-user'})]));
+    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'different-user'}));
+    throw new Error('Unexpected request');
+  });
+  const res = responseRecorder();
+  await resendHandler(request('POST', {id:'employee-1'}), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(calls.some(call => call.options.method === 'PATCH'), false);
+});
+
+test("a concurrent activation cannot be overwritten by the resend status update", async () => {
+  installManagerFetch(async (url, options) => {
+    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1'}));
+    if (options.method === 'PATCH') {
+      assert.match(url, /activated_at=is\.null/);
+      assert.match(url, /invitation_status=neq\.Account%20Activated/);
+      return new Response('[]'); // PostgREST finds no row after concurrent activation.
+    }
+    return new Response(JSON.stringify([employee({auth_user_id:'auth-employee-1'})]));
+  });
+  const res = responseRecorder();
+  await resendHandler(request('POST', {id:'employee-1'}), res);
+  assert.equal(res.statusCode, 500);
+  assert.notEqual(res.payload.success, true);
 });
 
 test("server credentials never appear in Manager Portal browser code", () => {

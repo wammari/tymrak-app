@@ -28,7 +28,7 @@ test.beforeEach(()=>{
   if(url.pathname==='/auth/v1/invite')return json({id:'33333333-3333-4333-8333-333333333333'});
   if(url.pathname==='/rest/v1/employees'){
    if(options.method==='POST'){
-    const row=JSON.parse(options.body);assert.equal(row.organization_id,companyA);rows.push(row);return json([row]);
+    const row={id:'55555555-5555-4555-8555-555555555555',...JSON.parse(options.body)};assert.equal(row.organization_id,companyA);rows.push(row);return json([row]);
    }
    // Treat a missing company predicate as a failing test, not as a mock denial.
    assert.equal(url.searchParams.get('organization_id'),`eq.${companyA}`);

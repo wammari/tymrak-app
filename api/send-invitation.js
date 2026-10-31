@@ -38,10 +38,14 @@ export default async function handler(req, res) {
     });
     if (!response.ok) throw new Error("Employee record could not be saved after invitation");
     const records = await response.json();
+    if (!Array.isArray(records) || records.length !== 1 || !records[0]?.id ||
+        records[0].auth_user_id !== invite.id) {
+      throw new Error("Invited employee record was not saved with the expected identity");
+    }
     return res.status(201).json({
       success: true,
       message: "Employee added and activation invitation sent successfully",
-      employee: records?.[0] || null
+      employee: records[0]
     });
   } catch (error) {
     console.error("TYMRAK invitation operation failed", { errorName: error?.name || "Error" });
