@@ -62,7 +62,7 @@ def main():
     # Review the real legacy company/admin mapping only in this loopback restore.
     # The SQL itself always rolls back; it must never become a hosted backfill.
     company_review = local_bootstrap_review(admin,manifest)
-    expected_review = {'company_count':1,'company_employee_count':4,'administrator_count':1,'quarantined_manager_count':1,
+    expected_review = {'company_count':1,'company_employee_count':4,'administrator_count':1,'quarantined_manager_count':0,'removed_test_manager_count':1,
                        'inactive_workplace_count':1,'employee_assignments':0,
                        'punches':manifest['source_inventory']['public.punches']['count'],'will_commit':False}
     if company_review != expected_review:
