@@ -21,7 +21,7 @@ test.before(async()=>{
   await db.query('insert into auth.users values($1,$2,now())',[id,i===0?'w.ammari@outlook.com':`fixture${i}@example.invalid`]);
   await db.query("insert into employees values($1,$1,'Test','Employee',$2,$3,true,'Account Activated',now(),'ON',now())",[id,`fixture${i}@example.invalid`,`fixture${i}`]);
  }
- await db.query("insert into punches(employee_id,punch_type,punched_at,source) select $1,case when n%2=1 then 'clock_in' else 'clock_out' end,now()+n*interval '1 minute','fixture' from generate_series(1,47) n",[ids[0]]);
+ await db.query("insert into punches(employee_id,punch_type,punched_at,source) select $1,case when n%2=1 then 'clock_in' else 'clock_out' end,now()+n*interval '1 minute','fixture' from generate_series(1,49) n",[ids[0]]);
  for(const name of ['202610010001_manager_roles.sql','202610040001_timecard_approvals.sql','202610080001_atomic_employee_activation.sql','202610230001_atomic_employee_punches.sql','20261023172638_manual_workplaces_geofenced_punches.sql','20261023213945_company_isolation.sql','20261023220346_manager_workplace_scope.sql'])
   await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.query("insert into user_roles(auth_user_id,role) values($1,'manager')",[ids[0]]);
@@ -34,7 +34,7 @@ test('company bootstrap rehearses the exact reviewed mapping and rolls back with
  const rolesBefore=(await db.query('select row_to_json(r) data from user_roles r order by auth_user_id')).rows;
  const result=await db.exec(review);
  const report=result.flatMap(r=>r.rows??[]).find(r=>r.bootstrap_review)?.bootstrap_review;
- assert.deepEqual(report,{company_count:1,company_employee_count:4,administrator_count:1,quarantined_manager_count:1,inactive_workplace_count:1,employee_assignments:0,punches:47,will_commit:false});
+ assert.deepEqual(report,{company_count:1,company_employee_count:4,administrator_count:1,quarantined_manager_count:0,removed_test_manager_count:1,inactive_workplace_count:1,employee_assignments:0,punches:49,will_commit:false});
  assert.equal((await db.query('select count(*)::int n from organizations')).rows[0].n,0);
  assert.equal((await db.query('select count(*)::int n from workplaces')).rows[0].n,0);
  assert.deepEqual((await db.query('select row_to_json(e) data from employees e order by id')).rows,before);
