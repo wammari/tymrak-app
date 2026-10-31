@@ -68,3 +68,14 @@ test('future punch rejection explains that a manager correction is needed',async
  const r=res();await handler(req(body()),r);assert.equal(r.code,409);
  assert.match(r.body.error,/future-dated punch/);assert.match(r.body.error,/manager/);assert.doesNotMatch(r.body.error,/Refresh/);
 });
+
+test('unsupported methods fail closed before authentication or database calls',async()=>{
+ setup();global.fetch=()=>{throw new Error('unexpected network')};
+ for(const method of ['PUT','PATCH','DELETE']) {
+  const headers={};const response={setHeader(k,v){headers[k]=v;},status(n){this.code=n;return this;},json(b){this.body=b;return this;}};
+  await handler(req(body(),method),response);
+  assert.equal(response.code,405);
+  assert.equal(headers.Allow,'GET, POST');
+  assert.equal(headers['Cache-Control'],'no-store');
+ }
+});
