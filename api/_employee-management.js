@@ -133,18 +133,24 @@ export async function sendActivationInvite(configuration, employee) {
     error.status = alreadyRegistered ? 409 : response.status;
     throw error;
   }
-  if (!data?.id) throw new Error("Invitation returned no authentication user ID");
-  // Auth normally rejects invitations for confirmed users. Defend against an
-  // unexpected successful response rather than silently linking that identity.
-  const mismatchedEmail = typeof data.email === "string" &&
+  // A successful invite can already have sent an email. Never create a
+  // profile from an incomplete or ambiguous Auth response: the server must
+  // explicitly identify the recipient, not merely return an account ID.
+  const missingIdentity = typeof data?.id !== "string" || !data.id;
+  const missingEmail = typeof data?.email !== "string" || !data.email.trim();
+  const mismatchedEmail = !missingEmail &&
     data.email.trim().toLowerCase() !== employee.email.trim().toLowerCase();
+  const previouslySignedInIdentity = Array.isArray(data?.identities) &&
+    data.identities.some(identity => identity?.last_sign_in_at);
   const existingConfirmedIdentity = Boolean(
-    data.confirmed_at || data.email_confirmed_at || data.phone_confirmed_at || data.last_sign_in_at
+    data?.confirmed_at || data?.email_confirmed_at || data?.phone_confirmed_at ||
+    data?.last_sign_in_at || previouslySignedInIdentity
   );
-  if (mismatchedEmail || existingConfirmedIdentity) {
+  if (missingIdentity || missingEmail || mismatchedEmail || existingConfirmedIdentity) {
     const error = new Error(
-      "Auth returned a confirmed or mismatched account. No employee account link was created. " +
-      "An invitation email may have been sent; do not retry, delete, or relink the identity without an administrator review."
+      "Auth returned an incomplete, confirmed, previously signed-in or mismatched account. " +
+      "No employee account link was created. An invitation email may have been sent; " +
+      "do not retry, delete, or relink the identity without an administrator review."
     );
     error.status = 409;
     throw error;
