@@ -199,6 +199,44 @@ test("existing Auth identity errors from either Supabase status are safe conflic
   }
 });
 
+test("successful Auth response never silently links a confirmed or mismatched identity", async () => {
+  for (const authResult of [
+    { id: "existing-user", email: "ada@example.com", email_confirmed_at: "2026-10-01T00:00:00Z" },
+    { id: "existing-user", email: "ada@example.com", confirmed_at: "2026-10-01T00:00:00Z" },
+    { id: "existing-user", email: "ada@example.com", last_sign_in_at: "2026-10-01T00:00:00Z" },
+    { id: "other-user", email: "different@example.com" }
+  ]) {
+    const calls = installManagerFetch(async (url) => {
+      if (url.includes("/employees?")) return new Response("[]");
+      if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify(authResult));
+      throw new Error("No employee write is allowed after an unsafe Auth response");
+    });
+    const res = responseRecorder();
+    await invitationHandler(request("POST", input()), res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.payload.error, /No employee account link was created/);
+    assert.match(res.payload.error, /may have been sent/);
+    assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
+  }
+});
+
+test("resend does not update employee after a confirmed or mismatched Auth response", async () => {
+  for (const authResult of [
+    { id: "auth-employee-1", email: "ada@example.com", email_confirmed_at: "2026-10-01T00:00:00Z" },
+    { id: "auth-employee-1", email: "different@example.com" }
+  ]) {
+    const calls = installManagerFetch(async url => {
+      if (url.includes("/employees?")) return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
+      if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify(authResult));
+      throw new Error("No employee update is allowed after an unsafe Auth response");
+    });
+    const res = responseRecorder();
+    await resendHandler(request("POST", { id: "employee-1" }), res);
+    assert.equal(res.statusCode, 409);
+    assert.equal(calls.some(call => call.options.method === "PATCH"), false);
+  }
+});
+
 test("a manager edits exactly one employee and can save inactive status", async () => {
   let patchUrl;
   installManagerFetch(async (url, options) => {
