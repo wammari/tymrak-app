@@ -362,7 +362,33 @@ test("resend preserves the employee identity when Auth returns a different user"
   const res = responseRecorder();
   await resendHandler(request('POST', {id:'employee-1'}), res);
   assert.equal(res.statusCode, 409);
+  assert.match(res.payload.error, /may have been sent/i);
+  assert.match(res.payload.error, /do not retry or resend/i);
   assert.equal(calls.some(call => call.options.method === 'PATCH'), false);
+});
+
+test("a failed resend status update warns that an email may already have been sent", async () => {
+  const calls = installManagerFetch(async (url, options) => {
+    if (url.includes("/employees?") && options.method !== "PATCH") {
+      return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
+    }
+    if (url.includes("/auth/v1/invite")) {
+      return new Response(JSON.stringify({ id: "auth-employee-1", email: "ada@example.com" }));
+    }
+    if (options.method === "PATCH") {
+      return new Response(JSON.stringify({ message: "database unavailable" }), { status: 503 });
+    }
+    throw new Error("Unexpected request");
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 500);
+  assert.notEqual(res.payload.success, true);
+  assert.match(res.payload.error, /invitation may have been sent/i);
+  assert.match(res.payload.error, /Do not retry or resend/i);
+  assert.doesNotMatch(res.payload.error, /database unavailable/i);
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/invite")).length, 1);
+  assert.equal(calls.filter(call => call.options.method === "PATCH").length, 1);
 });
 
 test("a concurrent activation cannot be overwritten by the resend status update", async () => {
@@ -379,6 +405,7 @@ test("a concurrent activation cannot be overwritten by the resend status update"
   await resendHandler(request('POST', {id:'employee-1'}), res);
   assert.equal(res.statusCode, 500);
   assert.notEqual(res.payload.success, true);
+  assert.match(res.payload.error, /Do not retry or resend/i);
 });
 
 test("server credentials never appear in Manager Portal browser code", () => {
