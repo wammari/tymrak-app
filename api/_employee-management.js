@@ -134,5 +134,20 @@ export async function sendActivationInvite(configuration, employee) {
     throw error;
   }
   if (!data?.id) throw new Error("Invitation returned no authentication user ID");
+  // Auth normally rejects invitations for confirmed users. Defend against an
+  // unexpected successful response rather than silently linking that identity.
+  const mismatchedEmail = typeof data.email === "string" &&
+    data.email.trim().toLowerCase() !== employee.email.trim().toLowerCase();
+  const existingConfirmedIdentity = Boolean(
+    data.confirmed_at || data.email_confirmed_at || data.phone_confirmed_at || data.last_sign_in_at
+  );
+  if (mismatchedEmail || existingConfirmedIdentity) {
+    const error = new Error(
+      "Auth returned a confirmed or mismatched account. No employee account link was created. " +
+      "An invitation email may have been sent; do not retry, delete, or relink the identity without an administrator review."
+    );
+    error.status = 409;
+    throw error;
+  }
   return data;
 }
