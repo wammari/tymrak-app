@@ -132,7 +132,7 @@ test("a manager can list employees", async () => {
 test("a manager can create an active employee and send an invitation", async () => {
   const calls = installManagerFetch(async (url, options) => {
     if (url.includes("/employees?") && options.method !== "POST") return new Response("[]");
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1" }));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1", email: "ada@example.com" }));
     if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
       const body = JSON.parse(options.body);
       assert.equal(body.is_active, true);
@@ -220,6 +220,48 @@ test("successful Auth response never silently links a confirmed or mismatched id
   }
 });
 
+test("incomplete Auth responses or nested prior sign-ins never create employee links", async () => {
+  for (const authResult of [
+    { id: "auth-employee-1" },
+    { email: "ada@example.com" },
+    { id: "auth-employee-1", email: "" },
+    { id: "auth-employee-1", email: "ada@example.com",
+      identities: [{ provider: "email", last_sign_in_at: "2026-10-01T00:00:00Z" }] }
+  ]) {
+    const calls = installManagerFetch(async (url) => {
+      if (url.includes("/employees?")) return new Response("[]");
+      if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify(authResult));
+      throw new Error("No employee write allowed after ambiguous Auth response");
+    });
+    const res = responseRecorder();
+    await invitationHandler(request("POST", input()), res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.payload.error, /may have been sent/);
+    assert.equal(calls.some(call => call.options.method === "POST" &&
+      call.url.endsWith("/rest/v1/employees")), false);
+  }
+});
+
+test("resend fails closed on missing Auth email or nested prior sign-in", async () => {
+  for (const authResult of [
+    { id: "auth-employee-1" },
+    { id: "auth-employee-1", email: "ada@example.com",
+      identities: [{ last_sign_in_at: "2026-10-01T00:00:00Z" }] }
+  ]) {
+    const calls = installManagerFetch(async url => {
+      if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
+        auth_user_id: "auth-employee-1"
+      })]));
+      if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify(authResult));
+      throw new Error("No status update allowed after ambiguous Auth response");
+    });
+    const res = responseRecorder();
+    await resendHandler(request("POST", { id: "employee-1" }), res);
+    assert.equal(res.statusCode, 409);
+    assert.equal(calls.some(call => call.options.method === "PATCH"), false);
+  }
+});
+
 test("resend does not update employee after a confirmed or mismatched Auth response", async () => {
   for (const authResult of [
     { id: "auth-employee-1", email: "ada@example.com", email_confirmed_at: "2026-10-01T00:00:00Z" },
@@ -265,7 +307,7 @@ test("resending an invitation updates by ID and never creates an employee", asyn
     if (url.includes("/employees?id=eq.employee-1") && !options.method) {
       return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
     }
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1" }));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1", email: "ada@example.com" }));
     if (url.includes("/employees?id=eq.employee-1") && options.method === "PATCH") {
       assert.match(url, /auth_user_id=eq\.auth-employee-1/);
       assert.match(url, /activated_at=is\.null/);
@@ -313,7 +355,7 @@ test("invitation creation never reports success for missing, ambiguous or incorr
   for (const saved of [[], {}, [employee(), employee()], [employee({auth_user_id:'different-user'})]]) {
     installManagerFetch(async (url, options) => {
       if (url.includes('/employees?')) return new Response('[]');
-      if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1'}));
+      if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1',email:'ada@example.com'}));
       if (options.method === 'POST') return new Response(JSON.stringify(saved));
       throw new Error('Unexpected request');
     });
@@ -327,7 +369,7 @@ test("invitation creation never reports success for missing, ambiguous or incorr
 test("an invitation sent before a failed employee write requires reconciliation, never blind retry", async () => {
   const calls = installManagerFetch(async (url, options) => {
     if (url.includes("/employees?")) return new Response("[]");
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({id:"auth-employee-1"}));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({id:"auth-employee-1",email:"ada@example.com"}));
     if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
       return new Response(JSON.stringify({message:"database temporarily unavailable"}), {status:503});
     }
@@ -356,7 +398,7 @@ test("an unlinked employee cannot receive a misleading resend", async () => {
 test("resend preserves the employee identity when Auth returns a different user", async () => {
   const calls = installManagerFetch(async url => {
     if (url.includes('/employees?')) return new Response(JSON.stringify([employee({auth_user_id:'original-user'})]));
-    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'different-user'}));
+    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'different-user',email:'ada@example.com'}));
     throw new Error('Unexpected request');
   });
   const res = responseRecorder();
@@ -393,7 +435,7 @@ test("a failed resend status update warns that an email may already have been se
 
 test("a concurrent activation cannot be overwritten by the resend status update", async () => {
   installManagerFetch(async (url, options) => {
-    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1'}));
+    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1',email:'ada@example.com'}));
     if (options.method === 'PATCH') {
       assert.match(url, /activated_at=is\.null/);
       assert.match(url, /invitation_status=neq\.Account%20Activated/);
