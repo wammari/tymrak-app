@@ -18,7 +18,7 @@ test("production invitations target the password setup page, never the portal ho
       assert.equal(target.pathname, "/auth/v1/invite");
       assert.equal(target.searchParams.get("redirect_to"), "https://app.tymrak.com/activate.html");
       assert.equal(options.method, "POST");
-      return new Response(JSON.stringify({ id: "11111111-1111-4111-8111-111111111111" }), {
+      return new Response(JSON.stringify({ id: "11111111-1111-4111-8111-111111111111", email: "unused-test@example.com", email_confirmed_at: null, last_sign_in_at: null, identities: [] }), {
         status: 200, headers: { "Content-Type": "application/json" }
       });
     };
