@@ -87,7 +87,7 @@ const script=html.match(/<script type="module">([\s\S]*?)<\/script>/)[1]
   .replace(/import \{ createClient \} from\s*"[^"]+";/,"")
   .replace(/import \{ loadSupabaseConfiguration \} from "[^"]+";/,"");
 async function page({hash="#type=invite&access_token=invite-token&refresh_token=refresh",search="",failures=0,setError=null,userMismatch=false,updateError=null,sessionMissing=false}={}) {
-  const elements=Object.fromEntries(["activationForm","activateButton","message","password","confirmPassword","passwordFields","activationDescription"]
+  const elements=Object.fromEntries(["activationForm","activateButton","message","password","confirmPassword","passwordFields","activationDescription","portalLink"]
     .map(id=>[id,{style:{},value:"correct-password",disabled:false,hidden:false,textContent:"",
       addEventListener(_,fn){this.submit=fn;}}]));
   let saves=0,completions=0,sets=0,verifies=0,config;
