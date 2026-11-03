@@ -143,6 +143,18 @@ export async function sendActivationInvite(configuration, employee) {
     error.status = 409;
     throw error;
   }
+  const responseIdentityUnsafe = Boolean(
+    data?.confirmed_at || data?.email_confirmed_at || data?.phone_confirmed_at ||
+    data?.last_sign_in_at ||
+    (Array.isArray(data?.identities) && data.identities.some(identity => identity?.last_sign_in_at)) ||
+    (typeof data?.email === "string" && data.email.trim() &&
+      data.email.trim().toLowerCase() !== employee.email.trim().toLowerCase())
+  );
+  if (responseIdentityUnsafe) {
+    const error = new Error("Auth returned a confirmed, previously signed-in or mismatched account. No employee account link was created. An invitation email may have been sent; administrator review required.");
+    error.status = 409;
+    throw error;
+  }
   const verify = await fetch(`${configuration.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
     headers: databaseHeaders(configuration.secretKey)
   });
