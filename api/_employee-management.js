@@ -133,27 +133,41 @@ export async function sendActivationInvite(configuration, employee) {
     error.status = alreadyRegistered ? 409 : response.status;
     throw error;
   }
-  // A successful invite can already have sent an email. Never create a
-  // profile from an incomplete or ambiguous Auth response: the server must
-  // explicitly identify the recipient, not merely return an account ID.
-  const missingIdentity = typeof data?.id !== "string" || !data.id;
-  const missingEmail = typeof data?.email !== "string" || !data.email.trim();
-  const mismatchedEmail = !missingEmail &&
-    data.email.trim().toLowerCase() !== employee.email.trim().toLowerCase();
-  const previouslySignedInIdentity = Array.isArray(data?.identities) &&
-    data.identities.some(identity => identity?.last_sign_in_at);
-  const existingConfirmedIdentity = Boolean(
-    data?.confirmed_at || data?.email_confirmed_at || data?.phone_confirmed_at ||
-    data?.last_sign_in_at || previouslySignedInIdentity
-  );
-  if (missingIdentity || missingEmail || mismatchedEmail || existingConfirmedIdentity) {
+  // The invite endpoint may return a partial user representation even when
+  // the invitation has been issued. Verify against the authoritative admin
+  // user record before deciding whether it is safe to create an employee.
+  // Never use an email-only lookup, and never infer identity from the request.
+  const id = typeof data?.id === "string" ? data.id : "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    const error = new Error("Auth invitation returned no verifiable user identity. An invitation may have been sent; administrator review required.");
+    error.status = 409;
+    throw error;
+  }
+  const verify = await fetch(`${configuration.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
+    headers: databaseHeaders(configuration.secretKey)
+  });
+  const verified = verify.ok ? await verify.json().catch(() => null) : null;
+  const normalizedEmail = typeof verified?.email === "string" ? verified.email.trim().toLowerCase() : "";
+  const metadata = verified?.user_metadata || {};
+  const priorIdentitySignIn = Array.isArray(verified?.identities) &&
+    verified.identities.some(identity => identity?.last_sign_in_at);
+  const safe = verified?.id === id &&
+    normalizedEmail === employee.email.trim().toLowerCase() &&
+    Boolean(verified.invited_at) &&
+    !verified.confirmed_at && !verified.email_confirmed_at &&
+    !verified.phone_confirmed_at && !verified.last_sign_in_at &&
+    !priorIdentitySignIn &&
+    metadata.first_name === employee.firstName &&
+    metadata.last_name === employee.lastName &&
+    metadata.username === employee.username;
+  if (!safe) {
     const error = new Error(
-      "Auth returned an incomplete, confirmed, previously signed-in or mismatched account. " +
+      "Auth invitation identity could not be verified as a new, unconfirmed invited account. " +
       "No employee account link was created. An invitation email may have been sent; " +
       "do not retry, delete, or relink the identity without an administrator review."
     );
     error.status = 409;
     throw error;
   }
-  return data;
+  return verified;
 }
