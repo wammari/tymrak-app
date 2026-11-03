@@ -139,15 +139,15 @@ test("a manager can list employees", async () => {
 test("a manager can create an active employee and send an invitation", async () => {
   const calls = installManagerFetch(async (url, options) => {
     if (url.includes("/employees?") && options.method !== "POST") return new Response("[]");
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1", email: "ada@example.com" }));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com" }));
     if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
       const body = JSON.parse(options.body);
       assert.equal(body.is_active, true);
       assert.equal(body.mobile, "+1 403 555 0100");
       assert.equal(body.hire_date, "2026-10-01");
-      assert.equal(body.auth_user_id, "auth-employee-1");
+      assert.equal(body.auth_user_id, "11111111-1111-4111-8111-111111111111");
       assert.equal(body.invitation_status, "Invitation Sent");
-      return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
+      return new Response(JSON.stringify([employee({ auth_user_id: "11111111-1111-4111-8111-111111111111" })]));
     }
     throw new Error(`Unexpected URL ${url}`);
   });
@@ -229,10 +229,10 @@ test("successful Auth response never silently links a confirmed or mismatched id
 
 test("incomplete Auth responses or nested prior sign-ins never create employee links", async () => {
   for (const authResult of [
-    { id: "auth-employee-1" },
+    { id: "11111111-1111-4111-8111-111111111111" },
     { email: "ada@example.com" },
-    { id: "auth-employee-1", email: "" },
-    { id: "auth-employee-1", email: "ada@example.com",
+    { id: "11111111-1111-4111-8111-111111111111", email: "" },
+    { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com",
       identities: [{ provider: "email", last_sign_in_at: "2026-10-01T00:00:00Z" }] }
   ]) {
     const calls = installManagerFetch(async (url) => {
@@ -251,13 +251,13 @@ test("incomplete Auth responses or nested prior sign-ins never create employee l
 
 test("resend fails closed on missing Auth email or nested prior sign-in", async () => {
   for (const authResult of [
-    { id: "auth-employee-1" },
-    { id: "auth-employee-1", email: "ada@example.com",
+    { id: "11111111-1111-4111-8111-111111111111" },
+    { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com",
       identities: [{ last_sign_in_at: "2026-10-01T00:00:00Z" }] }
   ]) {
     const calls = installManagerFetch(async url => {
       if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
-        auth_user_id: "auth-employee-1"
+        auth_user_id: "11111111-1111-4111-8111-111111111111"
       })]));
       if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify(authResult));
       throw new Error("No status update allowed after ambiguous Auth response");
@@ -271,11 +271,11 @@ test("resend fails closed on missing Auth email or nested prior sign-in", async 
 
 test("resend does not update employee after a confirmed or mismatched Auth response", async () => {
   for (const authResult of [
-    { id: "auth-employee-1", email: "ada@example.com", email_confirmed_at: "2026-10-01T00:00:00Z" },
-    { id: "auth-employee-1", email: "different@example.com" }
+    { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com", email_confirmed_at: "2026-10-01T00:00:00Z" },
+    { id: "11111111-1111-4111-8111-111111111111", email: "different@example.com" }
   ]) {
     const calls = installManagerFetch(async url => {
-      if (url.includes("/employees?")) return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
+      if (url.includes("/employees?")) return new Response(JSON.stringify([employee({ auth_user_id: "11111111-1111-4111-8111-111111111111" })]));
       if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify(authResult));
       throw new Error("No employee update is allowed after an unsafe Auth response");
     });
@@ -312,11 +312,11 @@ test("a manager edits exactly one employee and can save inactive status", async 
 test("resending an invitation updates by ID and never creates an employee", async () => {
   const calls = installManagerFetch(async (url, options) => {
     if (url.includes("/employees?id=eq.employee-1") && !options.method) {
-      return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
+      return new Response(JSON.stringify([employee({ auth_user_id: "11111111-1111-4111-8111-111111111111" })]));
     }
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "auth-employee-1", email: "ada@example.com" }));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com" }));
     if (url.includes("/employees?id=eq.employee-1") && options.method === "PATCH") {
-      assert.match(url, /auth_user_id=eq\.auth-employee-1/);
+      assert.match(url, /auth_user_id=eq\.11111111-1111-4111-8111-111111111111/);
       assert.match(url, /activated_at=is\.null/);
       assert.match(url, /invitation_status=neq\.Account%20Activated/);
       return new Response(JSON.stringify([employee()]));
@@ -362,7 +362,7 @@ test("invitation creation never reports success for missing, ambiguous or incorr
   for (const saved of [[], {}, [employee(), employee()], [employee({auth_user_id:'different-user'})]]) {
     installManagerFetch(async (url, options) => {
       if (url.includes('/employees?')) return new Response('[]');
-      if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1',email:'ada@example.com'}));
+      if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'11111111-1111-4111-8111-111111111111',email:'ada@example.com'}));
       if (options.method === 'POST') return new Response(JSON.stringify(saved));
       throw new Error('Unexpected request');
     });
@@ -376,7 +376,7 @@ test("invitation creation never reports success for missing, ambiguous or incorr
 test("an invitation sent before a failed employee write requires reconciliation, never blind retry", async () => {
   const calls = installManagerFetch(async (url, options) => {
     if (url.includes("/employees?")) return new Response("[]");
-    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({id:"auth-employee-1",email:"ada@example.com"}));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({id:"11111111-1111-4111-8111-111111111111",email:"ada@example.com"}));
     if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
       return new Response(JSON.stringify({message:"database temporarily unavailable"}), {status:503});
     }
@@ -419,10 +419,10 @@ test("resend preserves the employee identity when Auth returns a different user"
 test("a failed resend status update warns that an email may already have been sent", async () => {
   const calls = installManagerFetch(async (url, options) => {
     if (url.includes("/employees?") && options.method !== "PATCH") {
-      return new Response(JSON.stringify([employee({ auth_user_id: "auth-employee-1" })]));
+      return new Response(JSON.stringify([employee({ auth_user_id: "11111111-1111-4111-8111-111111111111" })]));
     }
     if (url.includes("/auth/v1/invite")) {
-      return new Response(JSON.stringify({ id: "auth-employee-1", email: "ada@example.com" }));
+      return new Response(JSON.stringify({ id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com" }));
     }
     if (options.method === "PATCH") {
       return new Response(JSON.stringify({ message: "database unavailable" }), { status: 503 });
@@ -442,13 +442,13 @@ test("a failed resend status update warns that an email may already have been se
 
 test("a concurrent activation cannot be overwritten by the resend status update", async () => {
   installManagerFetch(async (url, options) => {
-    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'auth-employee-1',email:'ada@example.com'}));
+    if (url.includes('/auth/v1/invite')) return new Response(JSON.stringify({id:'11111111-1111-4111-8111-111111111111',email:'ada@example.com'}));
     if (options.method === 'PATCH') {
       assert.match(url, /activated_at=is\.null/);
       assert.match(url, /invitation_status=neq\.Account%20Activated/);
       return new Response('[]'); // PostgREST finds no row after concurrent activation.
     }
-    return new Response(JSON.stringify([employee({auth_user_id:'auth-employee-1'})]));
+    return new Response(JSON.stringify([employee({auth_user_id:'11111111-1111-4111-8111-111111111111'})]));
   });
   const res = responseRecorder();
   await resendHandler(request('POST', {id:'employee-1'}), res);
