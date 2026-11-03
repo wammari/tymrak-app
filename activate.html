@@ -306,7 +306,10 @@ form.addEventListener("submit", async event => {
         }
         await completeActivation();
         form.style.display = "none";
-        showMessage("success", "✓ Account activated successfully! Your TYMRAK account is ready.");\n        const portalLink = document.getElementById("portalLink");\n        portalLink.hidden = false;\n        portalLink.style.display = "block";
+        showMessage("success", "✓ Account activated successfully! Your TYMRAK account is ready.");
+        const portalLink = document.getElementById("portalLink");
+        portalLink.hidden = false;
+        portalLink.style.display = "block";
     } catch (error) {
         const detail = error?.message || "Unable to activate your account.";
         showMessage("error", passwordSaved ?
