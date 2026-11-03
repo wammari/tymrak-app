@@ -158,6 +158,29 @@ test("a manager can create an active employee and send an invitation", async () 
   assert.equal(calls.filter(call => call.url.includes("/auth/v1/invite")).length, 1);
 });
 
+test("partial successful Auth invite is linked only after authoritative verification", async () => {
+  const calls = installManagerFetch(async (url, options) => {
+    if (url.includes("/employees?") && options.method !== "POST") return new Response("[]");
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({
+      id: "11111111-1111-4111-8111-111111111111"
+    }));
+    if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
+      const body = JSON.parse(options.body);
+      assert.equal(body.auth_user_id, "11111111-1111-4111-8111-111111111111");
+      return new Response(JSON.stringify([employee({ auth_user_id: body.auth_user_id })]));
+    }
+    throw new Error(`Unexpected URL ${url}`);
+  });
+  const res = responseRecorder();
+  await invitationHandler(request("POST", input()), res);
+  assert.equal(res.statusCode, 201);
+  assert.equal(res.payload.success, true);
+  const inviteIndex = calls.findIndex(call => call.url.includes("/auth/v1/invite"));
+  const verifyIndex = calls.findIndex(call => call.url.includes("/auth/v1/admin/users/"));
+  const saveIndex = calls.findIndex(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees"));
+  assert.ok(inviteIndex >= 0 && verifyIndex > inviteIndex && saveIndex > verifyIndex);
+});
+
 for (const duplicateField of ["email", "username"]) {
   test(`duplicate ${duplicateField} is rejected before an invitation is sent`, async () => {
     const calls = installManagerFetch(async url => {
