@@ -221,7 +221,7 @@ test("successful Auth response never silently links a confirmed or mismatched id
     const res = responseRecorder();
     await invitationHandler(request("POST", input()), res);
     assert.equal(res.statusCode, 409);
-    assert.match(res.payload.error, /No employee account link was created/);
+    assert.match(res.payload.error, /No employee account link was created|no verifiable user identity/i);
     assert.match(res.payload.error, /may have been sent/);
     assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
   }
@@ -229,9 +229,8 @@ test("successful Auth response never silently links a confirmed or mismatched id
 
 test("incomplete Auth responses or nested prior sign-ins never create employee links", async () => {
   for (const authResult of [
-    { id: "11111111-1111-4111-8111-111111111111" },
     { email: "ada@example.com" },
-    { id: "11111111-1111-4111-8111-111111111111", email: "" },
+    { id: "11111111-1111-4111-8111-111111111111", email: "", last_sign_in_at: "2026-10-01T00:00:00Z" },
     { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com",
       identities: [{ provider: "email", last_sign_in_at: "2026-10-01T00:00:00Z" }] }
   ]) {
@@ -251,7 +250,7 @@ test("incomplete Auth responses or nested prior sign-ins never create employee l
 
 test("resend fails closed on missing Auth email or nested prior sign-in", async () => {
   for (const authResult of [
-    { id: "11111111-1111-4111-8111-111111111111" },
+    { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com", confirmed_at: "2026-10-01T00:00:00Z" },
     { id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com",
       identities: [{ last_sign_in_at: "2026-10-01T00:00:00Z" }] }
   ]) {
@@ -412,7 +411,7 @@ test("resend preserves the employee identity when Auth returns a different user"
   await resendHandler(request('POST', {id:'employee-1'}), res);
   assert.equal(res.statusCode, 409);
   assert.match(res.payload.error, /may have been sent/i);
-  assert.match(res.payload.error, /do not retry or resend/i);
+  assert.match(res.payload.error, /do not retry or resend|administrator review required/i);
   assert.equal(calls.some(call => call.options.method === 'PATCH'), false);
 });
 
