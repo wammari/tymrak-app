@@ -93,7 +93,7 @@ button:disabled {
     color: #a32020;
 }
 
-.password-note {
+.portal-link { display: none; margin-top: 18px; padding: 14px; border-radius: 8px; background: #351b0c; color: #fff; font-weight: bold; text-align: center; text-decoration: none; }\n.portal-link:focus-visible { outline: 3px solid #c99539; outline-offset: 3px; }\n.password-note {
     font-size: 13px;
     color: #666;
     margin-top: 7px;
@@ -306,7 +306,7 @@ form.addEventListener("submit", async event => {
         }
         await completeActivation();
         form.style.display = "none";
-        showMessage("success", "✓ Account activated successfully! Your TYMRAK account is ready.");
+        showMessage("success", "✓ Account activated successfully! Your TYMRAK account is ready.");\n        const portalLink = document.getElementById("portalLink");\n        portalLink.hidden = false;\n        portalLink.style.display = "block";
     } catch (error) {
         const detail = error?.message || "Unable to activate your account.";
         showMessage("error", passwordSaved ?
