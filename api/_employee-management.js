@@ -146,7 +146,7 @@ export async function sendActivationInvite(configuration, employee) {
   const responseIdentityUnsafe = Boolean(
     data?.confirmed_at || data?.email_confirmed_at || data?.phone_confirmed_at ||
     data?.last_sign_in_at ||
-    (Array.isArray(data?.identities) && data.identities.some(identity => identity?.last_sign_in_at)) ||
+    (Array.isArray(data?.identities) && data.identities.some(identity => identity?.last_sign_in_at && (!identity?.created_at || Date.parse(identity.last_sign_in_at) > Date.parse(identity.created_at) + 1000))) ||
     (typeof data?.email === "string" && data.email.trim() &&
       data.email.trim().toLowerCase() !== employee.email.trim().toLowerCase())
   );
@@ -162,7 +162,7 @@ export async function sendActivationInvite(configuration, employee) {
   const normalizedEmail = typeof verified?.email === "string" ? verified.email.trim().toLowerCase() : "";
   const metadata = verified?.user_metadata || {};
   const priorIdentitySignIn = Array.isArray(verified?.identities) &&
-    verified.identities.some(identity => identity?.last_sign_in_at);
+    verified.identities.some(identity => identity?.last_sign_in_at && (!identity?.created_at || Date.parse(identity.last_sign_in_at) > Date.parse(identity.created_at) + 1000));
   const safe = verified?.id === id &&
     normalizedEmail === employee.email.trim().toLowerCase() &&
     Boolean(verified.invited_at) &&
