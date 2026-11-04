@@ -1,9 +1,11 @@
 import { requireManager } from "./_manager-auth.js";
+import {canManageEmployee} from './_manager-scope.js';
 import {
   databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite
 } from "./_employee-management.js";
 
 export default async function handler(req, res) {
+  let inviteIssued = false;
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method not allowed" });
@@ -14,9 +16,10 @@ export default async function handler(req, res) {
     const id = typeof req.body?.id === "string" && /^[A-Za-z0-9-]{1,128}$/.test(req.body.id)
       ? req.body.id : null;
     if (!id) return res.status(400).json({ error: "A valid employee ID is required" });
+    if (!canManageEmployee(authorization, id)) return res.status(404).json({error:'Employee not found'});
     const { supabaseUrl, secretKey } = authorization.configuration;
     const lookup = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
       { headers: databaseHeaders(secretKey) }
     );
     if (!lookup.ok) throw new Error("Employee lookup failed");
@@ -28,12 +31,19 @@ export default async function handler(req, res) {
     if (employee.invitation_status === "Account Activated" || employee.activated_at) {
       return res.status(409).json({ error: "Activated employees cannot be sent another activation invitation" });
     }
-    await sendActivationInvite(authorization.configuration, {
+    if (!employee.auth_user_id) {
+      return res.status(409).json({ error: "This employee's account link needs repair before another invitation can be sent" });
+    }
+    const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
       lastName: employee.last_name, username: employee.username
     });
+    inviteIssued = true;
+    if (invite.id !== employee.auth_user_id) {
+      return res.status(409).json({ error: "The invitation returned a different account. The existing employee account link was preserved. An email may have been sent; do not retry or resend. Contact your administrator to reconcile the account." });
+    }
     const update = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&select=${EMPLOYEE_SELECT}`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&auth_user_id=eq.${encodeURIComponent(employee.auth_user_id)}&activated_at=is.null&invitation_status=neq.Account%20Activated&select=${EMPLOYEE_SELECT}`,
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),
@@ -45,7 +55,12 @@ export default async function handler(req, res) {
     if (!Array.isArray(updated) || updated.length !== 1) throw new Error("Invitation status update was not unique");
     return res.status(200).json({ success: true, message: "Activation invitation resent successfully", employee: updated[0] });
   } catch (error) {
-    console.error("Invitation resend failed", { errorName: error?.name || "Error" });
+    console.error("Invitation resend failed", { errorName: error?.name || "Error", inviteIssued });
+    if (inviteIssued) {
+      return res.status(500).json({
+        error: "An invitation may have been sent, but its employee status could not be verified. Do not retry or resend. Contact your administrator to reconcile the invitation and account link."
+      });
+    }
     return res.status(error?.status >= 400 && error.status < 500 ? error.status : 500)
       .json({ error: error?.status ? error.message : "Unable to resend invitation" });
   }

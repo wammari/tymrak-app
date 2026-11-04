@@ -1,3 +1,4 @@
+import { getSiteUrl } from "./_deployment-config.js";
 export const EMPLOYEE_SELECT = [
   "id", "first_name", "last_name", "email", "username", "mobile",
   "position", "department", "province", "hire_date", "invitation_status",
@@ -20,7 +21,7 @@ export function cleanString(value) {
 export function databaseHeaders(secretKey, prefer) {
   return {
     apikey: secretKey,
-    Authorization: `Bearer ${secretKey}`,
+    ...(secretKey.startsWith("sb_secret_") ? {} : { Authorization: `Bearer ${secretKey}` }),
     "Content-Type": "application/json",
     ...(prefer ? { Prefer: prefer } : {})
   };
@@ -83,14 +84,16 @@ export function toEmployeeRecord(input) {
   };
 }
 
-export async function findDuplicate({ supabaseUrl, secretKey, email, username, excludeId }) {
+export async function findDuplicate({ supabaseUrl, secretKey, organizationId, scopeFilter = '', email, username, excludeId }) {
+  if (!organizationId) throw new Error("Company membership required");
   const headers = databaseHeaders(secretKey);
   const filters = [
     ["email", "eq", email, "email"],
-    ["username", "ilike", username, "username"]
+    // Escape SQL LIKE wildcards so valid usernames containing "_" compare literally.
+    ["username", "ilike", username.replace(/[\\%_]/g, "\\$&"), "username"]
   ];
   for (const [column, operator, value, label] of filters) {
-    let url = `${supabaseUrl}/rest/v1/employees?${column}=${operator}.${encodeURIComponent(value)}&select=id&limit=2`;
+    let url = `${supabaseUrl}/rest/v1/employees?organization_id=eq.${organizationId}${scopeFilter}&${column}=${operator}.${encodeURIComponent(value)}&select=id&limit=2`;
     if (excludeId) url += `&id=neq.${encodeURIComponent(excludeId)}`;
     const response = await fetch(url, { headers });
     if (!response.ok) throw new Error("Employee duplicate check failed");
@@ -102,8 +105,7 @@ export async function findDuplicate({ supabaseUrl, secretKey, email, username, e
 }
 
 export function activationRedirect() {
-  const siteUrl = (process.env.SITE_URL || "https://tymrak.vercel.app").replace(/\/$/, "");
-  return `${siteUrl}/activate.html`;
+  return `${getSiteUrl()}/activate.html`;
 }
 
 export async function sendActivationInvite(configuration, employee) {
@@ -124,10 +126,60 @@ export async function sendActivationInvite(configuration, employee) {
   );
   const data = await response.json().catch(() => ({}));
   if (!response.ok) {
-    const error = new Error(data?.msg || data?.message || "Unable to send activation invitation");
-    error.status = response.status;
+    const alreadyRegistered = [400, 422].includes(response.status) && /already (been )?registered|already exists|user_already_exists/i.test([data?.msg, data?.message, data?.error_description, data?.error, data?.code].filter(Boolean).join(" "));
+    const error = new Error(alreadyRegistered
+      ? "This email already has a sign-in account. No invitation was sent. An administrator must verify account ownership and the employee account link before retrying; do not delete or recreate the account."
+      : (data?.msg || data?.message || "Unable to send activation invitation"));
+    error.status = alreadyRegistered ? 409 : response.status;
     throw error;
   }
-  if (!data?.id) throw new Error("Invitation returned no authentication user ID");
-  return data;
+  // The invite endpoint may return a partial user representation even when
+  // the invitation has been issued. Verify against the authoritative admin
+  // user record before deciding whether it is safe to create an employee.
+  // Never use an email-only lookup, and never infer identity from the request.
+  const id = typeof data?.id === "string" ? data.id : "";
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(id)) {
+    const error = new Error("Auth invitation returned no verifiable user identity. An invitation may have been sent; administrator review required.");
+    error.status = 409;
+    throw error;
+  }
+  const responseIdentityUnsafe = Boolean(
+    data?.confirmed_at || data?.email_confirmed_at || data?.phone_confirmed_at ||
+    data?.last_sign_in_at ||
+    (Array.isArray(data?.identities) && data.identities.some(identity => identity?.last_sign_in_at && (!identity?.created_at || Date.parse(identity.last_sign_in_at) > Date.parse(identity.created_at) + 1000))) ||
+    (typeof data?.email === "string" && data.email.trim() &&
+      data.email.trim().toLowerCase() !== employee.email.trim().toLowerCase())
+  );
+  if (responseIdentityUnsafe) {
+    const error = new Error("Auth returned a confirmed, previously signed-in or mismatched account. No employee account link was created. An invitation email may have been sent; administrator review required.");
+    error.status = 409;
+    throw error;
+  }
+  const verify = await fetch(`${configuration.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(id)}`, {
+    headers: databaseHeaders(configuration.secretKey)
+  });
+  const verified = verify.ok ? await verify.json().catch(() => null) : null;
+  const normalizedEmail = typeof verified?.email === "string" ? verified.email.trim().toLowerCase() : "";
+  const metadata = verified?.user_metadata || {};
+  const priorIdentitySignIn = Array.isArray(verified?.identities) &&
+    verified.identities.some(identity => identity?.last_sign_in_at && (!identity?.created_at || Date.parse(identity.last_sign_in_at) > Date.parse(identity.created_at) + 1000));
+  const safe = verified?.id === id &&
+    normalizedEmail === employee.email.trim().toLowerCase() &&
+    Boolean(verified.invited_at) &&
+    !verified.confirmed_at && !verified.email_confirmed_at &&
+    !verified.phone_confirmed_at && !verified.last_sign_in_at &&
+    !priorIdentitySignIn &&
+    metadata.first_name === employee.firstName &&
+    metadata.last_name === employee.lastName &&
+    metadata.username === employee.username;
+  if (!safe) {
+    const error = new Error(
+      "Auth invitation identity could not be verified as a new, unconfirmed invited account. " +
+      "No employee account link was created. An invitation email may have been sent; " +
+      "do not retry, delete, or relink the identity without an administrator review."
+    );
+    error.status = 409;
+    throw error;
+  }
+  return verified;
 }

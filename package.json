@@ -3,9 +3,15 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "build:cloudflare": "node cloudflare/build-assets.mjs",
+    "check:cloudflare": "wrangler deploy --dry-run --outdir .wrangler/dry-run",
+    "test:cloudflare": "node cloudflare/smoke-test.mjs",
+    "check:cloudflare:production": "wrangler deploy --config wrangler.production.jsonc --dry-run --outdir .wrangler/production-dry-run",
+    "test:cloudflare:production": "node cloudflare/smoke-test.mjs --production"
   },
   "devDependencies": {
-    "@electric-sql/pglite": "0.5.8"
+    "@electric-sql/pglite": "0.5.8",
+    "wrangler": "4.152.0"
   }
 }

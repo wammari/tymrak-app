@@ -7,6 +7,7 @@ import {
 export const validateInvitationInput = validateEmployeeInput;
 
 export default async function handler(req, res) {
+  let inviteIssued = false;
   if (req.method !== "POST") {
     res.setHeader("Allow", "POST");
     return res.status(405).json({ error: "Method not allowed" });
@@ -14,17 +15,20 @@ export default async function handler(req, res) {
   try {
     const authorization = await requireManager(req);
     if (!authorization.ok) return res.status(authorization.status).json({ error: authorization.error });
+    if (authorization.role !== 'admin') return res.status(403).json({error:'Ask your company administrator to add and assign employees to a workplace.'});
     const validation = validateEmployeeInput(req.body);
     if (validation.error) return res.status(400).json({ error: validation.error });
     const { supabaseUrl, secretKey } = authorization.configuration;
     const duplicate = await findDuplicate({
-      supabaseUrl, secretKey, email: validation.input.email, username: validation.input.username
+      supabaseUrl, secretKey, organizationId: authorization.organizationId, email: validation.input.email, username: validation.input.username
     });
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });
 
     const invite = await sendActivationInvite(authorization.configuration, validation.input);
+    inviteIssued = true;
     const employee = {
       ...toEmployeeRecord(validation.input),
+      organization_id: authorization.organizationId,
       auth_user_id: invite.id,
       invitation_status: "Invitation Sent",
       invited_at: new Date().toISOString()
@@ -36,13 +40,22 @@ export default async function handler(req, res) {
     });
     if (!response.ok) throw new Error("Employee record could not be saved after invitation");
     const records = await response.json();
+    if (!Array.isArray(records) || records.length !== 1 || !records[0]?.id ||
+        records[0].auth_user_id !== invite.id) {
+      throw new Error("Invited employee record was not saved with the expected identity");
+    }
     return res.status(201).json({
       success: true,
       message: "Employee added and activation invitation sent successfully",
-      employee: records?.[0] || null
+      employee: records[0]
     });
   } catch (error) {
-    console.error("TYMRAK invitation operation failed", { errorName: error?.name || "Error" });
+    console.error("TYMRAK invitation operation failed", { errorName: error?.name || "Error", inviteIssued });
+    if (inviteIssued) {
+      return res.status(500).json({
+        error: "An invitation may have been sent, but the employee profile could not be verified. Do not retry or resend. Contact your administrator to reconcile the invitation and account link."
+      });
+    }
     return res.status(error?.status >= 400 && error.status < 500 ? error.status : 500)
       .json({ error: error?.status ? error.message : "Unable to add employee" });
   }

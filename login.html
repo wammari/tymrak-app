@@ -11,7 +11,7 @@
 
 body {
     font-family: Arial, sans-serif;
-    background: #fff8ed;
+    background: #fbf8f3;
     margin: 0;
     padding: 30px 20px;
 }
@@ -26,19 +26,19 @@ body {
 }
 
 h1 {
-    color: #1b120e;
+    color: #351b0c;
     margin-bottom: 4px;
     font-size: 36px;
 }
 
 .tagline {
-    color: #b78b46;
+    color: #8d5316;
     font-weight: bold;
     margin-bottom: 38px;
 }
 
 h2 {
-    color: #1b120e;
+    color: #351b0c;
     margin-bottom: 8px;
 }
 
@@ -64,15 +64,15 @@ input {
 }
 
 input:focus {
-    outline: 2px solid #b78b46;
-    border-color: #b78b46;
+    outline: 2px solid #8d5316;
+    border-color: #8d5316;
 }
 
 button {
     width: 100%;
     padding: 15px;
     margin-top: 26px;
-    background: #1b120e;
+    background: #351b0c;
     color: white;
     border: 0;
     border-radius: 8px;
@@ -112,30 +112,20 @@ button:disabled {
 }
 
 .forgot a {
-    color: #b78b46;
+    color: #8d5316;
     text-decoration: none;
 }
 
-
-/* TYMRAK approved warm brand styling; login behavior unchanged */
-body{background:radial-gradient(circle at 90% 10%,rgba(239,189,100,.24),transparent 36%),linear-gradient(135deg,#fff8ed,#efdfc7)!important;color:#2c1b12}
-.card{border:1px solid #e7d5b8!important;box-shadow:0 18px 50px rgba(52,34,25,.13)!important}
-button[type=submit],.btn-primary{background:#1b120e!important;color:#fff8ed!important}
-button[type=submit]:hover,.btn-primary:hover{background:#8d6332!important}
-a{color:#795323}
 </style>
 
+<meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css">
 </head>
 
-<body>
+<body class="auth-page">
 
 <div class="card">
 
-<h1>TYMRAK</h1>
-
-<div class="tagline">
-TIME. TRACKED RIGHT.
-</div>
+<span class="tymrak-brand-mark"><img src="/tymrak-brand-board.png" alt="TYMRAK — Time. Tracked Right." width="1536" height="1024"></span>
 
 <h2>Employee Login</h2>
 
@@ -191,12 +181,15 @@ Sign In
 
 
 <script type="module">
+import { loadSupabaseConfiguration } from "./supabase-config.js";
+const deploymentConfiguration = await loadSupabaseConfiguration();
+const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
+const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
 
-const SUPABASE_URL =
-    "https://tsosredghislnehfyypi.supabase.co";
 
-const SUPABASE_PUBLISHABLE_KEY =
-    "sb_publishable_u3i0ktj9UjpwUWkEF4sfcg_WZjWo0w6";
+
+
+
 
 
 import { createClient } from
@@ -309,7 +302,7 @@ form.addEventListener(
 
             showMessage(
                 "error",
-                (error.message === "Invalid login credentials" ? "Email or password not recognized. Check the email used for your TYMRAK invitation, or select Forgot password to set a new password." : error.message) ||
+                error.message ||
                 "Unable to sign in."
             );
 
@@ -355,7 +348,7 @@ document.getElementById(
                         email,
                         {
                             redirectTo:
-                                "https://app.tymrak.com/reset-password.html"
+                                new URL("/reset-password.html", deploymentConfiguration.siteUrl).href
                         }
                     );
 

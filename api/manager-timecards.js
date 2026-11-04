@@ -1,4 +1,6 @@
 import { requireManager } from "./_manager-auth.js";
+import { databaseRows } from "./_database-pages.js";
+import {employeeScopeFilter} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES, calculationStart, getCurrentPayPeriod, getPayPeriod, getPayPeriodDateKeys, periodFromKey, summarizeEmployee } from "./_manager-timecards.js";
 
@@ -19,8 +21,10 @@ async function safeSupabaseError(response) {
 }
 
 async function query({ url, secretKey, stage, resource, queryName }) {
-  const response = await fetch(url, { headers: databaseHeaders(secretKey) });
-  if (!response.ok) {
+  try { return await databaseRows(url, databaseHeaders(secretKey)); }
+  catch (failure) {
+    const response = failure.response;
+    if (!response) throw failure;
     const details = await safeSupabaseError(response);
     console.error("Manager timecard Supabase request failed", {
       stage,
@@ -33,16 +37,6 @@ async function query({ url, secretKey, stage, resource, queryName }) {
     error.diagnosticLogged = true;
     throw error;
   }
-  const value = await response.json();
-  if (!Array.isArray(value)) {
-    console.error("Manager timecard Supabase response was invalid", {
-      stage, resource, query: queryName, status: response.status
-    });
-    const error = new Error("Manager timecard query returned invalid data");
-    error.diagnosticLogged = true;
-    throw error;
-  }
-  return value;
 }
 
 export default async function handler(req, res) {
@@ -58,7 +52,7 @@ export default async function handler(req, res) {
     const { startKey, endKey } = getPayPeriodDateKeys(period);
 
     const employees = await query({
-      url: `${supabaseUrl}/rest/v1/employees?is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc`,
+      url: `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}${employeeScopeFilter(authorization)}&is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc,id.asc`,
       secretKey, stage: "employees_query", resource: "employees",
       queryName: "active_employee_timecard_fields"
     });
@@ -81,7 +75,7 @@ export default async function handler(req, res) {
       })) + 24 * 60 * 60 * 1000;
       const ids = `(${employeeIds.map(id => `"${String(id).replaceAll('"', '')}"`).join(",")})`;
       punches = await query({
-        url: `${supabaseUrl}/rest/v1/punches?employee_id=in.${encodeURIComponent(ids)}&punched_at=gte.${encodeURIComponent(new Date(earliest).toISOString())}&punched_at=lte.${encodeURIComponent(new Date(latest).toISOString())}&select=id,employee_id,punch_type,punched_at,location_name&order=punched_at.asc`,
+        url: `${supabaseUrl}/rest/v1/punches?employee_id=in.${encodeURIComponent(ids)}&punched_at=gte.${encodeURIComponent(new Date(earliest).toISOString())}&punched_at=lte.${encodeURIComponent(new Date(latest).toISOString())}&select=id,employee_id,punch_type,punched_at,location_name&order=punched_at.asc,id.asc`,
         secretKey, stage: "punches_query", resource: "punches",
         queryName: "employee_period_punches"
       });

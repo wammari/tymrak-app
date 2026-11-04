@@ -1,0 +1,16 @@
+{
+  "git": {
+    "deploymentEnabled": {
+      "fix/basic-clock-release": false,
+      "feature/manual-geofencing": false,
+      "feature/company-isolation": false,
+      "feature/cloudflare-free-hosting": false,
+      "feature/workplace-address-search": false,
+      "feature/brown-gold-brand": false,
+      "ops/production-backup": false,
+      "release/database-rehearsal": false,
+      "release/production-preparation": false,
+      "release/customer-candidate": false
+    }
+  }
+}
