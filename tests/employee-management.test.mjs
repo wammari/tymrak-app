@@ -47,7 +47,7 @@ function input(overrides = {}) {
   };
 }
 
-function installManagerFetch(operation) {
+function installManagerFetch(operation, authIdentity = null) {
   const calls = [];
   global.fetch = async (url, options = {}) => {
     calls.push({ url: String(url), options });
@@ -56,7 +56,7 @@ function installManagerFetch(operation) {
     }
     if (String(url).includes("/auth/v1/admin/users/")) {
       const id = decodeURIComponent(String(url).split("/").pop());
-      return new Response(JSON.stringify({
+      return new Response(JSON.stringify(authIdentity || {
         id, email: "ada@example.com", invited_at: "2026-11-03T12:00:00Z",
         user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
       }));
@@ -170,18 +170,11 @@ test("fresh Supabase email identity timestamp is not mistaken for a prior sign-i
       return new Response(JSON.stringify([employee()]));
     }
     throw new Error(`Unexpected URL ${url}`);
+  }, {
+    id: "11111111-1111-4111-8111-111111111111",
+    email: "ada@example.com", invited_at: created, identities: [identity],
+    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
   });
-  const previousFetch = global.fetch;
-  global.fetch = async (url, options) => {
-    if (String(url).includes("/auth/v1/admin/users/")) {
-      return new Response(JSON.stringify({
-        id: "11111111-1111-4111-8111-111111111111",
-        email: "ada@example.com", invited_at: created, identities: [identity],
-        user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
-      }));
-    }
-    return previousFetch(url, options);
-  };
   const res = responseRecorder();
   await invitationHandler(request("POST", input()), res);
   assert.equal(res.statusCode, 201);
