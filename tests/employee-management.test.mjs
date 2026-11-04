@@ -167,7 +167,7 @@ test("fresh Supabase email identity timestamp is not mistaken for a prior sign-i
       id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com", identities: [identity]
     }));
     if (url.endsWith("/rest/v1/employees") && options.method === "POST") {
-      return new Response(JSON.stringify([employee()]));
+      return new Response(JSON.stringify([employee({ auth_user_id: "11111111-1111-4111-8111-111111111111" })]));
     }
     throw new Error(`Unexpected URL ${url}`);
   }, {
