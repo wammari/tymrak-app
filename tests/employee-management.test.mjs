@@ -177,7 +177,7 @@ test("fresh Supabase email identity timestamp is not mistaken for a prior sign-i
   });
   const res = responseRecorder();
   await invitationHandler(request("POST", input()), res);
-  assert.equal(res.statusCode, 201);
+  assert.equal(res.statusCode, 201, JSON.stringify(res.payload));
   assert.ok(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")));
 });
 
