@@ -18,7 +18,7 @@ export default function handler(req, res) {
   if ((env.VERCEL || env.VERCEL_ENV) && env.APP_ENV === "development") return fail("hosted_development_conflict");
   let parsed;
   try { parsed = new URL(env.SUPABASE_URL || ""); } catch { return fail("supabase_url_invalid"); }
-  if (parsed.protocol !== "https:" || !/^([a-z0-9]+)\\.supabase\\.co$/.test(parsed.hostname) ||
+  if (parsed.protocol !== "https:" || !parsed.hostname.split(".").length !== 3 || parsed.hostname.split(".")[1] !== "supabase" || parsed.hostname.split(".")[2] !== "co" || !/^[a-z0-9]+$/.test(parsed.hostname.split(".")[0]) ||
       parsed.username || parsed.password || parsed.search || parsed.hash ||
       !["", "/"].includes(parsed.pathname) || parsed.port) return fail("supabase_url_invalid");
   const actualRef = parsed.hostname.split(".")[0];
