@@ -92,9 +92,9 @@ def run(args, name, readonly=False, capture=False, output_path=None):
             import re
             private_log = PRIVATE / (name+'.log')
             log_text = private_log.read_text(errors='replace')[-65536:]
-            codes = re.findall(r'(?m)(?:SQLSTATE|sqlstate)\s*[:= ]\s*([0-9A-Z]{5})\b', log_text)
+            codes = re.findall(r'(?m)(?:SQLSTATE|sqlstate)\s*[:= ]\s*([0-9A-Z]{5})\b|(?:ERROR|FATAL):\s+([0-9A-Z]{5}):', log_text)
             if codes:
-                print('Local restore SQLSTATE: '+codes[-1], file=sys.stderr)
+                print('Local restore SQLSTATE: '+(codes[-1][0] or codes[-1][1]), file=sys.stderr)
         raise RuntimeError(name+' failed; detailed output stays in the encrypted archive')
     return result.stdout.decode() if capture else None
 
@@ -180,7 +180,7 @@ def restore():
             for kind in ('TABLES','SEQUENCES','FUNCTIONS'):
                 defaults.append(f'ALTER DEFAULT PRIVILEGES FOR ROLE {owner}{scope} REVOKE ALL ON {kind} FROM anon, authenticated, service_role;')
     # Only a validated loopback URL can reach this restore call.
-    run(['psql','--no-psqlrc','--single-transaction','--set','ON_ERROR_STOP=1','--dbname',url,
+    run(['psql','--no-psqlrc','--single-transaction','--set','ON_ERROR_STOP=1','--set','VERBOSITY=verbose','--dbname',url,
          '--command',''.join(defaults),
          '--file',str(EXPORT/'roles.sql'),'--file',str(EXPORT/'schema.sql'),
          '--command','SET session_replication_role = replica','--file',str(EXPORT/'data.sql')],'local-restore')
