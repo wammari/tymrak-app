@@ -95,6 +95,12 @@ def run(args, name, readonly=False, capture=False, output_path=None):
             codes = re.findall(r'(?m)(?:SQLSTATE|sqlstate)\s*[:= ]\s*([0-9A-Z]{5})\b|(?:ERROR|FATAL):\s+([0-9A-Z]{5}):', log_text)
             if codes:
                 print('Local restore SQLSTATE: '+(codes[-1][0] or codes[-1][1]), file=sys.stderr)
+            # Only the allowlisted dump filename and numeric line are public.
+            # Never disclose the failing SQL statement, relation or row data.
+            locations = re.findall(r'(?m)(?:^|\\n)(?:psql:)?[^\\n:]*?/(roles|schema|data)\\.sql:(\\d+):\\s*(?:ERROR|FATAL):', log_text)
+            if locations:
+                filename, line = locations[-1]
+                print('Local restore location: '+filename+'.sql line '+line, file=sys.stderr)
         raise RuntimeError(name+' failed; detailed output stays in the encrypted archive')
     return result.stdout.decode() if capture else None
 
