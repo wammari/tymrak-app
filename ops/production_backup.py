@@ -111,7 +111,11 @@ def run(args, name, readonly=False, capture=False, output_path=None):
                         if command:
                             print('Local restore command target: '+command.group(1), file=sys.stderr)
                         else:
-                            print('Local restore command type: '+('comment' if header.startswith('--') else 'other'), file=sys.stderr)
+                            # Whitelisted statement categories only, without printing SQL.
+                            kinds = ('SET ', 'SELECT ', 'CREATE ', 'ALTER ', 'COPY ', 'INSERT ', 'UPDATE ', 'DELETE ', 'DO ', 'BEGIN', 'COMMIT', 'GRANT ', 'REVOKE ', 'TRUNCATE ', 'COMMENT ', 'REFRESH ', 'WITH ', '\\.', '--')
+                            kind = next((k.strip() for k in kinds if header.upper().startswith(k)), 'unclassified')
+                            print('Local restore command type: '+kind, file=sys.stderr)
+                            print('Local restore line length: '+str(len(header)), file=sys.stderr)
             # Only report the missing relation identifier, never SQL or row data.
             missing = re.findall(r'(?m)^psql:[^\\r\\n]*?/data\\.sql:\\d+: ERROR:\\s+42P01:\\s+relation "([A-Za-z_][A-Za-z_0-9.]*)" does not exist', log_text)
             if missing:
