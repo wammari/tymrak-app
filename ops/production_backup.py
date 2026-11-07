@@ -107,7 +107,7 @@ def run(args, name, readonly=False, capture=False, output_path=None):
                     n = int(line)
                     if 1 <= n <= len(lines):
                         header = lines[n-1].strip()
-                        command = re.match(r'^(?:COPY|INSERT INTO|ALTER TABLE(?: ONLY)?|TRUNCATE(?: TABLE)?)\\s+((?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*)(?:\\.(?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*))?)\\b', header, re.I)
+                        command = re.match(r'^(?:COPY|INSERT INTO|ALTER TABLE(?: ONLY)?|TRUNCATE(?: TABLE)?)\s+((?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*)(?:\.(?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*))?)(?=\s|\(|$)', header, re.I)
                         if command:
                             print('Local restore command target: '+command.group(1), file=sys.stderr)
                         else:
