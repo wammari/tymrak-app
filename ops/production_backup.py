@@ -79,6 +79,12 @@ def run(args, name, readonly=False, capture=False, output_path=None):
         else:
             result = subprocess.run(args, env=env, stdout=subprocess.PIPE if capture else log, stderr=log, check=False, timeout=900)
     if result.returncode:
+        # Stage names are fixed internal identifiers, never subprocess output.
+        # Expose only the failing stage; sensitive diagnostics remain encrypted.
+        safe_stages = {'local-init', 'local-start', 'local-status', 'local-restore',
+                       'inventory-tables', 'inventory-rls', 'local-stop'}
+        if name in safe_stages or name.startswith('inventory-'):
+            print('Disposable restore failed at stage: '+name, file=sys.stderr)
         raise RuntimeError(name+' failed; detailed output stays in the encrypted archive')
     return result.stdout.decode() if capture else None
 
