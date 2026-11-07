@@ -101,6 +101,17 @@ def run(args, name, readonly=False, capture=False, output_path=None):
             if locations:
                 filename, line = locations[-1]
                 print('Local restore location: '+filename+'.sql line '+line, file=sys.stderr)
+                if filename == 'data':
+                    # Parse only the command header at the failed line; never emit SQL or values.
+                    lines = (EXPORT/'data.sql').read_text(errors='replace').splitlines()
+                    n = int(line)
+                    if 1 <= n <= len(lines):
+                        header = lines[n-1].strip()
+                        command = re.match(r'^(?:COPY|INSERT INTO|ALTER TABLE(?: ONLY)?|TRUNCATE(?: TABLE)?)\\s+((?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*)(?:\\.(?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*))?)\\b', header, re.I)
+                        if command:
+                            print('Local restore command target: '+command.group(1), file=sys.stderr)
+                        else:
+                            print('Local restore command type: '+('comment' if header.startswith('--') else 'other'), file=sys.stderr)
             # Only report the missing relation identifier, never SQL or row data.
             missing = re.findall(r'(?m)^psql:[^\\r\\n]*?/data\\.sql:\\d+: ERROR:\\s+42P01:\\s+relation "([A-Za-z_][A-Za-z_0-9.]*)" does not exist', log_text)
             if missing:
