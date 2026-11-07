@@ -101,6 +101,10 @@ def run(args, name, readonly=False, capture=False, output_path=None):
             if locations:
                 filename, line = locations[-1]
                 print('Local restore location: '+filename+'.sql line '+line, file=sys.stderr)
+            # Only report the missing relation identifier, never SQL or row data.
+            missing = re.findall(r'(?m)^psql:[^\\r\\n]*?/data\\.sql:\\d+: ERROR:\\s+42P01:\\s+relation "([A-Za-z_][A-Za-z_0-9.]*)" does not exist', log_text)
+            if missing:
+                print('Local restore missing relation: '+missing[-1], file=sys.stderr)
         raise RuntimeError(name+' failed; detailed output stays in the encrypted archive')
     return result.stdout.decode() if capture else None
 
