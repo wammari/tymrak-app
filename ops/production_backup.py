@@ -97,7 +97,7 @@ def run(args, name, readonly=False, capture=False, output_path=None):
                 print('Local restore SQLSTATE: '+(codes[-1][0] or codes[-1][1]), file=sys.stderr)
             # Only the allowlisted dump filename and numeric line are public.
             # Never disclose the failing SQL statement, relation or row data.
-            locations = re.findall(r'(?m)(?:^|\\n)(?:psql:)?[^\\n:]*?/(roles|schema|data)\\.sql:(\\d+):\\s*(?:ERROR|FATAL):', log_text)
+            locations = re.findall(r'(?m)^psql:[^\r\n]*?/(roles|schema|data)\.sql:(\d+):\s*(?:ERROR|FATAL):', log_text)
             if locations:
                 filename, line = locations[-1]
                 print('Local restore location: '+filename+'.sql line '+line, file=sys.stderr)
