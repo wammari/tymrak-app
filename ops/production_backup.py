@@ -85,6 +85,16 @@ def run(args, name, readonly=False, capture=False, output_path=None):
                        'inventory-tables', 'inventory-rls', 'local-stop'}
         if name in safe_stages or name.startswith('inventory-'):
             print('Disposable restore failed at stage: '+name, file=sys.stderr)
+        if name == 'local-restore':
+            # SQLSTATE is a five-character diagnostic category, not SQL text,
+            # credentials, row contents or the full private error message.
+            # Do not print anything if the server supplied no SQLSTATE.
+            import re
+            private_log = PRIVATE / (name+'.log')
+            log_text = private_log.read_text(errors='replace')[-65536:]
+            codes = re.findall(r'(?m)(?:SQLSTATE|sqlstate)\s*[:= ]\s*([0-9A-Z]{5})\b', log_text)
+            if codes:
+                print('Local restore SQLSTATE: '+codes[-1], file=sys.stderr)
         raise RuntimeError(name+' failed; detailed output stays in the encrypted archive')
     return result.stdout.decode() if capture else None
 
