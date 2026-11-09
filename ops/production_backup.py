@@ -79,6 +79,47 @@ def run(args, name, readonly=False, capture=False, output_path=None):
         else:
             result = subprocess.run(args, env=env, stdout=subprocess.PIPE if capture else log, stderr=log, check=False, timeout=900)
     if result.returncode:
+        # Stage names are fixed internal identifiers, never subprocess output.
+        # Expose only the failing stage; sensitive diagnostics remain encrypted.
+        safe_stages = {'local-init', 'local-start', 'local-status', 'local-restore',
+                       'inventory-tables', 'inventory-rls', 'local-stop'}
+        if name in safe_stages or name.startswith('inventory-'):
+            print('Disposable restore failed at stage: '+name, file=sys.stderr)
+        if name == 'local-restore':
+            # SQLSTATE is a five-character diagnostic category, not SQL text,
+            # credentials, row contents or the full private error message.
+            # Do not print anything if the server supplied no SQLSTATE.
+            import re
+            private_log = PRIVATE / (name+'.log')
+            log_text = private_log.read_text(errors='replace')[-65536:]
+            codes = re.findall(r'(?m)(?:SQLSTATE|sqlstate)\s*[:= ]\s*([0-9A-Z]{5})\b|(?:ERROR|FATAL):\s+([0-9A-Z]{5}):', log_text)
+            if codes:
+                print('Local restore SQLSTATE: '+(codes[-1][0] or codes[-1][1]), file=sys.stderr)
+            # Only the allowlisted dump filename and numeric line are public.
+            # Never disclose the failing SQL statement, relation or row data.
+            locations = re.findall(r'(?m)^psql:[^\r\n]*?/(roles|schema|data)\.sql:(\d+):\s*(?:ERROR|FATAL):', log_text)
+            if locations:
+                filename, line = locations[-1]
+                print('Local restore location: '+filename+'.sql line '+line, file=sys.stderr)
+                if filename == 'data':
+                    # Parse only the command header at the failed line; never emit SQL or values.
+                    lines = (EXPORT/'data.sql').read_text(errors='replace').splitlines()
+                    n = int(line)
+                    if 1 <= n <= len(lines):
+                        header = lines[n-1].strip()
+                        command = re.match(r'^(?:COPY|INSERT INTO|ALTER TABLE(?: ONLY)?|TRUNCATE(?: TABLE)?)\s+((?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*)(?:\.(?:"[A-Za-z_][A-Za-z_0-9]*"|[A-Za-z_][A-Za-z_0-9]*))?)(?=\s|\(|$)', header, re.I)
+                        if command:
+                            print('Local restore command target: '+command.group(1), file=sys.stderr)
+                        else:
+                            # Whitelisted statement categories only, without printing SQL.
+                            kinds = ('SET ', 'SELECT ', 'CREATE ', 'ALTER ', 'COPY ', 'INSERT ', 'UPDATE ', 'DELETE ', 'DO ', 'BEGIN', 'COMMIT', 'GRANT ', 'REVOKE ', 'TRUNCATE ', 'COMMENT ', 'REFRESH ', 'WITH ', '\\.', '--')
+                            kind = next((k.strip() for k in kinds if header.upper().startswith(k)), 'unclassified')
+                            print('Local restore command type: '+kind, file=sys.stderr)
+                            print('Local restore line length: '+str(len(header)), file=sys.stderr)
+            # Only report the missing relation identifier, never SQL or row data.
+            missing = re.findall(r'(?m)^psql:[^\\r\\n]*?/data\\.sql:\\d+: ERROR:\\s+42P01:\\s+relation "([A-Za-z_][A-Za-z_0-9.]*)" does not exist', log_text)
+            if missing:
+                print('Local restore missing relation: '+missing[-1], file=sys.stderr)
         raise RuntimeError(name+' failed; detailed output stays in the encrypted archive')
     return result.stdout.decode() if capture else None
 
@@ -155,6 +196,41 @@ def restore():
     run(CLI+['start','--workdir',str(LOCAL)],'local-start')
     status = json.loads(run(CLI+['status','--workdir',str(LOCAL),'--output','json'],'local-status',capture=True))
     url = local_admin_url(status['DB_URL'])
+    # The managed production Storage service has a lifecycle-state relation that
+    # the pinned local CLI stack does not yet provision. Recreate its verified
+    # structural shape ONLY in the disposable loopback restore database.
+    # Never run this compatibility DDL against production.
+    lifecycle_ddl = """CREATE TABLE IF NOT EXISTS storage.bucket_lifecycle_states (
+      bucket_id text PRIMARY KEY,
+      generation uuid,
+      next_run_at timestamptz,
+      claim_id uuid,
+      claim_until timestamptz,
+      continuation jsonb,
+      last_started_at timestamptz,
+      last_completed_at timestamptz,
+      last_success_at timestamptz,
+      last_result jsonb,
+      failure_count integer NOT NULL DEFAULT 0,
+      last_error jsonb,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS bucket_lifecycle_states_due_idx
+      ON storage.bucket_lifecycle_states (next_run_at, bucket_id)
+      WHERE next_run_at IS NOT NULL;"""
+    lifecycle_ddl += """
+    CREATE TABLE IF NOT EXISTS storage.lifecycle_abandoned_artifacts (
+      bucket_id text NOT NULL,
+      key text NOT NULL,
+      name text NOT NULL,
+      version text,
+      attempted_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (bucket_id, key)
+    );
+    CREATE INDEX IF NOT EXISTS lifecycle_abandoned_artifacts_attempted_at_idx
+      ON storage.lifecycle_abandoned_artifacts (attempted_at);"""
+    run(['psql','--no-psqlrc','--set','ON_ERROR_STOP=1','--dbname',url,
+         '--command',lifecycle_ddl],'local-storage-compat')
     # Fresh CLI stacks grant browser roles broad privileges by default. Clear
     # those local defaults before creating restored objects; the dump then
     # supplies the source's explicit object grants and default privileges.
@@ -164,7 +240,7 @@ def restore():
             for kind in ('TABLES','SEQUENCES','FUNCTIONS'):
                 defaults.append(f'ALTER DEFAULT PRIVILEGES FOR ROLE {owner}{scope} REVOKE ALL ON {kind} FROM anon, authenticated, service_role;')
     # Only a validated loopback URL can reach this restore call.
-    run(['psql','--no-psqlrc','--single-transaction','--set','ON_ERROR_STOP=1','--dbname',url,
+    run(['psql','--no-psqlrc','--single-transaction','--set','ON_ERROR_STOP=1','--set','VERBOSITY=verbose','--dbname',url,
          '--command',''.join(defaults),
          '--file',str(EXPORT/'roles.sql'),'--file',str(EXPORT/'schema.sql'),
          '--command','SET session_replication_role = replica','--file',str(EXPORT/'data.sql')],'local-restore')
