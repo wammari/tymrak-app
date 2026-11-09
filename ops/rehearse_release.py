@@ -38,6 +38,7 @@ def local_bootstrap_review(url, manifest):
     return json.loads(result.strip())
 
 def main():
+    print('Rehearsal stage: verify restored inventory', flush=True)
     manifest = json.loads((backup.EXPORT/'manifest.json').read_text())
     if manifest.get('project_ref') != backup.PROJECT or not manifest.get('restore_verified'):
         raise ValueError('A verified local restore is required')
@@ -45,12 +46,14 @@ def main():
     initial = backup.inventory(url)
     if initial != manifest['source_inventory']:
         raise ValueError('Local restore changed before rehearsal')
+    print('Rehearsal stage: apply migrations to disposable database', flush=True)
     hashes = {}
     for filename in MIGRATIONS:
         path = backup.ROOT/'supabase/migrations'/filename
         hashes[filename] = hashlib.sha256(path.read_bytes()).hexdigest()
         # Use the ordinary local postgres role, matching hosted migration access.
         backup.run(['psql','--no-psqlrc','--quiet','--set','ON_ERROR_STOP=1','--dbname',url,'--file',str(path)],'migration-'+filename)
+    print('Rehearsal stage: run synthetic access-control acceptance', flush=True)
     # Only the disposable local administrator provisions synthetic Auth fixtures.
     admin = backup.local_admin_url(url)
     result = backup.run(['psql','--no-psqlrc','--quiet','--tuples-only','--no-align','--set','ON_ERROR_STOP=1','--dbname',admin,
@@ -61,12 +64,14 @@ def main():
         raise RuntimeError('Rehearsal acceptance failed')
     # Review the real legacy company/admin mapping only in this loopback restore.
     # The SQL itself always rolls back; it must never become a hosted backfill.
+    print('Rehearsal stage: review company bootstrap mapping', flush=True)
     company_review = local_bootstrap_review(admin,manifest)
     expected_review = {'company_count':1,'company_employee_count':4,'administrator_count':1,'quarantined_manager_count':0,'removed_test_manager_count':1,
                        'inactive_workplace_count':1,'employee_assignments':0,
                        'punches':manifest['source_inventory']['public.punches']['count'],'will_commit':False}
     if company_review != expected_review:
         raise RuntimeError('Company bootstrap review failed')
+    print('Rehearsal stage: verify original records preserved', flush=True)
     after = backup.inventory(admin)
     # The fixture transaction rolls back. New company columns must remain
     # quarantined, and every original field/row must match its export hash.
