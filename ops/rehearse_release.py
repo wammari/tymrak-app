@@ -33,8 +33,8 @@ def local_bootstrap_review(url, manifest):
     auth_count = manifest['source_inventory']['auth.users']['count']
     if type(employee_count) is not int or type(auth_count) is not int or employee_count < 1 or auth_count != employee_count:
         raise ValueError('Unreviewed bootstrap inventory')
-    sql, employee_guard = re.subn(r'(select count\\(\\*\\) from public\\.employees\\)<>)[0-9]+', lambda m:m[1]+str(employee_count), sql)
-    sql, auth_guard = re.subn(r'(select count\\(\\*\\) from auth\\.users\\)<>)[0-9]+', lambda m:m[1]+str(auth_count), sql)
+    sql, employee_guard = re.subn(r'(select count\(\*\) from public\.employees\)<>)[0-9]+', lambda m:m[1]+str(employee_count), sql)
+    sql, auth_guard = re.subn(r'(select count\(\*\) from auth\.users\)<>)[0-9]+', lambda m:m[1]+str(auth_count), sql)
     if employee_guard != 1 or auth_guard != 1:
         raise ValueError('Unrecognized bootstrap inventory guards')
     if replacements != 1 or not sql.rstrip().lower().endswith('rollback;'):
