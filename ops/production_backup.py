@@ -218,6 +218,17 @@ def restore():
     CREATE INDEX IF NOT EXISTS bucket_lifecycle_states_due_idx
       ON storage.bucket_lifecycle_states (next_run_at, bucket_id)
       WHERE next_run_at IS NOT NULL;"""
+    lifecycle_ddl += """
+    CREATE TABLE IF NOT EXISTS storage.lifecycle_abandoned_artifacts (
+      bucket_id text NOT NULL,
+      key text NOT NULL,
+      name text NOT NULL,
+      version text,
+      attempted_at timestamptz NOT NULL DEFAULT now(),
+      PRIMARY KEY (bucket_id, key)
+    );
+    CREATE INDEX IF NOT EXISTS lifecycle_abandoned_artifacts_attempted_at_idx
+      ON storage.lifecycle_abandoned_artifacts (attempted_at);"""
     run(['psql','--no-psqlrc','--set','ON_ERROR_STOP=1','--dbname',url,
          '--command',lifecycle_ddl],'local-storage-compat')
     # Fresh CLI stacks grant browser roles broad privileges by default. Clear
