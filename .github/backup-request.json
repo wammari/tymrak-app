@@ -1,0 +1,1 @@
+{"purpose":"Refresh encrypted production backup and disposable restore verification before customer cutover; production remains read only","request":5,"requested_at":"2026-11-06","expected_minimum_punches":49}
