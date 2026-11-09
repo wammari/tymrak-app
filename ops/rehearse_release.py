@@ -56,8 +56,19 @@ def main():
     print('Rehearsal stage: run synthetic access-control acceptance', flush=True)
     # Only the disposable local administrator provisions synthetic Auth fixtures.
     admin = backup.local_admin_url(url)
+    # Bind legacy fixture counts to the verified production snapshot, not stale constants.
+    expected_employees = manifest['source_inventory']['public.employees']['count']
+    expected_users = manifest['source_inventory']['auth.users']['count']
+    if type(expected_employees) is not int or expected_employees < 1 or expected_users != expected_employees:
+        raise ValueError('Unreviewed employee/Auth inventory mismatch')
+    acceptance_source = (backup.ROOT/'ops/rehearsal-acceptance.sql').read_text()
+    acceptance_sql, replacements = re.subn(r'original_employees<>4', 'original_employees<>'+str(expected_employees), acceptance_source)
+    if replacements != 1:
+        raise ValueError('Unrecognized acceptance snapshot guard')
+    acceptance_path = backup.PRIVATE/'rehearsal-acceptance-snapshot.sql'
+    acceptance_path.write_text(acceptance_sql)
     result = backup.run(['psql','--no-psqlrc','--quiet','--tuples-only','--no-align','--set','ON_ERROR_STOP=1','--dbname',admin,
-                         '--file',str(backup.ROOT/'ops/rehearsal-acceptance.sql')],
+                         '--file',str(acceptance_path)],
                         'rehearsal-acceptance',capture=True)
     checks = json.loads(result.strip())
     if checks.get('all_checks_passed') is not True:
@@ -66,7 +77,7 @@ def main():
     # The SQL itself always rolls back; it must never become a hosted backfill.
     print('Rehearsal stage: review company bootstrap mapping', flush=True)
     company_review = local_bootstrap_review(admin,manifest)
-    expected_review = {'company_count':1,'company_employee_count':4,'administrator_count':1,'quarantined_manager_count':0,'removed_test_manager_count':1,
+    expected_review = {'company_count':1,'company_employee_count':expected_employees,'administrator_count':1,'quarantined_manager_count':0,'removed_test_manager_count':1,
                        'inactive_workplace_count':1,'employee_assignments':0,
                        'punches':manifest['source_inventory']['public.punches']['count'],'will_commit':False}
     if company_review != expected_review:
