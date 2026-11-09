@@ -196,6 +196,30 @@ def restore():
     run(CLI+['start','--workdir',str(LOCAL)],'local-start')
     status = json.loads(run(CLI+['status','--workdir',str(LOCAL),'--output','json'],'local-status',capture=True))
     url = local_admin_url(status['DB_URL'])
+    # The managed production Storage service has a lifecycle-state relation that
+    # the pinned local CLI stack does not yet provision. Recreate its verified
+    # structural shape ONLY in the disposable loopback restore database.
+    # Never run this compatibility DDL against production.
+    lifecycle_ddl = """CREATE TABLE IF NOT EXISTS storage.bucket_lifecycle_states (
+      bucket_id text PRIMARY KEY,
+      generation uuid,
+      next_run_at timestamptz,
+      claim_id uuid,
+      claim_until timestamptz,
+      continuation jsonb,
+      last_started_at timestamptz,
+      last_completed_at timestamptz,
+      last_success_at timestamptz,
+      last_result jsonb,
+      failure_count integer NOT NULL DEFAULT 0,
+      last_error jsonb,
+      updated_at timestamptz NOT NULL DEFAULT now()
+    );
+    CREATE INDEX IF NOT EXISTS bucket_lifecycle_states_due_idx
+      ON storage.bucket_lifecycle_states (next_run_at, bucket_id)
+      WHERE next_run_at IS NOT NULL;"""
+    run(['psql','--no-psqlrc','--set','ON_ERROR_STOP=1','--dbname',url,
+         '--command',lifecycle_ddl],'local-storage-compat')
     # Fresh CLI stacks grant browser roles broad privileges by default. Clear
     # those local defaults before creating restored objects; the dump then
     # supplies the source's explicit object grants and default privileges.
