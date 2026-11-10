@@ -5,7 +5,7 @@ const uuid = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-
 export default async function handler(req,res) {
  if(req.method!=="POST"){res.setHeader("Allow","POST");return res.status(405).json({error:"Method not allowed"});}
  try {
-  const auth=await requireManager(req);
+  const auth=await requireManager(req, { allowUnselected: true });
   if(!auth.ok)return res.status(auth.status).json({error:auth.error});
   const {supabaseUrl,secretKey}=auth.configuration;
   const headers={...databaseHeaders(secretKey),"Content-Type":"application/json"};
