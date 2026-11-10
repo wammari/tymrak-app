@@ -34,10 +34,21 @@ export default async function handler(req, res) {
     if (!employee.auth_user_id) {
       return res.status(409).json({ error: "This employee's account link needs repair before another invitation can be sent" });
     }
+    const companyResponse = await fetch(
+      `${supabaseUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(authorization.organizationId)}&is_active=eq.true&select=id,name`,
+      { headers: databaseHeaders(secretKey) }
+    );
+    if (!companyResponse.ok) throw new Error("Unable to verify invitation company");
+    const companies = await companyResponse.json();
+    if (!Array.isArray(companies) || companies.length !== 1 ||
+        companies[0]?.id !== authorization.organizationId ||
+        typeof companies[0]?.name !== "string" || !companies[0].name.trim()) {
+      return res.status(403).json({ error: "Active company could not be verified" });
+    }
     const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
       lastName: employee.last_name, username: employee.username
-    });
+    }, companies[0].name);
     inviteIssued = true;
     if (invite.id !== employee.auth_user_id) {
       return res.status(409).json({ error: "The invitation returned a different account. The existing employee account link was preserved. An email may have been sent; do not retry or resend. Contact your administrator to reconcile the account." });
