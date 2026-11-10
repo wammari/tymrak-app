@@ -135,7 +135,7 @@ export async function requireManager(req, { allowUnselected = false } = {}) {
     roleResponse = await fetch(
       `${supabaseUrl}/rest/v1/user_roles?auth_user_id=eq.${encodeURIComponent(
         user.id
-      )}&select=role,organization_id,organization:organizations!inner(is_active)&organization.is_active=eq.true`,
+      )}&select=role,organization_id,organization:organizations!inner(name,is_active)&organization.is_active=eq.true`,
       {
         headers: databaseHeaders(secretKey)
       }
@@ -208,7 +208,7 @@ export async function requireManager(req, { allowUnselected = false } = {}) {
       user: { id: user.id, email: user.email || "" },
       organizationId: null,
       role: null,
-      availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, role: record.role }))
+      availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, name: record.organization.name, role: record.role }))
     };
   }
 
@@ -243,7 +243,7 @@ export async function requireManager(req, { allowUnselected = false } = {}) {
     },
     role,
     organizationId,
-    availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, role: record.role })),
+    availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, name: record.organization.name, role: record.role })),
     employeeIds,
     configuration
   };
