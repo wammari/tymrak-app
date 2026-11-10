@@ -7,24 +7,25 @@
 <main><p id="status" role="status">Verifying administrator access…</p>
 <section id="adminPanel" hidden><h2>Add Company</h2><p>Create a separate company under your administrator account. Employees and workplaces can be added after creation.</p>
 <form id="companyForm"><label for="companyName">Company name</label><input id="companyName" required minlength="2" maxlength="120" autocomplete="organization" placeholder="Business name"><button id="create" type="submit">Create Company</button></form>
-<p><small>Company administrator delegation will be available after its separate security review.</small></p></section></main>
+</section><section id="delegationPanel" hidden><h2>Company Administrators</h2><p>Grant or revoke administrator permissions for an existing company member. This does not invite new users.</p><form id="delegationForm"><label for="orgId">Company</label><select id="orgId" required style="width:100%;padding:12px;margin-bottom:14px"></select><label for="memberEmail">Existing member email</label><input id="memberEmail" type="email" required autocomplete="email"><label for="grantChoice" style="margin-top:14px">Permission change</label><select id="grantChoice" style="width:100%;padding:12px"><option value="grant">Grant Company Administrator</option><option value="revoke">Revoke Company Administrator (return to Manager)</option></select><button type="submit" id="updateAdmin">Update Permissions</button></form><p><small>Changes take effect on subsequent authorized requests. The Main Administrator account cannot be revoked.</small></p></section></main>
 <script type="module">
 import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
 import {loadSupabaseConfiguration} from './supabase-config.js';
-const status=document.getElementById('status'),panel=document.getElementById('adminPanel'),form=document.getElementById('companyForm'),button=document.getElementById('create');
+const status=document.getElementById('status'),panel=document.getElementById('adminPanel'),form=document.getElementById('companyForm'),button=document.getElementById('create'),delegation=document.getElementById('delegationPanel'),delegationForm=document.getElementById('delegationForm');
 let client;
-async function request(method='GET',body){
+async function request(method='GET',body,endpoint='/api/platform-companies'){
  const {data:{session}}=await client.auth.getSession();
  if(!session)throw new Error('Sign in to the Manager Portal first.');
  const company=sessionStorage.getItem('tymrak-company-id');
- const response=await fetch('/api/platform-companies',{method,headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json',...(company?{'x-tymrak-organization-id':company}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const response=await fetch(endpoint,{method,headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json',...(company?{'x-tymrak-organization-id':company}:{})},...(body?{body:JSON.stringify(body)}:{})});
  const data=await response.json();if(!response.ok)throw new Error(data.error||'Company request failed');return data;
 }
 try{const cfg=await loadSupabaseConfiguration();client=createClient(cfg.supabaseUrl,cfg.supabasePublishableKey);
- await request();panel.hidden=false;status.textContent='Main Administrator verified.';
+ await request();panel.hidden=false;delegation.hidden=false;status.textContent='Main Administrator verified.';const select=document.getElementById('orgId');const memberships=await fetch('/api/manager-context',{headers:{Authorization:'Bearer '+(await client.auth.getSession()).data.session.access_token}}).then(r=>r.ok?r.json():null).catch(()=>null);const organizations=memberships?.availableOrganizations||memberships?.organizations||[];for(const item of organizations){const id=item.organizationId||item.organization_id;if(!id)continue;const option=document.createElement('option');option.value=id;option.textContent=item.name||id;select.append(option);}
 }catch(e){status.textContent=e.message;}
 form.addEventListener('submit',async e=>{e.preventDefault();button.disabled=true;status.textContent='Creating company…';
  try{const name=document.getElementById('companyName').value.trim();const result=await request('POST',{name});status.textContent='Company created: '+name+'. Return to the Manager Portal and refresh the company selector.';form.reset();}
  catch(error){status.textContent=error.message;}finally{button.disabled=false;}
 });
+delegationForm.addEventListener('submit',async e=>{e.preventDefault();const action=document.getElementById('updateAdmin');action.disabled=true;status.textContent='Updating permissions…';try{const organizationId=document.getElementById('orgId').value,email=document.getElementById('memberEmail').value.trim(),grant=document.getElementById('grantChoice').value==='grant';if(!organizationId)throw new Error('Select a company first.');await request('POST',{organizationId,email,grant},'/api/company-administrators');status.textContent='Company administrator permissions updated.';delegationForm.reset();}catch(error){status.textContent=error.message;}finally{action.disabled=false;}});
 </script></body></html>
