@@ -108,6 +108,48 @@ export function activationRedirect() {
   return `${getSiteUrl()}/activate.html`;
 }
 
+export async function prepareExistingInvitationIdentity(configuration, employee, companyName, expectedAuthUserId) {
+  const headers = databaseHeaders(configuration.secretKey);
+  const url = `${configuration.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(expectedAuthUserId)}`;
+  const response = await fetch(url, { headers });
+  if (!response.ok) throw new Error("Existing invitation identity lookup failed");
+  const user = await response.json();
+  const valid = user?.id === expectedAuthUserId &&
+    user?.email?.trim().toLowerCase() === employee.email.trim().toLowerCase() &&
+    Boolean(user.invited_at) &&
+    !user.confirmed_at && !user.email_confirmed_at && !user.phone_confirmed_at && !user.last_sign_in_at &&
+    (!Array.isArray(user.identities) || user.identities.every(identity =>
+      !identity?.last_sign_in_at || (identity?.created_at && Date.parse(identity.last_sign_in_at) <= Date.parse(identity.created_at) + 1000))) &&
+    user.user_metadata?.first_name === employee.firstName &&
+    user.user_metadata?.last_name === employee.lastName &&
+    user.user_metadata?.username === employee.username;
+  if (!valid) {
+    const error = new Error("Existing invitation identity requires administrator review; no invitation sent");
+    error.status = 409;
+    throw error;
+  }
+  // Preserve all unrelated metadata. Supabase Auth's invite endpoint does not
+  // reliably overwrite user_metadata for previously invited users.
+  const metadata = { ...user.user_metadata, company_name: companyName.trim() };
+  const updatedResponse = await fetch(url, {
+    method: "PUT",
+    headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ user_metadata: metadata })
+  });
+  if (!updatedResponse.ok) throw new Error("Unable to prepare invitation company metadata");
+  const verifiedResponse = await fetch(url, { headers });
+  if (!verifiedResponse.ok) throw new Error("Unable to verify invitation company metadata");
+  const verified = await verifiedResponse.json();
+  if (verified?.id !== expectedAuthUserId ||
+      verified?.email?.trim().toLowerCase() !== employee.email.trim().toLowerCase() ||
+      verified?.user_metadata?.company_name !== companyName.trim() ||
+      verified?.confirmed_at || verified?.email_confirmed_at || verified?.last_sign_in_at) {
+    const error = new Error("Invitation metadata verification failed; no invitation sent");
+    error.status = 409;
+    throw error;
+  }
+}
+
 export async function sendActivationInvite(configuration, employee, companyName) {
   if (typeof companyName !== 'string' || !companyName.trim()) {
     throw new Error('Verified company name is required before sending an invitation');
