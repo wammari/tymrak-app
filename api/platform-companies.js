@@ -11,7 +11,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: "Method not allowed" });
   }
   try {
-    const auth = await requireManager(req);
+    const auth = await requireManager(req, { allowUnselected: true });
     if (!auth.ok) return res.status(auth.status).json({ error: auth.error });
     const { supabaseUrl, secretKey } = auth.configuration;
     // This registry is protected from browser access. Never trust a client-supplied admin flag.
