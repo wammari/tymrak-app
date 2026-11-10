@@ -1,0 +1,27 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "tymrak-production",
+  "main": "cloudflare/production-worker.mjs",
+  "compatibility_date": "2026-10-24",
+  "compatibility_flags": ["nodejs_compat"],
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [],
+  "build": {"command": "node cloudflare/build-assets.mjs"},
+  "assets": {
+    "directory": ".cloudflare-assets",
+    "binding": "ASSETS",
+    "run_worker_first": ["/api/*"],
+    "html_handling": "none",
+    "not_found_handling": "404-page"
+  },
+  "secrets": {"required": ["SUPABASE_PUBLISHABLE_KEY", "SUPABASE_SECRET_KEY"]},
+  "vars": {
+    "APP_ENV": "production",
+    "CLOUDFLARE_RELEASE_ENV": "production",
+    "SITE_URL": "https://app.tymrak.com",
+    "SUPABASE_URL": "https://tsosredghislnehfyypi.supabase.co",
+    "SUPABASE_EXPECTED_PROJECT_REF": "tsosredghislnehfyypi",
+    "TYMRAK_RELEASE_READY": "false"
+  }
+}

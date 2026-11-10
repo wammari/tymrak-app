@@ -1,3 +1,4 @@
+import "./_test-environment.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
 import {
@@ -111,7 +112,8 @@ test("explicit manager roles are authorized", async () => {
     if (url.endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({ id: "manager-id", email: "m@example.com" }));
     }
-    return new Response(JSON.stringify([{ role: "manager" }]));
+    if (url.endsWith('/rpc/manager_employee_scope')) return new Response(JSON.stringify({employeeIds:[]}));
+    return new Response(JSON.stringify([{ role: "manager", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
   };
 
   try {
@@ -120,11 +122,12 @@ test("explicit manager roles are authorized", async () => {
     });
     assert.equal(result.ok, true);
     assert.equal(result.role, "manager");
-    assert.equal(requests.length, 2);
-    assert.equal(requests[0].options.headers.apikey, "sb_secret_server-key");
+    assert.equal(requests.length, 3);
+    assert.equal(requests[0].options.headers.apikey, "sb_publishable_local_test");
     assert.equal(requests[0].options.headers.Authorization, "Bearer manager-token");
     assert.deepEqual(requests[1].options.headers, {
-      apikey: "sb_secret_server-key"
+      apikey: "sb_secret_server-key",
+      "Content-Type": "application/json"
     });
     assert.notEqual(
       requests[1].options.headers.Authorization,
@@ -156,12 +159,11 @@ test("role lookup failures log safe Supabase diagnostics without credentials", a
   console.error = (...args) => errorLogs.push(args);
 
   try {
-    await assert.rejects(
-      requireManager({
+    const result = await requireManager({
         headers: { authorization: "Bearer user-token-must-not-be-logged" }
-      }),
-      /Manager role lookup failed/
-    );
+      });
+    assert.equal(result.status, 502);
+    assert.match(result.error, /Manager role lookup failed/);
     assert.deepEqual(errorLogs, [[
       "Manager role lookup rejected",
       {
