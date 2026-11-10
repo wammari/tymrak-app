@@ -41,7 +41,7 @@ export function getSupabaseConfiguration() {
   } catch { return null; }
 }
 
-export async function requireManager(req) {
+export async function requireManager(req, { allowUnselected = false } = {}) {
   const accessToken = getBearerToken(req);
 
   if (!accessToken) {
@@ -200,6 +200,17 @@ export async function requireManager(req) {
     role: role || null,
     authorized
   });
+
+  if (!authorized && allowUnselected && !selectedId && activeMemberships.length > 1) {
+    return {
+      ok: true,
+      selectionRequired: true,
+      user: { id: user.id, email: user.email || "" },
+      organizationId: null,
+      role: null,
+      availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, role: record.role }))
+    };
+  }
 
   if (!authorized) {
     return {
