@@ -29,3 +29,15 @@ begin
 end $$;
 revoke all on function public.create_managed_company(text,uuid) from public, anon, authenticated;
 grant execute on function public.create_managed_company(text,uuid) to service_role;
+
+grant usage on schema tymrak_private to service_role;
+grant select on tymrak_private.platform_administrators to service_role;
+
+create or replace function public.is_platform_administrator(p_auth_user_id uuid)
+returns boolean language sql stable security invoker set search_path = ''
+as $$ select exists (
+ select 1 from tymrak_private.platform_administrators
+ where auth_user_id=p_auth_user_id
+) $$;
+revoke all on function public.is_platform_administrator(uuid) from public, anon, authenticated;
+grant execute on function public.is_platform_administrator(uuid) to service_role;
