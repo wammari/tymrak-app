@@ -174,7 +174,7 @@ test("fresh Supabase email identity timestamp is not mistaken for a prior sign-i
   }, {
     id: "11111111-1111-4111-8111-111111111111",
     email: "ada@example.com", invited_at: created, identities: [identity],
-    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
+    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", company_name: "I Care Pharmacy" }
   });
   const res = responseRecorder();
   await invitationHandler(request("POST", input()), res);
