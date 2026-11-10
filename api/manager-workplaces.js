@@ -16,7 +16,7 @@ export default async function handler(req,res) {
   const auth=await requireManager(req);if(!auth.ok)return res.status(auth.status).json({error:auth.error});
   const value=req.method==='POST'?validateWorkplace(req.body):null;
   if(req.method==='POST'&&!value)return res.status(400).json({error:'Enter a name, valid coordinates, a radius from 25 to 5000 metres, and valid employee assignments.'});
-  const response=await fetch(`${auth.configuration.supabaseUrl}/rest/v1/rpc/manage_workplaces`,{method:'POST',headers:activationServerHeaders(auth.configuration.secretKey),body:JSON.stringify({p_manager_id:auth.user.id,p_workplace:value})});
+  const response=await fetch(`${auth.configuration.supabaseUrl}/rest/v1/rpc/manage_workplaces_for_company`,{method:'POST',headers:activationServerHeaders(auth.configuration.secretKey),body:JSON.stringify({p_manager_id:auth.user.id,p_organization_id:auth.organizationId,p_workplace:value})});
   if(!response.ok)throw new Error('Workplace operation failed');
   const result=await response.json();
   if(result.error)return res.status(result.error==='manager_required'?403:409).json({error:'Unable to save workplace. Refresh and check employee assignments.',code:result.error});
