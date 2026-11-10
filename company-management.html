@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Company Management | TYMRAK</title>
+<style>
+:root{font-family:Arial,sans-serif;color:#352015;background:#f9f6f0}*{box-sizing:border-box}body{margin:0}header{background:#442414;color:white;padding:24px}header a{color:#f4bb42}main{max-width:760px;margin:35px auto;padding:0 18px}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}label{display:block;font-weight:bold;margin-bottom:8px}input{width:100%;padding:12px;border:1px solid #bba995;border-radius:7px}button{background:#70400e;color:white;border:0;border-radius:7px;padding:12px 18px;font-weight:bold;margin-top:16px;cursor:pointer}button:disabled{opacity:.5}#status{min-height:25px}small{color:#68594c}
+</style></head><body><header><a href="/manager.html">← Manager Portal</a><h1>Company Management</h1><p>Main Administrator workspace</p></header>
+<main><p id="status" role="status">Verifying administrator access…</p>
+<section id="adminPanel" hidden><h2>Add Company</h2><p>Create a separate company under your administrator account. Employees and workplaces can be added after creation.</p>
+<form id="companyForm"><label for="companyName">Company name</label><input id="companyName" required minlength="2" maxlength="120" autocomplete="organization" placeholder="Business name"><button id="create" type="submit">Create Company</button></form>
+<p><small>Company administrator delegation will be available after its separate security review.</small></p></section></main>
+<script type="module">
+import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import {loadSupabaseConfiguration} from './supabase-config.js';
+const status=document.getElementById('status'),panel=document.getElementById('adminPanel'),form=document.getElementById('companyForm'),button=document.getElementById('create');
+let client;
+async function request(method='GET',body){
+ const {data:{session}}=await client.auth.getSession();
+ if(!session)throw new Error('Sign in to the Manager Portal first.');
+ const company=sessionStorage.getItem('tymrak-company-id');
+ const response=await fetch('/api/platform-companies',{method,headers:{'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json',...(company?{'x-tymrak-organization-id':company}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const data=await response.json();if(!response.ok)throw new Error(data.error||'Company request failed');return data;
+}
+try{const cfg=await loadSupabaseConfiguration();client=createClient(cfg.supabaseUrl,cfg.supabasePublishableKey);
+ await request();panel.hidden=false;status.textContent='Main Administrator verified.';
+}catch(e){status.textContent=e.message;}
+form.addEventListener('submit',async e=>{e.preventDefault();button.disabled=true;status.textContent='Creating company…';
+ try{const name=document.getElementById('companyName').value.trim();const result=await request('POST',{name});status.textContent='Company created: '+name+'. Return to the Manager Portal and refresh the company selector.';form.reset();}
+ catch(error){status.textContent=error.message;}finally{button.disabled=false;}
+});
+</script></body></html>
