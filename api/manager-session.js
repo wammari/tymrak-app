@@ -7,7 +7,7 @@ export default async function handler(req, res) {
   }
 
   try {
-    const authorization = await requireManager(req);
+    const authorization = await requireManager(req, { allowUnselected: true });
 
     if (!authorization.ok) {
       return res
@@ -16,7 +16,8 @@ export default async function handler(req, res) {
     }
 
     return res.status(200).json({
-      authorized: true,
+      authorized: !authorization.selectionRequired,
+      selectionRequired: Boolean(authorization.selectionRequired),
       user: authorization.user,
       role: authorization.role,
       organizationId: authorization.organizationId,
