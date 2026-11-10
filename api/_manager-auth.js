@@ -172,7 +172,21 @@ export async function requireManager(req) {
     });
     return { ok: false, status: 502, error: "Manager role lookup returned an invalid response" };
   }
-  const membership = Array.isArray(roleRecords) && roleRecords.length === 1 ? roleRecords[0] : null;
+  // An explicit organization context is mandatory when the user belongs to multiple companies.
+  // Never silently fall back to another tenant when the selected company is unavailable.
+  const selected = req.headers?.["x-tymrak-organization-id"];
+  const selectedId = Array.isArray(selected) ? null : selected;
+  const validId = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  if (selectedId != null && !validId(selectedId)) {
+    return { ok: false, status: 400, error: "Invalid selected company" };
+  }
+  const activeMemberships = Array.isArray(roleRecords) ? roleRecords.filter(record =>
+    MANAGER_ROLES.has(record?.role) && validId(record?.organization_id) && record?.organization?.is_active === true
+  ) : [];
+  const matching = selectedId
+    ? activeMemberships.filter(record => record.organization_id === selectedId)
+    : activeMemberships;
+  const membership = matching.length === 1 ? matching[0] : null;
   const role = membership?.role;
   const organizationId = membership?.organization_id;
   const authorized = MANAGER_ROLES.has(role) &&
@@ -191,7 +205,7 @@ export async function requireManager(req) {
     return {
       ok: false,
       status: 403,
-      error: "Manager access requires an active company membership"
+      error: selectedId ? "Selected company is not available to this administrator" : "Select a company to continue (an active company membership is required)"
     };
   }
 
@@ -218,6 +232,7 @@ export async function requireManager(req) {
     },
     role,
     organizationId,
+    availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, role: record.role })),
     employeeIds,
     configuration
   };
