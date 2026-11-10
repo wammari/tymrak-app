@@ -27,8 +27,14 @@ BEGIN
   THEN RAISE EXCEPTION 'Le Delice activity exists; review historical tenant ownership before migration'; END IF;
   INSERT INTO public.organizations(name,is_active) VALUES ('Ledelice Pastry shop',true) RETURNING id INTO new_org;
   DELETE FROM public.employee_workplaces WHERE employee_id=pastry_employee AND workplace_id=pastry_workplace AND organization_id=old_org;
+  -- Restrict the ownership-trigger exception to this one audited migration transaction.
+  -- All checks run before disabling and the triggers are restored before commit.
+  ALTER TABLE public.employees DISABLE TRIGGER preserve_employee_company;
+  ALTER TABLE public.workplaces DISABLE TRIGGER preserve_workplace_company;
   UPDATE public.employees SET organization_id=new_org WHERE id=pastry_employee AND organization_id=old_org;
   UPDATE public.workplaces SET organization_id=new_org WHERE id=pastry_workplace AND organization_id=old_org;
+  ALTER TABLE public.employees ENABLE TRIGGER preserve_employee_company;
+  ALTER TABLE public.workplaces ENABLE TRIGGER preserve_workplace_company;
   INSERT INTO public.employee_workplaces(employee_id,workplace_id,organization_id) VALUES(pastry_employee,pastry_workplace,new_org);
   INSERT INTO public.user_roles(auth_user_id,organization_id,role) VALUES(admin_user,new_org,'admin');
   IF (SELECT count(*) FROM public.employee_workplaces WHERE employee_id=pastry_employee AND organization_id=new_org)<>1
