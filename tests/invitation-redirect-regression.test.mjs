@@ -15,7 +15,7 @@ test("production invitations target the password setup page, never the portal ho
     global.fetch = async (url, options) => {
       called = true;
       const target = new URL(url);
-      if (target.pathname.startsWith("/auth/v1/admin/users/")) return new Response(JSON.stringify({id:"11111111-1111-4111-8111-111111111111",email:"unused-test@example.com",invited_at:"2026-11-03T12:00:00Z",user_metadata:{first_name:"Test",last_name:"Employee",username:"unused-test"}}));
+      if (target.pathname.startsWith("/auth/v1/admin/users/")) return new Response(JSON.stringify({id:"11111111-1111-4111-8111-111111111111",email:"unused-test@example.com",invited_at:"2026-11-03T12:00:00Z",user_metadata:{first_name:"Test",last_name:"Employee",username:"unused-test",company_name:"I Care Pharmacy"}}));
       assert.equal(target.pathname, "/auth/v1/invite");
       assert.equal(target.searchParams.get("redirect_to"), "https://app.tymrak.com/activate.html");
       assert.equal(options.method, "POST");
@@ -25,7 +25,7 @@ test("production invitations target the password setup page, never the portal ho
     };
     await sendActivationInvite({ supabaseUrl: "https://example.supabase.co", secretKey: "sb_secret_test" }, {
       email: "unused-test@example.com", firstName: "Test", lastName: "Employee", username: "unused-test"
-    });
+    }, "I Care Pharmacy");
     assert.equal(called, true);
   } finally {
     process.env = originalEnv;
@@ -59,7 +59,7 @@ test("staging invitations use the stable release-branch activation page", async 
     global.fetch = async (url, options) => {
       calls++;
       const target = new URL(url);
-      if (target.pathname.startsWith("/auth/v1/admin/users/")) return new Response(JSON.stringify({id:"11111111-1111-4111-8111-111111111111",email:"unused-staging-test@example.com",invited_at:"2026-11-03T12:00:00Z",user_metadata:{first_name:"Test",last_name:"Employee",username:"unused-staging-test"}}));
+      if (target.pathname.startsWith("/auth/v1/admin/users/")) return new Response(JSON.stringify({id:"11111111-1111-4111-8111-111111111111",email:"unused-staging-test@example.com",invited_at:"2026-11-03T12:00:00Z",user_metadata:{first_name:"Test",last_name:"Employee",username:"unused-staging-test",company_name:"I Care Pharmacy"}}));
       assert.equal(target.pathname, "/auth/v1/invite");
       assert.equal(target.searchParams.get("redirect_to"), expected);
       assert.equal(options.method, "POST");
@@ -73,7 +73,7 @@ test("staging invitations use the stable release-branch activation page", async 
     };
     await sendActivationInvite({ supabaseUrl: "https://example.supabase.co", secretKey: "sb_secret_test" }, {
       email: "unused-staging-test@example.com", firstName: "Test", lastName: "Employee", username: "unused-staging-test"
-    });
+    }, "I Care Pharmacy");
     assert.equal(calls, 2);
   } finally {
     process.env = originalEnv;
@@ -93,7 +93,7 @@ test("staging invitation redirects reject a production site URL before sending",
     await assert.rejects(
       sendActivationInvite({ supabaseUrl: "https://example.supabase.co", secretKey: "sb_secret_test" }, {
         email: "unused-staging-test@example.com", firstName: "Test", lastName: "Employee", username: "unused-staging-test"
-      }),
+      }, "I Care Pharmacy"),
       /Invalid staging site origin/
     );
     assert.equal(called, false);

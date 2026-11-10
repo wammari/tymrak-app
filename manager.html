@@ -24,7 +24,7 @@
   <div class="user"><div class="user-email" id="managerEmail"></div><div class="user-role" id="managerRole"></div><button class="signout" id="signOut" type="button">Sign out</button></div>
 </aside>
 <main class="main">
-  <header class="topbar"><h1 id="topbarTitle">Manager Portal</h1><span class="protected">Protected workspace</span></header>
+  <header class="topbar"><h1 id="topbarTitle">Manager Portal</h1><label for="companySelect">Company <select id="companySelect" aria-label="Active company" hidden></select></label><span class="protected">Protected workspace</span></header>
   <div class="content">
     <div class="view" id="dashboardView"><section class="welcome"><h2>Welcome to TYMRAK Manager</h2><p>Your secure workspace for managing people and workforce operations.</p></section><div class="module-grid"><div class="module-card"><strong>Employees</strong><span>Manage employee profiles and secure account invitations.</span></div><div class="module-card"><strong>Workforce tools</strong><span>Review employee hours, exceptions, and pay-period timecards.</span></div><div class="module-card"><strong>Administration</strong><span>Payroll and settings are placeholders and are not enabled yet.</span></div></div></div>
     <div class="view" id="employeesView" hidden>
@@ -65,10 +65,10 @@ import { createClient } from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js
 
 
 const supabase=createClient(SUPABASE_URL,SUPABASE_PUBLISHABLE_KEY);
-let currentSession=null;let employees=[];let editingId=null;let timecards=[];let selectedPeriodKey=null;let currentPeriodKey=null;
+let currentSession=null;let selectedCompanyId=null;let employees=[];let editingId=null;let timecards=[];let selectedPeriodKey=null;let currentPeriodKey=null;
 const $=id=>document.getElementById(id);
 
-async function managerRequest(path,options={}){const{data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("Your session has expired. Please sign in again.");currentSession=session;return fetch(path,{...options,headers:{...(options.headers||{}),Authorization:`Bearer ${session.access_token}`}})}
+async function managerRequest(path,options={}){const{data:{session}}=await supabase.auth.getSession();if(!session)throw new Error("Your session has expired. Please sign in again.");currentSession=session;return fetch(path,{...options,headers:{...(options.headers||{}),Authorization:`Bearer ${session.access_token}`,...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})}})}
 async function readResponse(response){const data=await response.json().catch(()=>({}));if(response.status===401||response.status===403){await supabase.auth.signOut();window.location.replace("/manager-login.html");throw new Error("Manager access required")}if(!response.ok)throw new Error(data.error||"Unable to complete request");return data}
 function showNotice(element,message,type){element.textContent=message;element.className=`notice ${type}`}
 function clearNotice(element){element.textContent="";element.className="notice"}
@@ -100,7 +100,25 @@ $("nextPeriod").addEventListener("click",()=>{const next=periodKeyAfter(selected
 $("selectAllTimecards").addEventListener("change",event=>document.querySelectorAll(".employee-select:not(:disabled)").forEach(box=>box.checked=event.target.checked));
 $("saveApprove").addEventListener("click",approveSelectedTimecards);
 $("backToTimecards").addEventListener("click",()=>{$("timecardDetail").hidden=true;$("timecardSummary").hidden=false});
-async function initialize(){try{const data=await readResponse(await managerRequest("/api/manager-session"));$("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("addEmployee").hidden=data.role!=="admin";$("loading").style.display="none";$("app").style.display="grid"}catch(_){await supabase.auth.signOut();window.location.replace("/manager-login.html")}}
+async function initialize(){try{
+  const initial=await readResponse(await managerRequest("/api/manager-session"));
+  const memberships=initial.availableOrganizations||[];
+  if(!memberships.length)throw new Error("No active company membership");
+  const companySelect=$("companySelect");
+  const stored=sessionStorage.getItem("tymrak-company-id");
+  selectedCompanyId=memberships.some(m=>m.organizationId===stored)?stored:(memberships.length===1?memberships[0].organizationId:null);
+  companySelect.replaceChildren();
+  if(memberships.length>1){const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="Select a company";companySelect.append(placeholder)}
+  for(const membership of memberships){const option=document.createElement("option");option.value=membership.organizationId;option.textContent=membership.name||membership.organizationId;companySelect.append(option)}
+  companySelect.hidden=memberships.length<2;
+  companySelect.value=selectedCompanyId||"";
+  companySelect.addEventListener("change",()=>{if(!memberships.some(m=>m.organizationId===companySelect.value))return;sessionStorage.setItem("tymrak-company-id",companySelect.value);window.location.reload()});
+  if(!selectedCompanyId){$("loading").textContent="Select your company above to continue";$("loading").style.display="none";$("app").style.display="grid";document.querySelector(".content").hidden=true;return}
+  sessionStorage.setItem("tymrak-company-id",selectedCompanyId);
+  const data=await readResponse(await managerRequest("/api/manager-session"));
+  if(!data.authorized||data.organizationId!==selectedCompanyId)throw new Error("Company access not authorized");
+  $("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("addEmployee").hidden=data.role!=="admin";$("loading").style.display="none";$("app").style.display="grid"
+}catch(_){$("loading").textContent="Unable to verify company access. Please sign in again."}}
 $("signOut").addEventListener("click",async()=>{await supabase.auth.signOut();window.location.replace("/manager-login.html")});supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT"&&currentSession)window.location.replace("/manager-login.html")});initialize();
 </script>
 </body>

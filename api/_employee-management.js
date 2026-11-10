@@ -108,7 +108,10 @@ export function activationRedirect() {
   return `${getSiteUrl()}/activate.html`;
 }
 
-export async function sendActivationInvite(configuration, employee) {
+export async function sendActivationInvite(configuration, employee, companyName) {
+  if (typeof companyName !== 'string' || !companyName.trim()) {
+    throw new Error('Verified company name is required before sending an invitation');
+  }
   const response = await fetch(
     `${configuration.supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(activationRedirect())}`,
     {
@@ -119,7 +122,8 @@ export async function sendActivationInvite(configuration, employee) {
         data: {
           first_name: employee.firstName,
           last_name: employee.lastName,
-          username: employee.username
+          username: employee.username,
+          company_name: companyName.trim()
         }
       })
     }
@@ -171,7 +175,8 @@ export async function sendActivationInvite(configuration, employee) {
     !priorIdentitySignIn &&
     metadata.first_name === employee.firstName &&
     metadata.last_name === employee.lastName &&
-    metadata.username === employee.username;
+    metadata.username === employee.username &&
+    metadata.company_name === companyName.trim();
   if (!safe) {
     const error = new Error(
       "Auth invitation identity could not be verified as a new, unconfirmed invited account. " +

@@ -24,7 +24,19 @@ export default async function handler(req, res) {
     });
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });
 
-    const invite = await sendActivationInvite(authorization.configuration, validation.input);
+    // Resolve the company name from the server-authorized organization, never from request body.
+    const companyResponse = await fetch(
+      `${supabaseUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(authorization.organizationId)}&is_active=eq.true&select=id,name`,
+      { headers: databaseHeaders(secretKey) }
+    );
+    if (!companyResponse.ok) throw new Error("Unable to verify invitation company");
+    const companies = await companyResponse.json();
+    if (!Array.isArray(companies) || companies.length !== 1 ||
+        companies[0]?.id !== authorization.organizationId ||
+        typeof companies[0]?.name !== "string" || !companies[0].name.trim()) {
+      return res.status(403).json({ error: "Active company could not be verified" });
+    }
+    const invite = await sendActivationInvite(authorization.configuration, validation.input, companies[0].name);
     inviteIssued = true;
     const employee = {
       ...toEmployeeRecord(validation.input),

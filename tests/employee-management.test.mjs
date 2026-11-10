@@ -58,12 +58,13 @@ function installManagerFetch(operation, authIdentity = null) {
       const id = decodeURIComponent(String(url).split("/").pop());
       return new Response(JSON.stringify(authIdentity || {
         id, email: "ada@example.com", invited_at: "2026-11-03T12:00:00Z",
-        user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
+        user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", company_name: "I Care Pharmacy" }
       }));
     }
     if (String(url).includes("/rest/v1/user_roles")) {
       return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     }
+    if (String(url).includes("/rest/v1/organizations?")) return new Response(JSON.stringify([{id:"aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",name:"I Care Pharmacy"}]));
     return operation(String(url), options, calls);
   };
   return calls;
@@ -121,7 +122,7 @@ test("ordinary employees cannot access employee-management APIs", async () => {
   const res = responseRecorder();
   await employeesHandler(request("GET"), res);
   assert.equal(res.statusCode, 403);
-  assert.match(res.payload.error, /Manager/);
+  assert.match(res.payload.error, /company membership/i);
 });
 
 test("a manager can list employees", async () => {
@@ -173,7 +174,7 @@ test("fresh Supabase email identity timestamp is not mistaken for a prior sign-i
   }, {
     id: "11111111-1111-4111-8111-111111111111",
     email: "ada@example.com", invited_at: created, identities: [identity],
-    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
+    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", company_name: "I Care Pharmacy" }
   });
   const res = responseRecorder();
   await invitationHandler(request("POST", input()), res);

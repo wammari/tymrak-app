@@ -41,7 +41,7 @@ export function getSupabaseConfiguration() {
   } catch { return null; }
 }
 
-export async function requireManager(req) {
+export async function requireManager(req, { allowUnselected = false } = {}) {
   const accessToken = getBearerToken(req);
 
   if (!accessToken) {
@@ -135,7 +135,7 @@ export async function requireManager(req) {
     roleResponse = await fetch(
       `${supabaseUrl}/rest/v1/user_roles?auth_user_id=eq.${encodeURIComponent(
         user.id
-      )}&select=role,organization_id,organization:organizations!inner(is_active)&organization.is_active=eq.true`,
+      )}&select=role,organization_id,organization:organizations!inner(name,is_active)&organization.is_active=eq.true`,
       {
         headers: databaseHeaders(secretKey)
       }
@@ -172,7 +172,21 @@ export async function requireManager(req) {
     });
     return { ok: false, status: 502, error: "Manager role lookup returned an invalid response" };
   }
-  const membership = Array.isArray(roleRecords) && roleRecords.length === 1 ? roleRecords[0] : null;
+  // An explicit organization context is mandatory when the user belongs to multiple companies.
+  // Never silently fall back to another tenant when the selected company is unavailable.
+  const selected = req.headers?.["x-tymrak-organization-id"];
+  const selectedId = Array.isArray(selected) ? null : selected;
+  const validId = value => typeof value === "string" && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
+  if (selectedId != null && !validId(selectedId)) {
+    return { ok: false, status: 400, error: "Invalid selected company" };
+  }
+  const activeMemberships = Array.isArray(roleRecords) ? roleRecords.filter(record =>
+    MANAGER_ROLES.has(record?.role) && validId(record?.organization_id) && record?.organization?.is_active === true
+  ) : [];
+  const matching = selectedId
+    ? activeMemberships.filter(record => record.organization_id === selectedId)
+    : activeMemberships;
+  const membership = matching.length === 1 ? matching[0] : null;
   const role = membership?.role;
   const organizationId = membership?.organization_id;
   const authorized = MANAGER_ROLES.has(role) &&
@@ -187,11 +201,22 @@ export async function requireManager(req) {
     authorized
   });
 
+  if (!authorized && allowUnselected && !selectedId && activeMemberships.length > 1) {
+    return {
+      ok: true,
+      selectionRequired: true,
+      user: { id: user.id, email: user.email || "" },
+      organizationId: null,
+      role: null,
+      availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, name: record.organization.name, role: record.role }))
+    };
+  }
+
   if (!authorized) {
     return {
       ok: false,
       status: 403,
-      error: "Manager access requires an active company membership"
+      error: selectedId ? "Selected company is not available to this administrator" : "Select a company to continue (an active company membership is required)"
     };
   }
 
@@ -218,6 +243,7 @@ export async function requireManager(req) {
     },
     role,
     organizationId,
+    availableOrganizations: activeMemberships.map(record => ({ organizationId: record.organization_id, name: record.organization.name, role: record.role })),
     employeeIds,
     configuration
   };
