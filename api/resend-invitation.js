@@ -1,7 +1,7 @@
 import { requireManager } from "./_manager-auth.js";
 import {canManageEmployee} from './_manager-scope.js';
 import {
-  databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite
+  databaseHeaders, EMPLOYEE_SELECT, prepareExistingInvitationIdentity, sendActivationInvite
 } from "./_employee-management.js";
 
 export default async function handler(req, res) {
@@ -45,6 +45,10 @@ export default async function handler(req, res) {
         typeof companies[0]?.name !== "string" || !companies[0].name.trim()) {
       return res.status(403).json({ error: "Active company could not be verified" });
     }
+    await prepareExistingInvitationIdentity(authorization.configuration, {
+      email: employee.email, firstName: employee.first_name,
+      lastName: employee.last_name, username: employee.username
+    }, companies[0].name, employee.auth_user_id);
     const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
       lastName: employee.last_name, username: employee.username
