@@ -109,7 +109,7 @@ async function initialize(){try{
   selectedCompanyId=memberships.some(m=>m.organizationId===stored)?stored:(memberships.length===1?memberships[0].organizationId:null);
   companySelect.replaceChildren();
   if(memberships.length>1){const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="Select a company";companySelect.append(placeholder)}
-  for(const membership of memberships){const option=document.createElement("option");option.value=membership.organizationId;option.textContent=membership.organizationId;companySelect.append(option)}
+  for(const membership of memberships){const option=document.createElement("option");option.value=membership.organizationId;option.textContent=membership.name||membership.organizationId;companySelect.append(option)}
   companySelect.hidden=memberships.length<2;
   companySelect.value=selectedCompanyId||"";
   companySelect.addEventListener("change",()=>{if(!memberships.some(m=>m.organizationId===companySelect.value))return;sessionStorage.setItem("tymrak-company-id",companySelect.value);window.location.reload()});
