@@ -1,4 +1,5 @@
 name: Disposable production migration rehearsal
+# Fresh disposable restore and migration rehearsal requested 2026-11-09
 on:
   push:
     branches: [release/database-rehearsal]
