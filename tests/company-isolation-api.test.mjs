@@ -24,9 +24,10 @@ test.beforeEach(()=>{
   const json=value=>new Response(JSON.stringify(value));
   if(url.pathname==='/auth/v1/user')return json({id:'manager-A'});
   if(url.pathname==='/rest/v1/user_roles')return json([membership]);
+  if(url.pathname==='/rest/v1/organizations')return json([{id:companyA,name:'I Care Pharmacy'}]);
   if(url.pathname==='/rest/v1/rpc/manager_employee_scope')return json({employeeIds:[empA]});
   if(url.pathname==='/auth/v1/invite')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com'});
-  if(url.pathname==='/auth/v1/admin/users/33333333-3333-4333-8333-333333333333')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com',invited_at:'2026-11-03T12:00:00Z',user_metadata:{first_name:'A',last_name:'Employee',username:'employeeA'}});
+  if(url.pathname==='/auth/v1/admin/users/33333333-3333-4333-8333-333333333333')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com',invited_at:'2026-11-03T12:00:00Z',user_metadata:{first_name:'A',last_name:'Employee',username:'employeeA',company_name:'I Care Pharmacy'}});
   if(url.pathname==='/rest/v1/employees'){
    if(options.method==='POST'){
     const row={id:'55555555-5555-4555-8555-555555555555',...JSON.parse(options.body)};assert.equal(row.organization_id,companyA);rows.push(row);return json([row]);
@@ -79,6 +80,9 @@ test('new employee company comes from the server membership and ignores submitte
  membership.role='admin';
  const result=await run(invitation,'POST',{...input,organization_id:companyB,organizationId:companyB,role:'admin'});
  assert.equal(result.code,201);const saved=rows.at(-1);assert.equal(saved.organization_id,companyA);assert.equal(saved.role,undefined);
+ const inviteCall=calls.find(c=>c.url.pathname==='/auth/v1/invite');
+ assert.equal(JSON.parse(inviteCall.options.body).data.company_name,'I Care Pharmacy');
+ assert.equal(calls.find(c=>c.url.pathname==='/rest/v1/organizations').url.searchParams.get('id'),`eq.${companyA}`);
 });
 test('authorization joins the active company using database-owned membership, never editable Auth metadata',async()=>{
  const result=await requireManager({headers:{authorization:'Bearer manager-A'}});
