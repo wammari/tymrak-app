@@ -10,7 +10,7 @@ on conflict do nothing;
 
 -- Single transaction for company creation and initial admin membership.
 -- Only the service backend can execute, after independently validating the caller.
-create or replace function tymrak_private.create_managed_company(
+create or replace function public.create_managed_company(
  p_name text, p_platform_admin uuid
 ) returns uuid language plpgsql security invoker
 set search_path = '' as $$
@@ -27,4 +27,5 @@ begin
  values (p_platform_admin,v_id,'admin');
  return v_id;
 end $$;
-revoke all on function tymrak_private.create_managed_company(text,uuid) from public, anon, authenticated;
+revoke all on function public.create_managed_company(text,uuid) from public, anon, authenticated;
+grant execute on function public.create_managed_company(text,uuid) to service_role;
