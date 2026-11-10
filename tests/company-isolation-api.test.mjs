@@ -84,6 +84,20 @@ test('new employee company comes from the server membership and ignores submitte
  assert.equal(JSON.parse(inviteCall.options.body).data.company_name,'I Care Pharmacy');
  assert.equal(calls.find(c=>c.url.pathname==='/rest/v1/organizations').url.searchParams.get('id'),`eq.${companyA}`);
 });
+test('multi-company access requires explicit authorized company context',async()=>{
+ const original=global.fetch;
+ global.fetch=async(url,options)=>String(url).includes('/rest/v1/user_roles')
+  ?new Response(JSON.stringify([membership,{role:'admin',organization_id:companyB,organization:{is_active:true}}]))
+  :original(url,options);
+ const ambiguous=await requireManager({headers:{authorization:'Bearer manager-A'}});
+ assert.equal(ambiguous.status,403);
+ const selected=await requireManager({headers:{authorization:'Bearer manager-A','x-tymrak-organization-id':companyB}});
+ assert.equal(selected.ok,true);assert.equal(selected.organizationId,companyB);
+ const foreign=await requireManager({headers:{authorization:'Bearer manager-A','x-tymrak-organization-id':'cccccccc-cccc-4ccc-8ccc-cccccccccccc'}});
+ assert.equal(foreign.status,403);
+ const invalid=await requireManager({headers:{authorization:'Bearer manager-A','x-tymrak-organization-id':'invalid'}});
+ assert.equal(invalid.status,400);
+});
 test('authorization joins the active company using database-owned membership, never editable Auth metadata',async()=>{
  const result=await requireManager({headers:{authorization:'Bearer manager-A'}});
  assert.equal(result.organizationId,companyA);
