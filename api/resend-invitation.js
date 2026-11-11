@@ -38,7 +38,7 @@ export default async function handler(req, res) {
     const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
       lastName: employee.last_name, username: employee.username, companyName
-    });
+    }, employee.auth_user_id);
     inviteIssued = true;
     if (invite.id !== employee.auth_user_id) {
       return res.status(409).json({ error: "The invitation returned a different account. The existing employee account link was preserved. An email may have been sent; do not retry or resend. Contact your administrator to reconcile the account." });
