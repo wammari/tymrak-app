@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     if (!canManageEmployee(authorization, id)) return res.status(404).json({error:'Employee not found'});
     const { supabaseUrl, secretKey } = authorization.configuration;
     const lookup = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id,invited_at&limit=2`,
       { headers: databaseHeaders(secretKey) }
     );
     if (!lookup.ok) throw new Error("Employee lookup failed");
