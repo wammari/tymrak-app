@@ -391,6 +391,24 @@ test("resending an invitation updates by ID and never creates an employee", asyn
   await resendHandler(request("POST", { id: "employee-1" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/")).length, 2);
+});
+
+test("resend blocks a mismatched linked Auth identity before sending", async () => {
+  const calls = installManagerFetch(async (url) => {
+    if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
+      auth_user_id: "11111111-1111-4111-8111-111111111111"
+    })]));
+    throw new Error(`Unexpected URL ${url}`);
+  }, {
+    id: "11111111-1111-4111-8111-111111111111",
+    email: "different@example.com", invited_at: "2026-11-03T12:00:00Z"
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
+  assert.equal(calls.some(call => call.options.method === "PATCH"), false);
 });
 
 test("activated employees cannot be resent an activation invitation", async () => {
