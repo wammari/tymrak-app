@@ -1,7 +1,7 @@
 import { requireManager } from "./_manager-auth.js";
 import {canManageEmployee} from './_manager-scope.js';
 import {
-  databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite
+  databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite, verifiedCompanyName
 } from "./_employee-management.js";
 
 export default async function handler(req, res) {
@@ -34,9 +34,10 @@ export default async function handler(req, res) {
     if (!employee.auth_user_id) {
       return res.status(409).json({ error: "This employee's account link needs repair before another invitation can be sent" });
     }
+    const companyName = await verifiedCompanyName(authorization.configuration, authorization.organizationId);
     const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
-      lastName: employee.last_name, username: employee.username
+      lastName: employee.last_name, username: employee.username, companyName
     });
     inviteIssued = true;
     if (invite.id !== employee.auth_user_id) {
