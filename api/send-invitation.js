@@ -1,7 +1,7 @@
 import { requireManager } from "./_manager-auth.js";
 import {
   databaseHeaders, findDuplicate, sendActivationInvite,
-  toEmployeeRecord, validateEmployeeInput
+  toEmployeeRecord, validateEmployeeInput, verifiedCompanyName
 } from "./_employee-management.js";
 
 export const validateInvitationInput = validateEmployeeInput;
@@ -24,7 +24,8 @@ export default async function handler(req, res) {
     });
     if (duplicate) return res.status(409).json({ error: `An employee with this ${duplicate} already exists` });
 
-    const invite = await sendActivationInvite(authorization.configuration, validation.input);
+    const companyName = await verifiedCompanyName(authorization.configuration, authorization.organizationId);
+    const invite = await sendActivationInvite(authorization.configuration, { ...validation.input, companyName });
     inviteIssued = true;
     const employee = {
       ...toEmployeeRecord(validation.input),

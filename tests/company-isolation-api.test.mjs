@@ -24,9 +24,14 @@ test.beforeEach(()=>{
   const json=value=>new Response(JSON.stringify(value));
   if(url.pathname==='/auth/v1/user')return json({id:'manager-A'});
   if(url.pathname==='/rest/v1/user_roles')return json([membership]);
+  if(url.pathname==='/rest/v1/organizations'){
+   assert.equal(url.searchParams.get('id'),`eq.${companyA}`);
+   assert.equal(url.searchParams.get('is_active'),'eq.true');
+   return json([{id:companyA,name:'Company A'}]);
+  }
   if(url.pathname==='/rest/v1/rpc/manager_employee_scope')return json({employeeIds:[empA]});
   if(url.pathname==='/auth/v1/invite')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com'});
-  if(url.pathname==='/auth/v1/admin/users/33333333-3333-4333-8333-333333333333')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com',invited_at:'2026-11-03T12:00:00Z',user_metadata:{first_name:'A',last_name:'Employee',username:'employeeA'}});
+  if(url.pathname==='/auth/v1/admin/users/33333333-3333-4333-8333-333333333333')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com',invited_at:'2026-11-03T12:00:00Z',user_metadata:{first_name:'A',last_name:'Employee',username:'employeeA',company_name:'Company A'}});
   if(url.pathname==='/rest/v1/employees'){
    if(options.method==='POST'){
     const row={id:'55555555-5555-4555-8555-555555555555',...JSON.parse(options.body)};assert.equal(row.organization_id,companyA);rows.push(row);return json([row]);
