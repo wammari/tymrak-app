@@ -104,6 +104,23 @@ export async function findDuplicate({ supabaseUrl, secretKey, organizationId, sc
   return null;
 }
 
+export async function verifiedCompanyName(configuration, organizationId) {
+  if (!/^[0-9a-f-]{36}$/i.test(organizationId || "")) throw new Error("A valid company is required");
+  const response = await fetch(
+    `${configuration.supabaseUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(organizationId)}&is_active=eq.true&select=id,name&limit=2`,
+    { headers: databaseHeaders(configuration.secretKey) }
+  );
+  if (!response.ok) throw new Error("Company lookup failed");
+  const rows = await response.json();
+  const name = Array.isArray(rows) && rows.length === 1 ? cleanString(rows[0]?.name) : "";
+  if (!name) {
+    const error = new Error("Company name is missing or company is inactive; invitation was not sent");
+    error.status = 409;
+    throw error;
+  }
+  return name;
+}
+
 export function activationRedirect() {
   return `${getSiteUrl()}/activate.html`;
 }
@@ -119,7 +136,8 @@ export async function sendActivationInvite(configuration, employee) {
         data: {
           first_name: employee.firstName,
           last_name: employee.lastName,
-          username: employee.username
+          username: employee.username,
+          organization_name: employee.companyName
         }
       })
     }
@@ -171,7 +189,8 @@ export async function sendActivationInvite(configuration, employee) {
     !priorIdentitySignIn &&
     metadata.first_name === employee.firstName &&
     metadata.last_name === employee.lastName &&
-    metadata.username === employee.username;
+    metadata.username === employee.username &&
+    metadata.organization_name === employee.companyName;
   if (!safe) {
     const error = new Error(
       "Auth invitation identity could not be verified as a new, unconfirmed invited account. " +
