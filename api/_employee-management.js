@@ -150,6 +150,33 @@ export async function sendActivationInvite(configuration, employee, expectedAuth
       error.status = 409;
       throw error;
     }
+    // Supabase may reuse an invited Auth user without updating its metadata.
+    // Synchronize verified company details before issuing the email so the
+    // email template receives company_name for this existing identity.
+    const metadataResponse = await fetch(
+      `${configuration.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(expectedAuthUserId)}`,
+      {
+        method: "PUT",
+        headers: databaseHeaders(configuration.secretKey),
+        body: JSON.stringify({ user_metadata: {
+          ...(existing.user_metadata || {}),
+          first_name: employee.firstName,
+          last_name: employee.lastName,
+          username: employee.username,
+          company_name: employee.companyName
+        } })
+      }
+    );
+    const synchronized = metadataResponse.ok ? await metadataResponse.json().catch(() => null) : null;
+    if (synchronized?.id !== expectedAuthUserId ||
+        synchronized?.email?.trim().toLowerCase() !== employee.email.trim().toLowerCase() ||
+        synchronized?.user_metadata?.company_name !== employee.companyName ||
+        synchronized?.confirmed_at || synchronized?.email_confirmed_at ||
+        synchronized?.last_sign_in_at) {
+      const error = new Error("Could not synchronize the verified company name on the linked Auth account; no invitation sent");
+      error.status = 409;
+      throw error;
+    }
   }
   const response = await fetch(
     `${configuration.supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(activationRedirect())}`,
