@@ -574,3 +574,20 @@ test("administrator renewal rejects invitations older than 21 days before contac
   assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
   assert.equal(calls.some(call => call.options.method === "PATCH"), false);
 });
+
+
+test("resend queries original invited_at for 21-day eligibility", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
+      auth_user_id: "11111111-1111-4111-8111-111111111111"
+    })]));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({
+      id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com"
+    }));
+    if (url.includes("/rest/v1/employees") && url.includes("auth_user_id=eq.")) return new Response(JSON.stringify([employee()]));
+    throw new Error("Unexpected request");
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.ok(calls.some(call => call.url.includes("/employees?") && call.url.includes("invited_at")));
+});
