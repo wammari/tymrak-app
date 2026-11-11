@@ -58,7 +58,7 @@ function installManagerFetch(operation, authIdentity = null) {
       const id = decodeURIComponent(String(url).split("/").pop());
       return new Response(JSON.stringify(authIdentity || {
         id, email: "ada@example.com", invited_at: "2026-11-03T12:00:00Z",
-        user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", organization_name: "Le Delice Pastry Shop" }
+        user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", company_name: "Le Delice Pastry Shop" }
       }));
     }
     if (String(url).includes("/rest/v1/organizations?")) {
@@ -160,7 +160,7 @@ test("a manager can create an active employee and send an invitation", async () 
   assert.equal(res.payload.success, true);
   assert.equal(calls.filter(call => call.url.includes("/auth/v1/invite")).length, 1);
   const inviteRequest = calls.find(call => call.url.includes("/auth/v1/invite"));
-  assert.equal(JSON.parse(inviteRequest.options.body).data.organization_name, "Le Delice Pastry Shop");
+  assert.equal(JSON.parse(inviteRequest.options.body).data.company_name, "Le Delice Pastry Shop");
 });
 
 test("company lookup failure blocks invitation before sending email", async () => {
@@ -192,7 +192,7 @@ test("fresh Supabase email identity timestamp is not mistaken for a prior sign-i
   }, {
     id: "11111111-1111-4111-8111-111111111111",
     email: "ada@example.com", invited_at: created, identities: [identity],
-    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", organization_name: "Le Delice Pastry Shop" }
+    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", company_name: "Le Delice Pastry Shop" }
   });
   const res = responseRecorder();
   await invitationHandler(request("POST", input()), res);
