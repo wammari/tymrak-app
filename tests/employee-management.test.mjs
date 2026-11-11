@@ -397,7 +397,8 @@ test("resending an invitation updates by ID and never creates an employee", asyn
   await resendHandler(request("POST", { id: "employee-1" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
-  assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/")).length, 2);
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/")).length, 3);
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/") && call.options.method === "PUT").length, 1);
 });
 
 test("resend blocks a mismatched linked Auth identity before sending", async () => {
