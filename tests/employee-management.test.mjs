@@ -34,6 +34,7 @@ function employee(overrides = {}) {
     email: "ada@example.com", username: "ada", mobile: null,
     position: "Engineer", department: "Technology", province: "AB",
     hire_date: null, invitation_status: "Invitation Sent",
+    invited_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     activated_at: null, is_active: true, ...overrides
   };
 }
@@ -556,3 +557,20 @@ test("employee list is the default Employees view and add/edit exposes mobile an
   assert.match(browserSource, /\["hireDate","hire_date"\]/);
 });
 import {PostgrestResponse as Response} from "./_postgrest-response.mjs";
+
+
+test("administrator renewal rejects invitations older than 21 days before contacting Auth", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
+      auth_user_id: "11111111-1111-4111-8111-111111111111",
+      invited_at: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000).toISOString()
+    })]));
+    throw new Error("Expired renewal must not call Auth or update records");
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 409);
+  assert.match(res.payload.error, /21-day/);
+  assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
+  assert.equal(calls.some(call => call.options.method === "PATCH"), false);
+});
