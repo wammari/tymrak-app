@@ -159,6 +159,22 @@ test("a manager can create an active employee and send an invitation", async () 
   assert.equal(res.statusCode, 201);
   assert.equal(res.payload.success, true);
   assert.equal(calls.filter(call => call.url.includes("/auth/v1/invite")).length, 1);
+  const inviteRequest = calls.find(call => call.url.includes("/auth/v1/invite"));
+  assert.equal(JSON.parse(inviteRequest.options.body).data.organization_name, "Le Delice Pastry Shop");
+});
+
+test("company lookup failure blocks invitation before sending email", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes("/employees?")) return new Response("[]");
+    throw new Error(`Unexpected URL ${url}`);
+  });
+  const originalFetchForTest = global.fetch;
+  global.fetch = async (url, options) => String(url).includes("/rest/v1/organizations?")
+    ? new Response("[]") : originalFetchForTest(url, options);
+  const res = responseRecorder();
+  await invitationHandler(request("POST", input()), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
 });
 
 test("fresh Supabase email identity timestamp is not mistaken for a prior sign-in", async () => {
