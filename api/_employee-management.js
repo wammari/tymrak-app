@@ -162,7 +162,7 @@ export async function sendActivationInvite(configuration, employee, expectedAuth
           first_name: employee.firstName,
           last_name: employee.lastName,
           username: employee.username,
-          organization_name: employee.companyName
+          company_name: employee.companyName
         }
       })
     }
@@ -215,7 +215,7 @@ export async function sendActivationInvite(configuration, employee, expectedAuth
     metadata.first_name === employee.firstName &&
     metadata.last_name === employee.lastName &&
     metadata.username === employee.username &&
-    metadata.organization_name === employee.companyName;
+    metadata.company_name === employee.companyName;
   if (!safe) {
     const error = new Error(
       "Auth invitation identity could not be verified as a new, unconfirmed invited account. " +
