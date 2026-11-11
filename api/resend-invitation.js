@@ -34,6 +34,13 @@ export default async function handler(req, res) {
     if (!employee.auth_user_id) {
       return res.status(409).json({ error: "This employee's account link needs repair before another invitation can be sent" });
     }
+    // The first invitation timestamp is the immutable start of the 21-day
+    // administrator-controlled renewal window. Never extend it on resend.
+    const firstInvitedAt = Date.parse(employee.invited_at || "");
+    if (!Number.isFinite(firstInvitedAt) || firstInvitedAt > Date.now() ||
+        Date.now() - firstInvitedAt >= 21 * 24 * 60 * 60 * 1000) {
+      return res.status(409).json({ error: "The 21-day invitation renewal window has expired or cannot be verified. An administrator must issue a new invitation." });
+    }
     const companyName = await verifiedCompanyName(authorization.configuration, authorization.organizationId);
     const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
@@ -48,7 +55,7 @@ export default async function handler(req, res) {
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),
-        body: JSON.stringify({ invitation_status: "Invitation Sent", invited_at: new Date().toISOString() })
+        body: JSON.stringify({ invitation_status: "Invitation Sent" })
       }
     );
     if (!update.ok) throw new Error("Invitation status update failed");
