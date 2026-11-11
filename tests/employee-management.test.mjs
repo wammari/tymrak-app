@@ -55,6 +55,11 @@ function installManagerFetch(operation, authIdentity = null) {
     if (String(url).endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({ id: "manager-id", email: "manager@example.com" }));
     }
+    if (String(url).includes("/auth/v1/admin/users/") && options.method === "PUT") {
+      const id = decodeURIComponent(String(url).split("/").pop());
+      const metadata = JSON.parse(options.body).user_metadata;
+      return new Response(JSON.stringify({ id, email: "ada@example.com", user_metadata: metadata }));
+    }
     if (String(url).includes("/auth/v1/admin/users/")) {
       const id = decodeURIComponent(String(url).split("/").pop());
       return new Response(JSON.stringify(authIdentity || {
