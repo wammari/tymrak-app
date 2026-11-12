@@ -125,13 +125,13 @@ New Password
 <input
     id="password"
     type="password"
-    minlength="8"
+    minlength="12"
     required
     autocomplete="new-password"
 >
 
 <div class="password-note">
-Password must contain at least 8 characters.
+Password must contain at least 12 characters, including an uppercase letter, a lowercase letter, a number, and a special character.
 </div>
 
 <label for="confirmPassword">
@@ -141,7 +141,7 @@ Confirm Password
 <input
     id="confirmPassword"
     type="password"
-    minlength="8"
+    minlength="12"
     required
     autocomplete="new-password"
 >
@@ -271,8 +271,8 @@ form.addEventListener("submit", async event => {
         return;
     }
     if (!passwordSaved) {
-        if (passwordInput.value.length < 8) {
-            showMessage("error", "Password must contain at least 8 characters.");
+        if (passwordInput.value.length < 12 || !/[a-z]/.test(passwordInput.value) || !/[A-Z]/.test(passwordInput.value) || !/[0-9]/.test(passwordInput.value) || !/[^A-Za-z0-9]/.test(passwordInput.value)) {
+            showMessage("error", "Password must contain at least 12 characters, including uppercase and lowercase letters, a number, and a special character.");
             return;
         }
         if (passwordInput.value !== confirmInput.value) {
