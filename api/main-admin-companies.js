@@ -30,7 +30,7 @@ export default async function handler(req, res) {
   );
   if (!memberships.ok) return res.status(502).json({ error: "Administrator verification unavailable" });
   const assigned = await memberships.json();
-  if (!Array.isArray(assigned) || !assigned.length) return res.status(403).json({ error: "Active administrator membership required" });
+  if (!Array.isArray(assigned) || !assigned.length) return res.status(403).json({ error: "Administrator membership required" });
 
   if (req.method === "GET") {
     const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,is_active,created_at&order=name.asc`, { headers });
@@ -60,9 +60,8 @@ export default async function handler(req, res) {
     body: JSON.stringify({ auth_user_id: user.id, organization_id: company.id, role: "admin" })
   });
   if (!assignedRole.ok) {
-    const rollback = await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${company.id}`, { method: "DELETE", headers });
-    if (!rollback.ok) console.error("Main Administrator company provisioning rollback failed", { companyId: company.id });
-    return res.status(502).json({ error: "Unable to assign company administrator; company creation was not completed. Contact support before retrying." });
+    console.error("Company created without administrator membership; manual reconciliation required", { companyId: company.id });
+    return res.status(502).json({ error: "Company created but administrator assignment needs review. Do not retry; contact support.", companyId: company.id });
   }
   return res.status(201).json({ company });
 }
