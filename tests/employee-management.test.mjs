@@ -34,7 +34,7 @@ function employee(overrides = {}) {
     email: "ada@example.com", username: "ada", mobile: null,
     position: "Engineer", department: "Technology", province: "AB",
     hire_date: null, invitation_status: "Invitation Sent",
-    activated_at: null, is_active: true, ...overrides
+    activated_at: null, invited_at: "2026-11-11T12:00:00Z", is_active: true, ...overrides
   };
 }
 
@@ -373,6 +373,41 @@ test("resending an invitation updates by ID and never creates an employee", asyn
   await resendHandler(request("POST", { id: "employee-1" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
+});
+
+test("resend preserves original invited_at and checks the 21-day window", async () => {
+  const calls = installManagerFetch(async (url, options) => {
+    if (url.includes("/employees?id=eq.employee-1") && !options.method) {
+      assert.match(url, /invited_at/);
+      return new Response(JSON.stringify([employee({ auth_user_id: "11111111-1111-4111-8111-111111111111" })]));
+    }
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({ id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com" }));
+    if (options.method === "PATCH") {
+      assert.deepEqual(JSON.parse(options.body), { invitation_status: "Invitation Sent" });
+      return new Response(JSON.stringify([employee()]));
+    }
+    throw new Error("Unexpected request: " + url);
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 200, JSON.stringify(res.payload));
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/invite")).length, 1);
+});
+
+test("expired, missing, or future invitation dates block resend before Auth", async () => {
+  for (const invited_at of [null, "2026-01-01T00:00:00Z", "2099-01-01T00:00:00Z"]) {
+    const calls = installManagerFetch(async url => {
+      if (url.includes("/employees?id=eq.employee-1")) return new Response(JSON.stringify([employee({
+        auth_user_id: "11111111-1111-4111-8111-111111111111", invited_at
+      })]));
+      throw new Error("No Auth request expected");
+    });
+    const res = responseRecorder();
+    await resendHandler(request("POST", { id: "employee-1" }), res);
+    assert.equal(res.statusCode, 409);
+    assert.match(res.payload.error, /21-day/);
+    assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
+  }
 });
 
 test("activated employees cannot be resent an activation invitation", async () => {
