@@ -47,3 +47,43 @@ test("company name validation blocks writes before database mutation",async()=>{
  const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:" "}},response);
  assert.equal(response.statusCode,400);assert.equal(writes,0);
 });
+
+test("inactive administrator membership is rejected",async()=>{
+ configure();global.fetch=async url=>{
+  if(String(url).includes("/auth/v1/user"))return json({id:ADMIN});
+  if(String(url).includes("/user_roles?"))return json([{organization_id:OTHER}]);
+  if(String(url).includes("/organizations?"))return json([]);
+  throw Error("unexpected request");
+ };
+ const response=res();await handler({method:"GET",headers:{authorization:"Bearer token"}},response);
+ assert.equal(response.statusCode,403);
+});
+test("main administrator creates a company and receives admin membership",async()=>{
+ configure();const createdId="22222222-2222-4222-8222-222222222222";const writes=[];
+ global.fetch=async(url,options={})=>{
+  const u=String(url);
+  if(u.includes("/auth/v1/user"))return json({id:ADMIN});
+  if(u.includes("/user_roles?"))return json([{organization_id:OTHER}]);
+  if(u.includes("/organizations?")&&u.includes("is_active=eq.true"))return json([{id:OTHER}]);
+  if(u.includes("/organizations?"))return json([]);
+  if(u.endsWith("/organizations")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json([{id:createdId,name:"New Bakery",is_active:true}],201);}
+  if(u.endsWith("/user_roles")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json({},201);}
+  throw Error("unexpected request: "+u);
+ };
+ const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"New Bakery"}},response);
+ assert.equal(response.statusCode,201);assert.equal(response.body.company.id,createdId);
+ assert.deepEqual(writes,[{name:"New Bakery",is_active:true},{auth_user_id:ADMIN,organization_id:createdId,role:"admin"}]);
+});
+test("duplicate company name blocks creation",async()=>{
+ configure();let writes=0;global.fetch=async(url,options={})=>{
+  if(options.method==="POST")writes++;
+  const u=String(url);
+  if(u.includes("/auth/v1/user"))return json({id:ADMIN});
+  if(u.includes("/user_roles?"))return json([{organization_id:OTHER}]);
+  if(u.includes("is_active=eq.true"))return json([{id:OTHER}]);
+  if(u.includes("name=ilike."))return json([{id:OTHER}]);
+  throw Error("unexpected request: "+u);
+ };
+ const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Existing Business"}},response);
+ assert.equal(response.statusCode,409);assert.equal(writes,0);
+});
