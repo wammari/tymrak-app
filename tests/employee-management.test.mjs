@@ -399,6 +399,12 @@ test("resending an invitation updates by ID and never creates an employee", asyn
   assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
   assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/")).length, 3);
   assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/") && call.options.method === "PUT").length, 1);
+  const syncIndex = calls.findIndex(call => call.url.includes("/auth/v1/admin/users/") && call.options.method === "PUT");
+  const inviteIndex = calls.findIndex(call => call.url.includes("/auth/v1/invite"));
+  assert.ok(syncIndex >= 0 && inviteIndex > syncIndex, "company metadata must be synchronized before invitation email");
+  const metadata = JSON.parse(calls[syncIndex].options.body).user_metadata;
+  assert.equal(metadata.company_name, "Le Delice Pastry Shop");
+  assert.equal(metadata.first_name, "Ada");
 });
 
 test("resend blocks a mismatched linked Auth identity before sending", async () => {
