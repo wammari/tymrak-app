@@ -18,7 +18,7 @@
   <div class="logo"><span class="tymrak-brand-mark"><img src="/tymrak-brand-board.png" alt="TYMRAK — Time. Tracked Right." width="1536" height="1024"></span></div>
   <nav aria-label="Manager navigation">
     <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
-    <button class="nav-item" type="button" data-view="employees">Employees</button>
+    <button class="nav-item" type="button" data-view="employees">Employees</button><a class="nav-item" id="mainAdminCompaniesLink" href="/company-management.html" hidden>Company Management</a>
     <button class="nav-item" type="button" data-view="timecards">Timecards</button><button class="nav-item" type="button" aria-disabled="true">Time Off</button><a class="nav-item" href="/workplaces.html">Locations</a><button class="nav-item" type="button" aria-disabled="true">Payroll</button><button class="nav-item" type="button" aria-disabled="true">Settings</button>
   </nav>
   <div class="user"><div class="user-email" id="managerEmail"></div><div class="user-role" id="managerRole"></div><button class="signout" id="signOut" type="button">Sign out</button></div>
@@ -117,6 +117,8 @@ async function initialize(){try{
   sessionStorage.setItem("tymrak-company-id",selectedCompanyId);
   const data=await readResponse(await managerRequest("/api/manager-session"));
   if(!data.authorized||data.organizationId!==selectedCompanyId)throw new Error("Company access not authorized");
+  const mainAdminCheck=await managerRequest("/api/main-admin-companies").catch(()=>null);
+  $("mainAdminCompaniesLink").hidden=!mainAdminCheck?.ok;
   $("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("addEmployee").hidden=data.role!=="admin";$("loading").style.display="none";$("app").style.display="grid"
 }catch(_){$("loading").textContent="Unable to verify company access. Please sign in again."}}
 $("signOut").addEventListener("click",async()=>{await supabase.auth.signOut();window.location.replace("/manager-login.html")});supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT"&&currentSession)window.location.replace("/manager-login.html")});initialize();
