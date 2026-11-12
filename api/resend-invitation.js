@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     if (!canManageEmployee(authorization, id)) return res.status(404).json({error:'Employee not found'});
     const { supabaseUrl, secretKey } = authorization.configuration;
     const lookup = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id,invited_at&limit=2`,
       { headers: databaseHeaders(secretKey) }
     );
     if (!lookup.ok) throw new Error("Employee lookup failed");
@@ -33,6 +33,12 @@ export default async function handler(req, res) {
     }
     if (!employee.auth_user_id) {
       return res.status(409).json({ error: "This employee's account link needs repair before another invitation can be sent" });
+    }
+    // Resends cannot extend the original 21-day invitation window.
+    const firstInvitedAt = Date.parse(employee.invited_at || "");
+    if (!Number.isFinite(firstInvitedAt) || firstInvitedAt > Date.now() ||
+        Date.now() - firstInvitedAt >= 21 * 24 * 60 * 60 * 1000) {
+      return res.status(409).json({ error: "The 21-day invitation renewal window has expired or cannot be verified. An administrator must issue a new invitation." });
     }
     const companyResponse = await fetch(
       `${supabaseUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(authorization.organizationId)}&is_active=eq.true&select=id,name`,
@@ -62,7 +68,7 @@ export default async function handler(req, res) {
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),
-        body: JSON.stringify({ invitation_status: "Invitation Sent", invited_at: new Date().toISOString() })
+        body: JSON.stringify({ invitation_status: "Invitation Sent" })
       }
     );
     if (!update.ok) throw new Error("Invitation status update failed");
