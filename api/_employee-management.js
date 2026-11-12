@@ -104,11 +104,80 @@ export async function findDuplicate({ supabaseUrl, secretKey, organizationId, sc
   return null;
 }
 
+export async function verifiedCompanyName(configuration, organizationId) {
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(organizationId || "")) throw new Error("A valid company is required");
+  const response = await fetch(
+    `${configuration.supabaseUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(organizationId)}&is_active=eq.true&select=id,name&limit=2`,
+    { headers: databaseHeaders(configuration.secretKey) }
+  );
+  if (!response.ok) throw new Error("Company lookup failed");
+  const rows = await response.json();
+  const name = Array.isArray(rows) && rows.length === 1 ? cleanString(rows[0]?.name) : "";
+  if (!name) {
+    const error = new Error("Company name is missing or company is inactive; invitation was not sent");
+    error.status = 409;
+    throw error;
+  }
+  return name;
+}
+
 export function activationRedirect() {
   return `${getSiteUrl()}/activate.html`;
 }
 
-export async function sendActivationInvite(configuration, employee) {
+export async function sendActivationInvite(configuration, employee, expectedAuthUserId = null) {
+  if (!cleanString(employee.companyName)) {
+    const error = new Error("Verified company name required before invitation");
+    error.status = 409;
+    throw error;
+  }
+  // For resends, validate the already-linked Auth user BEFORE issuing another email.
+  // Never use email-only matching to determine the account to reuse.
+  if (expectedAuthUserId) {
+    const existingResponse = await fetch(
+      `${configuration.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(expectedAuthUserId)}`,
+      { headers: databaseHeaders(configuration.secretKey) }
+    );
+    const existing = existingResponse.ok ? await existingResponse.json().catch(() => null) : null;
+    const priorSignIn = Array.isArray(existing?.identities) &&
+      existing.identities.some(identity => identity?.last_sign_in_at &&
+        (!identity?.created_at || Date.parse(identity.last_sign_in_at) > Date.parse(identity.created_at) + 1000));
+    if (existing?.id !== expectedAuthUserId ||
+        existing?.email?.trim().toLowerCase() !== employee.email.trim().toLowerCase() ||
+        existing?.confirmed_at || existing?.email_confirmed_at || existing?.phone_confirmed_at ||
+        existing?.last_sign_in_at || priorSignIn || !existing?.invited_at) {
+      const error = new Error("Linked Auth account could not be verified as unactivated; no invitation sent");
+      error.status = 409;
+      throw error;
+    }
+    // Supabase may reuse an invited Auth user without updating its metadata.
+    // Synchronize verified company details before issuing the email so the
+    // email template receives company_name for this existing identity.
+    const metadataResponse = await fetch(
+      `${configuration.supabaseUrl}/auth/v1/admin/users/${encodeURIComponent(expectedAuthUserId)}`,
+      {
+        method: "PUT",
+        headers: databaseHeaders(configuration.secretKey),
+        body: JSON.stringify({ user_metadata: {
+          ...(existing.user_metadata || {}),
+          first_name: employee.firstName,
+          last_name: employee.lastName,
+          username: employee.username,
+          company_name: employee.companyName
+        } })
+      }
+    );
+    const synchronized = metadataResponse.ok ? await metadataResponse.json().catch(() => null) : null;
+    if (synchronized?.id !== expectedAuthUserId ||
+        synchronized?.email?.trim().toLowerCase() !== employee.email.trim().toLowerCase() ||
+        synchronized?.user_metadata?.company_name !== employee.companyName ||
+        synchronized?.confirmed_at || synchronized?.email_confirmed_at ||
+        synchronized?.last_sign_in_at) {
+      const error = new Error("Could not synchronize the verified company name on the linked Auth account; no invitation sent");
+      error.status = 409;
+      throw error;
+    }
+  }
   const response = await fetch(
     `${configuration.supabaseUrl}/auth/v1/invite?redirect_to=${encodeURIComponent(activationRedirect())}`,
     {
@@ -119,7 +188,8 @@ export async function sendActivationInvite(configuration, employee) {
         data: {
           first_name: employee.firstName,
           last_name: employee.lastName,
-          username: employee.username
+          username: employee.username,
+          company_name: employee.companyName
         }
       })
     }
@@ -163,7 +233,7 @@ export async function sendActivationInvite(configuration, employee) {
   const metadata = verified?.user_metadata || {};
   const priorIdentitySignIn = Array.isArray(verified?.identities) &&
     verified.identities.some(identity => identity?.last_sign_in_at && (!identity?.created_at || Date.parse(identity.last_sign_in_at) > Date.parse(identity.created_at) + 1000));
-  const safe = verified?.id === id &&
+  const safe = (!expectedAuthUserId || id === expectedAuthUserId) && verified?.id === id &&
     normalizedEmail === employee.email.trim().toLowerCase() &&
     Boolean(verified.invited_at) &&
     !verified.confirmed_at && !verified.email_confirmed_at &&
@@ -171,7 +241,8 @@ export async function sendActivationInvite(configuration, employee) {
     !priorIdentitySignIn &&
     metadata.first_name === employee.firstName &&
     metadata.last_name === employee.lastName &&
-    metadata.username === employee.username;
+    metadata.username === employee.username &&
+    metadata.company_name === employee.companyName;
   if (!safe) {
     const error = new Error(
       "Auth invitation identity could not be verified as a new, unconfirmed invited account. " +

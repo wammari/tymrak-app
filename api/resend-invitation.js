@@ -1,7 +1,7 @@
 import { requireManager } from "./_manager-auth.js";
 import {canManageEmployee} from './_manager-scope.js';
 import {
-  databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite
+  databaseHeaders, EMPLOYEE_SELECT, sendActivationInvite, verifiedCompanyName
 } from "./_employee-management.js";
 
 export default async function handler(req, res) {
@@ -19,7 +19,7 @@ export default async function handler(req, res) {
     if (!canManageEmployee(authorization, id)) return res.status(404).json({error:'Employee not found'});
     const { supabaseUrl, secretKey } = authorization.configuration;
     const lookup = await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id&limit=2`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(id)}&organization_id=eq.${authorization.organizationId}&select=${EMPLOYEE_SELECT},auth_user_id,invited_at&limit=2`,
       { headers: databaseHeaders(secretKey) }
     );
     if (!lookup.ok) throw new Error("Employee lookup failed");
@@ -34,10 +34,18 @@ export default async function handler(req, res) {
     if (!employee.auth_user_id) {
       return res.status(409).json({ error: "This employee's account link needs repair before another invitation can be sent" });
     }
+    // The first invitation timestamp is the immutable start of the 21-day
+    // administrator-controlled renewal window. Never extend it on resend.
+    const firstInvitedAt = Date.parse(employee.invited_at || "");
+    if (!Number.isFinite(firstInvitedAt) || firstInvitedAt > Date.now() ||
+        Date.now() - firstInvitedAt >= 21 * 24 * 60 * 60 * 1000) {
+      return res.status(409).json({ error: "The 21-day invitation renewal window has expired or cannot be verified. An administrator must issue a new invitation." });
+    }
+    const companyName = await verifiedCompanyName(authorization.configuration, authorization.organizationId);
     const invite = await sendActivationInvite(authorization.configuration, {
       email: employee.email, firstName: employee.first_name,
-      lastName: employee.last_name, username: employee.username
-    });
+      lastName: employee.last_name, username: employee.username, companyName
+    }, employee.auth_user_id);
     inviteIssued = true;
     if (invite.id !== employee.auth_user_id) {
       return res.status(409).json({ error: "The invitation returned a different account. The existing employee account link was preserved. An email may have been sent; do not retry or resend. Contact your administrator to reconcile the account." });
@@ -47,7 +55,7 @@ export default async function handler(req, res) {
       {
         method: "PATCH",
         headers: databaseHeaders(secretKey, "return=representation"),
-        body: JSON.stringify({ invitation_status: "Invitation Sent", invited_at: new Date().toISOString() })
+        body: JSON.stringify({ invitation_status: "Invitation Sent" })
       }
     );
     if (!update.ok) throw new Error("Invitation status update failed");

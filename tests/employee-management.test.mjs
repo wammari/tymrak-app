@@ -34,6 +34,7 @@ function employee(overrides = {}) {
     email: "ada@example.com", username: "ada", mobile: null,
     position: "Engineer", department: "Technology", province: "AB",
     hire_date: null, invitation_status: "Invitation Sent",
+    invited_at: new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString(),
     activated_at: null, is_active: true, ...overrides
   };
 }
@@ -54,12 +55,20 @@ function installManagerFetch(operation, authIdentity = null) {
     if (String(url).endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({ id: "manager-id", email: "manager@example.com" }));
     }
+    if (String(url).includes("/auth/v1/admin/users/") && options.method === "PUT") {
+      const id = decodeURIComponent(String(url).split("/").pop());
+      const metadata = JSON.parse(options.body).user_metadata;
+      return new Response(JSON.stringify({ id, email: "ada@example.com", user_metadata: metadata }));
+    }
     if (String(url).includes("/auth/v1/admin/users/")) {
       const id = decodeURIComponent(String(url).split("/").pop());
       return new Response(JSON.stringify(authIdentity || {
         id, email: "ada@example.com", invited_at: "2026-11-03T12:00:00Z",
-        user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
+        user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", company_name: "Le Delice Pastry Shop" }
       }));
+    }
+    if (String(url).includes("/rest/v1/organizations?")) {
+      return new Response(JSON.stringify([{ id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", name: "Le Delice Pastry Shop" }]));
     }
     if (String(url).includes("/rest/v1/user_roles")) {
       return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
@@ -156,6 +165,22 @@ test("a manager can create an active employee and send an invitation", async () 
   assert.equal(res.statusCode, 201);
   assert.equal(res.payload.success, true);
   assert.equal(calls.filter(call => call.url.includes("/auth/v1/invite")).length, 1);
+  const inviteRequest = calls.find(call => call.url.includes("/auth/v1/invite"));
+  assert.equal(JSON.parse(inviteRequest.options.body).data.company_name, "Le Delice Pastry Shop");
+});
+
+test("company lookup failure blocks invitation before sending email", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes("/employees?")) return new Response("[]");
+    throw new Error(`Unexpected URL ${url}`);
+  });
+  const originalFetchForTest = global.fetch;
+  global.fetch = async (url, options) => String(url).includes("/rest/v1/organizations?")
+    ? new Response("[]") : originalFetchForTest(url, options);
+  const res = responseRecorder();
+  await invitationHandler(request("POST", input()), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
 });
 
 test("fresh Supabase email identity timestamp is not mistaken for a prior sign-in", async () => {
@@ -173,7 +198,7 @@ test("fresh Supabase email identity timestamp is not mistaken for a prior sign-i
   }, {
     id: "11111111-1111-4111-8111-111111111111",
     email: "ada@example.com", invited_at: created, identities: [identity],
-    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada" }
+    user_metadata: { first_name: "Ada", last_name: "Lovelace", username: "ada", company_name: "Le Delice Pastry Shop" }
   });
   const res = responseRecorder();
   await invitationHandler(request("POST", input()), res);
@@ -372,6 +397,31 @@ test("resending an invitation updates by ID and never creates an employee", asyn
   await resendHandler(request("POST", { id: "employee-1" }), res);
   assert.equal(res.statusCode, 200);
   assert.equal(calls.some(call => call.options.method === "POST" && call.url.endsWith("/rest/v1/employees")), false);
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/")).length, 3);
+  assert.equal(calls.filter(call => call.url.includes("/auth/v1/admin/users/") && call.options.method === "PUT").length, 1);
+  const syncIndex = calls.findIndex(call => call.url.includes("/auth/v1/admin/users/") && call.options.method === "PUT");
+  const inviteIndex = calls.findIndex(call => call.url.includes("/auth/v1/invite"));
+  assert.ok(syncIndex >= 0 && inviteIndex > syncIndex, "company metadata must be synchronized before invitation email");
+  const metadata = JSON.parse(calls[syncIndex].options.body).user_metadata;
+  assert.equal(metadata.company_name, "Le Delice Pastry Shop");
+  assert.equal(metadata.first_name, "Ada");
+});
+
+test("resend blocks a mismatched linked Auth identity before sending", async () => {
+  const calls = installManagerFetch(async (url) => {
+    if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
+      auth_user_id: "11111111-1111-4111-8111-111111111111"
+    })]));
+    throw new Error(`Unexpected URL ${url}`);
+  }, {
+    id: "11111111-1111-4111-8111-111111111111",
+    email: "different@example.com", invited_at: "2026-11-03T12:00:00Z"
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 409);
+  assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
+  assert.equal(calls.some(call => call.options.method === "PATCH"), false);
 });
 
 test("activated employees cannot be resent an activation invitation", async () => {
@@ -519,3 +569,37 @@ test("employee list is the default Employees view and add/edit exposes mobile an
   assert.match(browserSource, /\["hireDate","hire_date"\]/);
 });
 import {PostgrestResponse as Response} from "./_postgrest-response.mjs";
+
+
+test("administrator renewal rejects invitations older than 21 days before contacting Auth", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
+      auth_user_id: "11111111-1111-4111-8111-111111111111",
+      invited_at: new Date(Date.now() - 22 * 24 * 60 * 60 * 1000).toISOString()
+    })]));
+    throw new Error("Expired renewal must not call Auth or update records");
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 409);
+  assert.match(res.payload.error, /21-day/);
+  assert.equal(calls.some(call => call.url.includes("/auth/v1/invite")), false);
+  assert.equal(calls.some(call => call.options.method === "PATCH"), false);
+});
+
+
+test("resend queries original invited_at for 21-day eligibility", async () => {
+  const calls = installManagerFetch(async url => {
+    if (url.includes("/employees?")) return new Response(JSON.stringify([employee({
+      auth_user_id: "11111111-1111-4111-8111-111111111111"
+    })]));
+    if (url.includes("/auth/v1/invite")) return new Response(JSON.stringify({
+      id: "11111111-1111-4111-8111-111111111111", email: "ada@example.com"
+    }));
+    if (url.includes("/rest/v1/employees") && url.includes("auth_user_id=eq.")) return new Response(JSON.stringify([employee()]));
+    throw new Error("Unexpected request");
+  });
+  const res = responseRecorder();
+  await resendHandler(request("POST", { id: "employee-1" }), res);
+  assert.ok(calls.some(call => call.url.includes("/employees?") && call.url.includes("invited_at")));
+});
