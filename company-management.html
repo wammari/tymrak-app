@@ -6,7 +6,7 @@
 <main><p><a href="/manager.html">← Back to Manager Portal</a></p>
 <h1>Company Management</h1><p>Create and manage independent TYMRAK businesses. Only the designated Main Administrator can access this page.</p>
 <section class="card"><h2>Add a new business</h2><form id="create"><label for="name">Business name</label><input id="name" maxlength="150" minlength="2" required placeholder="Registered business name"><button id="submit" type="submit">Create Company</button></form><p id="message" role="status"></p></section>
-<section class="card"><h2>Businesses</h2><ul id="companies"><li>Verifying access…</li></ul></section></main>
+<section class="card"><h2>Businesses</h2><p>Select a business to manage its workplaces and employees in the Manager Portal.</p><ul id="companies"><li>Verifying access…</li></ul></section></main>
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
 import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
@@ -24,7 +24,7 @@ async function request(method="GET",body){
 async function refresh(){
  const data=await request();
  list.replaceChildren();
- for(const company of data.companies){const li=document.createElement("li");li.textContent=company.name+(company.is_active?"":" (Inactive)");list.append(li)}
+ for(const company of data.companies){const li=document.createElement("li");const button=document.createElement("button");button.type="button";button.textContent="Manage "+company.name;button.disabled=!company.is_active;button.addEventListener("click",()=>{const url=new URL("/manager.html",location.origin);url.searchParams.set("organization_id",company.id);location.assign(url.toString())});li.append(button);if(!company.is_active)li.append(" (Inactive)");list.append(li)}
  if(!data.companies.length){const li=document.createElement("li");li.textContent="No companies yet";list.append(li)}
 }
 try{await refresh()}catch(error){document.getElementById("create").hidden=true;list.textContent="Access unavailable";message.textContent=error.message}
