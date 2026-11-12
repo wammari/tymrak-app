@@ -31,6 +31,9 @@ export default async function handler(req, res) {
   if (!memberships.ok) return res.status(502).json({ error: "Administrator verification unavailable" });
   const assigned = await memberships.json();
   if (!Array.isArray(assigned) || !assigned.length) return res.status(403).json({ error: "Administrator membership required" });
+  const activeMembership = await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(assigned[0].organization_id)}&is_active=eq.true&select=id&limit=1`, { headers });
+  if (!activeMembership.ok) return res.status(502).json({ error: "Administrator membership verification unavailable" });
+  if (!(await activeMembership.json()).length) return res.status(403).json({ error: "Active administrator membership required" });
 
   if (req.method === "GET") {
     const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,is_active,created_at&order=name.asc`, { headers });
