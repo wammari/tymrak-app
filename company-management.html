@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Company Management | TYMRAK</title><link rel="stylesheet" href="/tymrak-theme.css">
+<style>body{font:16px Arial,sans-serif;background:#fbf8f3;color:#35271e;margin:0}header{background:#351b0c;color:white;padding:22px 5%}main{max-width:900px;margin:36px auto;padding:0 20px}.card{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:18px 0}input{padding:12px;width:100%;box-sizing:border-box;margin:10px 0;border:1px solid #cbbca9;border-radius:6px}button{background:#8d5316;color:white;border:0;padding:12px 20px;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}a{color:#8d5316}li{padding:9px 0;border-bottom:1px solid #eee}#message{min-height:20px}</style></head>
+<body><header><strong>TYMRAK · Main Administrator</strong></header>
+<main><p><a href="/manager.html">← Back to Manager Portal</a></p>
+<h1>Company Management</h1><p>Create and manage independent TYMRAK businesses. Only the designated Main Administrator can access this page.</p>
+<section class="card"><h2>Add a new business</h2><form id="create"><label for="name">Business name</label><input id="name" maxlength="150" minlength="2" required placeholder="Registered business name"><button id="submit" type="submit">Create Company</button></form><p id="message" role="status"></p></section>
+<section class="card"><h2>Businesses</h2><ul id="companies"><li>Verifying access…</li></ul></section></main>
+<script type="module">
+import {loadSupabaseConfiguration} from "./supabase-config.js";
+import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+const config=await loadSupabaseConfiguration();
+const supabase=createClient(config.supabaseUrl,config.supabasePublishableKey);
+const message=document.getElementById("message"),list=document.getElementById("companies");
+async function request(method="GET",body){
+ const {data:{session}}=await supabase.auth.getSession();
+ if(!session)throw new Error("Sign in to the Manager Portal first");
+ const response=await fetch("/api/main-admin-companies",{method,headers:{Authorization:"Bearer "+session.access_token,...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(data.error||"Company management unavailable");
+ return data;
+}
+async function refresh(){
+ const data=await request();
+ list.replaceChildren();
+ for(const company of data.companies){const li=document.createElement("li");li.textContent=company.name+(company.is_active?"":" (Inactive)");list.append(li)}
+ if(!data.companies.length){const li=document.createElement("li");li.textContent="No companies yet";list.append(li)}
+}
+try{await refresh()}catch(error){document.getElementById("create").hidden=true;list.textContent="Access unavailable";message.textContent=error.message}
+document.getElementById("create").addEventListener("submit",async event=>{
+ event.preventDefault();const button=document.getElementById("submit");button.disabled=true;message.textContent="";
+ try{const result=await request("POST",{name:document.getElementById("name").value.trim()});message.textContent=result.company.name+" created successfully";event.target.reset();await refresh()}
+ catch(error){message.textContent=error.message}finally{button.disabled=false}
+});
+</script></body></html>
