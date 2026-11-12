@@ -272,7 +272,7 @@ form.addEventListener("submit", async event => {
     }
     if (!passwordSaved) {
         if (passwordInput.value.length < 12 || !/[a-z]/.test(passwordInput.value) || !/[A-Z]/.test(passwordInput.value) || !/[0-9]/.test(passwordInput.value) || !/[^A-Za-z0-9]/.test(passwordInput.value)) {
-            showMessage("error", "Password must contain at least 8 characters.");
+            showMessage("error", "Password must contain at least 12 characters, including uppercase and lowercase letters, a number, and a special character.");
             return;
         }
         if (passwordInput.value !== confirmInput.value) {
