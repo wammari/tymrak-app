@@ -106,7 +106,9 @@ async function initialize(){try{
   if(!memberships.length)throw new Error("No active company membership");
   const companySelect=$("companySelect");
   const stored=sessionStorage.getItem("tymrak-company-id");
-  selectedCompanyId=memberships.some(m=>m.organizationId===stored)?stored:(memberships.length===1?memberships[0].organizationId:null);
+  const requested=new URLSearchParams(window.location.search).get("organization_id");
+  selectedCompanyId=memberships.some(m=>m.organizationId===requested)?requested:(memberships.some(m=>m.organizationId===stored)?stored:(memberships.length===1?memberships[0].organizationId:null));
+  if(requested && selectedCompanyId===requested)sessionStorage.setItem("tymrak-company-id",requested);
   companySelect.replaceChildren();
   if(memberships.length>1){const placeholder=document.createElement("option");placeholder.value="";placeholder.textContent="Select a company";companySelect.append(placeholder)}
   for(const membership of memberships){const option=document.createElement("option");option.value=membership.organizationId;option.textContent=membership.name||membership.organizationId;companySelect.append(option)}
