@@ -12,7 +12,7 @@ async function request(url,method='GET',body){
 let searchVersion=0;const searchAddress=createAddressSearch();
 function clearSearch(){searchVersion++;$('addressResults').replaceChildren();$('searchStatus').textContent='';}
 $('address').addEventListener('input',clearSearch);
-function edit(w){clearSearch();editing=w?.id||null;$('title').textContent=w?'Edit workplace':'Add workplace';$('name').value=w?.name||'';$('address').value=w?.address||'';$('latitude').value=w?.latitude??'';$('longitude').value=w?.longitude??'';$('radius').value=w?.radius_metres??150;$('active').checked=w?.is_active??true;
+function edit(w){clearSearch();editing=w?.id||null;$('title').textContent=w?'Edit workplace':'Add workplace';$('name').value=w?.name||'';$('address').value=w?.address||'';$('latitude').value=w?.latitude??'';$('longitude').value=w?.longitude??'';$('radius').value=w?.radius_metres??50;$('active').checked=w?.is_active??true;
  if(w)mapPicker?.setPosition(w.latitude,w.longitude);else mapPicker?.clearSelection();
  const assigned=new Set(w?.employee_ids||[]);$('employees').replaceChildren();
  for(const e of employees){const label=document.createElement('label'),box=document.createElement('input');box.type='checkbox';box.value=e.id;box.checked=assigned.has(e.id);label.append(box,document.createTextNode(` ${e.first_name} ${e.last_name}${e.is_active?'':' (inactive)'}`));$('employees').append(label);}
@@ -25,7 +25,7 @@ async function ensureMap(){
  $('loadMap').disabled=true;$('mapStatus').textContent='Loading map…';
  try {const config=await request('/api/workplace-map-config');
   const leaflet=await loadLeaflet();$('workplaceMap').hidden=false;
-  mapPicker=createWorkplaceMap({leaflet,config,mapContainer:$('workplaceMap'),getRadius:()=>Number($('radius').value)||150,
+  mapPicker=createWorkplaceMap({leaflet,config,mapContainer:$('workplaceMap'),getRadius:()=>Number($('radius').value)||50,
    onError:text=>$('mapStatus').textContent=text,onSelect:value=>{$('latitude').value=value.latitude;$('longitude').value=value.longitude;$('mapStatus').textContent='Workplace centre selected. Review the pin, radius and assignments, then save.';}});
   if($('latitude').value!==''&&$('longitude').value!=='')mapPicker.setPosition(Number($('latitude').value),Number($('longitude').value));
   $('mapStatus').textContent='Zoom to the workplace and click the building. Drag the pin to adjust the centre.';$('loadMap').hidden=true;return mapPicker;
