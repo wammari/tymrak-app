@@ -1,5 +1,6 @@
 import { createWorker } from './adapter.mjs';
 import publicConfig from '../api/public-config.js';
+import accountDeletion from '../api/account-deletion.js';
 import completeActivation from '../api/complete-activation.js';
 import employeePunch from '../api/employee-punch.js';
 import employees from '../api/employees.js';
@@ -14,6 +15,7 @@ import workplaceMapConfig from '../api/workplace-map-config.js';
 
 export const routes = {
   '/api/public-config': publicConfig,
+  '/api/account-deletion': accountDeletion,
   '/api/complete-activation': completeActivation,
   '/api/employee-punch': employeePunch,
   '/api/employees': employees,

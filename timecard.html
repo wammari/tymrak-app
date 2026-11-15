@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
+<head><script src="/api-base.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -267,7 +267,7 @@ tbody tr:last-child td {
 <header class="header">
 
     <div>
-        <span class="tymrak-brand-mark"><img src="/tymrak-brand-board.png" alt="TYMRAK — Time. Tracked Right." width="1536" height="1024"></span>
+        <span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span>
     </div>
 
     <div class="header-actions">
@@ -393,6 +393,7 @@ tbody tr:last-child td {
 
 <script type="module">
 import { loadSupabaseConfiguration } from "./supabase-config.js";
+import { mountAccountDeletion } from "./account-deletion-ui.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
 const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
 const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
@@ -405,7 +406,7 @@ const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
     let currentOvertimeRule = null;
 let employeeTimeZone = "America/Toronto";
 import { createClient } from
-"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+"/supabase-js.bundle.js";
 
 
 const supabase =
@@ -2057,7 +2058,7 @@ async function loadTimecard() {
             await supabase
                 .from("employees")
                .select(
-    "id,first_name,last_name,username,position,department,province,invitation_status,is_active"
+    "id,first_name,last_name,username,position,department,province,invitation_status,is_active,termination_date"
 )
                 .eq(
                     "auth_user_id",
@@ -2085,12 +2086,13 @@ const provinceTimeZones = {
     YT: "America/Whitehorse"
 };
 
+mountAccountDeletion({ supabase });
 employeeTimeZone =
     provinceTimeZones[employeeData.province] ||
     "America/Toronto";
 
         if (
-            !employeeData.is_active ||
+            (!employeeData.is_active && !employeeData.termination_date) ||
             employeeData.invitation_status !==
                 "Account Activated"
         ) {

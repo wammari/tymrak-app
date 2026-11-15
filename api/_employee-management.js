@@ -2,7 +2,7 @@ import { getSiteUrl } from "./_deployment-config.js";
 export const EMPLOYEE_SELECT = [
   "id", "first_name", "last_name", "email", "username", "mobile",
   "position", "department", "province", "hire_date", "invitation_status",
-  "activated_at", "is_active"
+  "activated_at", "is_active", "termination_date", "termination_reason"
 ].join(",");
 
 export const PROVINCES = new Set([
@@ -12,7 +12,10 @@ export const PROVINCES = new Set([
 
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
 const USERNAME_PATTERN = /^[A-Za-z0-9._-]+$/;
-const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+export const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/;
+// Date.parse() rolls impossible dates (2026-02-30) over to the next month, so round-trip instead.
+export const isRealDate = value => typeof value === "string" && DATE_PATTERN.test(value) &&
+  !Number.isNaN(Date.parse(`${value}T00:00:00Z`)) && new Date(`${value}T00:00:00Z`).toISOString().slice(0, 10) === value;
 
 export function cleanString(value) {
   return typeof value === "string" ? value.trim() : "";
@@ -59,8 +62,7 @@ export function validateEmployeeInput(body) {
   if (!PROVINCES.has(input.province)) {
     return { error: "Select a valid province" };
   }
-  if (input.hireDate && (!DATE_PATTERN.test(input.hireDate) ||
-      Number.isNaN(Date.parse(`${input.hireDate}T00:00:00Z`)))) {
+  if (input.hireDate && !isRealDate(input.hireDate)) {
     return { error: "Enter a valid hire date" };
   }
   if (typeof input.isActive !== "boolean") {
@@ -229,4 +231,29 @@ export async function sendActivationInvite(configuration, employee, companyName)
     throw error;
   }
   return verified;
+}
+
+// Terminated employees cannot clock in or out but keep read-only access to their own history.
+// The database enforces consistency (see 202611140001_employee_termination.sql).
+export function validateTerminationInput(body, now = new Date()) {
+  const date = body?.terminationDate;
+  if (!isRealDate(date)) {
+    return { error: "Enter a valid termination date" };
+  }
+  // Allow "today" in any time zone, but not further into the future.
+  const latest = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
+  if (date > latest) return { error: "The termination date cannot be in the future" };
+  const reason = body?.reason == null ? "" : body.reason;
+  if (typeof reason !== "string" || reason.trim().length > 500) {
+    return { error: "The reason must be 500 characters or fewer" };
+  }
+  return { terminationDate: date, reason: reason.trim() || null };
+}
+
+export function terminationRecord({ terminationDate, reason }, now = new Date()) {
+  return { is_active: false, termination_date: terminationDate, termination_reason: reason, terminated_at: now.toISOString() };
+}
+
+export function reactivationRecord() {
+  return { is_active: true, termination_date: null, termination_reason: null, terminated_at: null };
 }

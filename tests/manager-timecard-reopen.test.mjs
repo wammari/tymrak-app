@@ -127,7 +127,7 @@ test("follow-up migration makes reopen reasons optional without weakening actor 
 
 test("manager UI uses confirmation-only reopen and spaces the timecard actions", () => {
   const html = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
-  assert.match(html, /if\(!window\.confirm\(`/);
+  assert.match(html, /if\(!await askConfirm\(`/);
   assert.match(html, /action\.className="row-actions"/);
   for (const obsoleteIdentifier of [
     "submitReopen", "openReopen", "closeReopen", "reopenReason", "reopenModal", "reopenForm"

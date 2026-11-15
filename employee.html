@@ -1,7 +1,7 @@
 <!DOCTYPE html>
 <html lang="en">
 
-<head>
+<head><script src="/api-base.js"></script>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 
@@ -359,7 +359,7 @@ h2 {
 <header class="header">
 
 <div>
-    <span class="tymrak-brand-mark"><img src="/tymrak-brand-board.png" alt="TYMRAK — Time. Tracked Right." width="1536" height="1024"></span>
+    <span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span>
 </div>
 
 <div class="header-actions">
@@ -452,6 +452,7 @@ h2 {
 
 <script type="module">
 import { createPunchClient } from "./punch-client.js";
+import { mountAccountDeletion } from "./account-deletion-ui.js";
 import { capturePunchLocation } from "./geolocation.js";
 import { loadSupabaseConfiguration } from "./supabase-config.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
@@ -464,7 +465,7 @@ const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
 
 
 import { createClient } from
-"https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+"/supabase-js.bundle.js";
 
 const supabase = createClient(
     SUPABASE_URL,
@@ -998,7 +999,7 @@ async function loadEmployee() {
             await supabase
                 .from("employees")
                 .select(
-                    "id,first_name,last_name,email,username,position,department,employment_status,invitation_status,is_active"
+                    "id,first_name,last_name,email,username,position,department,employment_status,invitation_status,is_active,termination_date"
                 )
                 .eq(
                     "auth_user_id",
@@ -1013,7 +1014,7 @@ async function loadEmployee() {
 
 
         if (
-            !employeeData.is_active ||
+            (!employeeData.is_active && !employeeData.termination_date) ||
             employeeData.invitation_status !==
                 "Account Activated"
         ) {
@@ -1061,6 +1062,18 @@ async function loadEmployee() {
                 ? details.join(" • ")
                 : employee.username;
 
+
+        mountAccountDeletion({ supabase });
+
+        if (employee.termination_date) {
+            // Terminated: no clocking, read-only access to past timecards.
+            workStatus.className = "status status-off";
+            workStatus.textContent = `Employment ended ${employee.termination_date}`;
+            buttonArea.textContent = "";
+            message.textContent = "You can no longer clock in or out. You can still view your past timecards.";
+            message.style.display = "block";
+            return;
+        }
 
         punchClient = createPunchClient({request:punchRequest,storage:localStorage,captureLocation:capturePunchLocation,
             key:`tymrak-pending-punch:${deploymentConfiguration.supabaseUrl}:${employee.id}`,

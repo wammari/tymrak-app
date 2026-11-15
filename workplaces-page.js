@@ -1,7 +1,7 @@
 import {createAddressSearch} from './workplace-search.js';
 import {loadSupabaseConfiguration} from './supabase-config.js';
 import {loadLeaflet,createWorkplaceMap} from './workplace-map.js';
-import {createClient} from 'https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm';
+import {createClient} from '/supabase-js.bundle.js';
 const $=id=>document.getElementById(id);let client,workplaces=[],employees=[],editing=null,mapPicker=null;const selectedCompanyId=sessionStorage.getItem('tymrak-company-id');
 function message(text){$('message').textContent=text;}
 async function request(url,method='GET',body){

@@ -134,7 +134,7 @@ test("a manager can list employees", async () => {
   const res = responseRecorder();
   await employeesHandler(request("GET"), res);
   assert.equal(res.statusCode, 200);
-  assert.deepEqual(res.payload.employees, [record]);
+  assert.deepEqual(res.payload.employees, [{ ...record, deletion_requested_at: null, deletion_status: null }]);
 });
 
 test("a manager can create an active employee and send an invitation", async () => {
@@ -555,3 +555,97 @@ test("employee list is the default Employees view and add/edit exposes mobile an
   assert.match(browserSource, /\["hireDate","hire_date"\]/);
 });
 import {PostgrestResponse as Response} from "./_postgrest-response.mjs";
+
+test("a manager terminates one employee: inactive, dated, reason saved, company-scoped", async () => {
+  let patchUrl, sent;
+  installManagerFetch(async (url, options) => {
+    if (options.method === "PATCH") {
+      patchUrl = url; sent = JSON.parse(options.body);
+      return new Response(JSON.stringify([employee({ is_active: false, termination_date: "2026-11-13", termination_reason: "Resigned" })]));
+    }
+    return new Response("[]");
+  });
+  const res = responseRecorder();
+  await employeesHandler(request("PATCH", { action: "terminate", terminationDate: "2026-11-13", reason: "  Resigned " }, { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 200);
+  assert.match(patchUrl, /employees\?id=eq\.employee-1&organization_id=eq\.aaaaaaaa-/);
+  assert.equal(sent.is_active, false);
+  assert.equal(sent.termination_date, "2026-11-13");
+  assert.equal(sent.termination_reason, "Resigned");
+  assert.ok(Date.parse(sent.terminated_at));
+  assert.deepEqual(Object.keys(sent).sort(), ["is_active", "terminated_at", "termination_date", "termination_reason"]);
+  assert.match(res.payload.message, /can no longer clock in/);
+});
+
+test("termination rejects bad dates, future dates and over-long reasons before touching the database", async () => {
+  const calls = installManagerFetch(async () => new Response("[]"));
+  const tomorrowPlus = new Date(Date.now() + 5 * 86400000).toISOString().slice(0, 10);
+  for (const body of [
+    { action: "terminate" }, { action: "terminate", terminationDate: "13/11/2026" },
+    { action: "terminate", terminationDate: "2026-02-30" }, { action: "terminate", terminationDate: tomorrowPlus },
+    { action: "terminate", terminationDate: "2026-11-13", reason: "x".repeat(501) },
+    { action: "terminate", terminationDate: "2026-11-13", reason: 42 }
+  ]) {
+    const res = responseRecorder();
+    await employeesHandler(request("PATCH", body, { id: "employee-1" }), res);
+    assert.equal(res.statusCode, 400, JSON.stringify(body).slice(0, 80));
+  }
+  assert.equal(calls.filter(c => c.options.method === "PATCH").length, 0);
+});
+
+test("impossible calendar dates are rejected for termination and hire dates", async () => {
+  const calls = installManagerFetch(async () => new Response("[]"));
+  for (const body of [{ action: "terminate", terminationDate: "2026-02-30" }, { action: "terminate", terminationDate: "2026-04-31" },
+    input({ hireDate: "2026-02-30" })]) {
+    const res = responseRecorder();
+    await employeesHandler(request("PATCH", body, { id: "employee-1" }), res);
+    assert.equal(res.statusCode, 400);
+  }
+  assert.equal(calls.filter(c => c.options.method === "PATCH").length, 0);
+});
+
+test("a manager reactivates a terminated employee and only the status fields change", async () => {
+  let sent;
+  installManagerFetch(async (url, options) => {
+    if (options.method === "PATCH") { sent = JSON.parse(options.body); return new Response(JSON.stringify([employee()])); }
+    return new Response("[]");
+  });
+  const res = responseRecorder();
+  await employeesHandler(request("PATCH", { action: "reactivate" }, { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 200);
+  assert.deepEqual(sent, { is_active: true, termination_date: null, termination_reason: null, terminated_at: null });
+});
+
+test("terminating an employee outside the manager's company returns 404, never a cross-company update", async () => {
+  installManagerFetch(async (url, options) => {
+    if (options.method === "PATCH") return new Response("[]");
+    return new Response("[]");
+  });
+  const res = responseRecorder();
+  await employeesHandler(request("PATCH", { action: "terminate", terminationDate: "2026-11-13" }, { id: "someone-elses" }), res);
+  assert.equal(res.statusCode, 404);
+});
+
+test("ordinary profile edits cannot silently reactivate a terminated employee", async () => {
+  installManagerFetch(async (url, options) => {
+    if (options.method === "PATCH") return new Response(JSON.stringify({ code: "23514", message: "employees_termination_consistent" }), { status: 400 });
+    return new Response("[]");
+  });
+  const res = responseRecorder();
+  await employeesHandler(request("PATCH", input({ isActive: true }), { id: "employee-1" }), res);
+  assert.equal(res.statusCode, 409);
+  assert.match(res.payload.error, /Use Reactivate/);
+});
+
+test("manager list asks for the termination fields and pages show terminated status and no clock buttons", async () => {
+  const api = fs.readFileSync(new URL("../api/_employee-management.js", import.meta.url), "utf8");
+  assert.match(api, /"termination_date", "termination_reason"/);
+  const manager = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
+  assert.match(manager, /Terminated \$\{employee\.termination_date\}/);
+  assert.match(manager, /action:"terminate"/); assert.match(manager, /action:"reactivate"/);
+  const page = fs.readFileSync(new URL("../employee.html", import.meta.url), "utf8");
+  assert.match(page, /is_active,termination_date/);
+  assert.match(page, /if \(employee\.termination_date\) \{[\s\S]*?return;/);
+  const timecard = fs.readFileSync(new URL("../timecard.html", import.meta.url), "utf8");
+  assert.match(timecard, /!employeeData\.is_active && !employeeData\.termination_date/);
+});
