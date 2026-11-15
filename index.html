@@ -1,53 +1,9 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="theme-color" content="#351b0c"><meta name="description" content="TYMRAK employee and manager portals. Time. Tracked Right.">
-<title>TYMRAK | Employee &amp; Manager Portals</title>
-<link rel="icon" type="image/png" href="/tymrak-logo.png"><link rel="stylesheet" href="/tymrak-theme.css">
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><meta name="theme-color" content="#2c1609"><meta name="description" content="TYMRAK employee and manager portals. Time. Tracked Right."><link rel="icon" type="image/png" href="/tymrak-logo.png"><title>TYMRAK | Employee &amp; Manager Portals</title>
 <style>
-:root{color-scheme:light}*{box-sizing:border-box}
-body{margin:0;font-family:Arial,Helvetica,sans-serif;color:#351b0c;background:#fefdf9}
-a:focus-visible{outline:3px solid #8c560d;outline-offset:3px}
-.skip{position:absolute;left:12px;top:-60px;background:#351b0c;color:#fff;padding:10px 16px;border-radius:8px;z-index:20;font-weight:700}.skip:focus{top:10px}
-.welcome{position:relative;max-width:1280px;margin:0 auto;padding:40px 20px 48px;display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);align-items:center;gap:8px}
-.photo{width:100%;height:auto;display:block;border-radius:22px;-webkit-mask-image:linear-gradient(90deg,#000 55%,transparent);mask-image:linear-gradient(90deg,#000 55%,transparent)}
-.center{text-align:center}.center .tymrak-brand-mark{margin:0 auto 18px;width:240px}
-.tagline{font-size:13px;font-weight:800;letter-spacing:3px;text-transform:uppercase;color:#7a4f14;margin:0 0 10px}
-h1{font-size:clamp(30px,4vw,48px);margin:0 0 10px;line-height:1.1}
-.lead{font-size:clamp(17px,1.8vw,21px);margin:0 auto 28px;max-width:560px;line-height:1.45}
-.cards{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;text-align:left}
-.card{background:#fff;border:1px solid #e9d5b1;border-radius:18px;padding:26px;box-shadow:0 14px 36px #351b0c14;text-align:center}
-.card h2{margin:6px 0 8px;font-size:22px}.card p{margin:0 0 18px;font-size:15px;line-height:1.5;color:#4b3626}
-.card .ico{font-size:30px;color:#663710}
-.go{display:block;text-decoration:none;font-weight:700;padding:15px 12px;border-radius:11px;color:#fff;background:#663710}
-.go:hover{background:#452308}.go.employee{background:#8c560d}.go.employee:hover{background:#6e420a}
-.strip{background:#351b0c;color:#fff5e3}.strip ul{max-width:1280px;margin:0 auto;padding:26px 20px;list-style:none;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:18px}
-.strip li{text-align:center}.strip .i{display:grid;place-items:center;width:52px;height:52px;margin:0 auto 10px;border:2px solid #d9a43f;border-radius:50%;color:#f1c979;font-size:23px}
-.strip strong{display:block;font-size:16px}.strip .s{display:block;margin-top:4px;font-size:14px;color:#ead9bb}
-footer{text-align:center;padding:16px;font-size:13px;color:#4b3626}footer a{color:#7a4f14}
-@media(max-width:900px){.welcome{grid-template-columns:1fr;padding-top:24px}.photo{display:none}.strip ul{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:620px){.cards{grid-template-columns:1fr}}
-</style></head>
-<body>
-<a class="skip" href="#portals">Skip to portal choices</a>
-<main class="welcome">
-  <img class="photo" src="/tymrak-welcome-photo.webp" alt="A smiling employee working at a computer in a bright office" width="455" height="405">
-  <div class="center">
-    <span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span>
-    <p class="tagline">Anytime. Anywhere. A brighter tomorrow.</p>
-    <h1>Welcome to TYMRAK</h1>
-    <p class="lead">More than time tracking. A smarter way to manage your team.</p>
-    <nav id="portals" class="cards" aria-label="Portal access">
-      <section class="card"><div class="ico" aria-hidden="true">●</div><h2>Employee Portal</h2><p>Clock in, view your timecard and manage your requests.</p><a class="go employee" href="/login.html">Enter Employee Portal →</a></section>
-      <section class="card"><div class="ico" aria-hidden="true">●●</div><h2>Manager Portal</h2><p>Approve timecards, manage employees and view reports.</p><a class="go" href="/manager-login.html">Enter Manager Portal →</a></section>
-    </nav>
-  </div>
-</main>
-<section class="strip" aria-label="Key features"><ul>
-  <li><span class="i" aria-hidden="true">◷</span><strong>Track Time</strong><span class="s">Accurately and effortlessly</span></li>
-  <li><span class="i" aria-hidden="true">▦</span><strong>Manage Schedules</strong><span class="s">Keep your team on track</span></li>
-  <li><span class="i" aria-hidden="true">⌖</span><strong>Geofencing</strong><span class="s">Ensure the right place, at the right time</span></li>
-  <li><span class="i" aria-hidden="true">♧</span><strong>Team Management</strong><span class="s">Support your people</span></li>
-  <li><span class="i" aria-hidden="true">▥</span><strong>Reports &amp; Insights</strong><span class="s">Make informed decisions</span></li>
-</ul></section>
+:root{color-scheme:light;--espresso:#301807;--gold:#dca346}*{box-sizing:border-box}html,body{margin:0;min-height:100%;font-family:Arial,sans-serif;background:#2a1508}main{max-width:1599px;margin:auto;position:relative;line-height:0}main img{width:100%;height:auto;display:block}.sr-only{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip:rect(0,0,0,0);white-space:nowrap;border:0}.hotspot{position:absolute;display:block;border-radius:12px;z-index:2;outline-offset:4px}.hotspot:focus-visible{outline:4px solid #fff;box-shadow:0 0 0 7px #8c560d}.hotspot:hover{box-shadow:inset 0 0 0 3px rgba(255,255,255,.55)}.employee{left:24.3%;top:69.0%;width:23.5%;height:7.2%}.manager{left:52%;top:69.0%;width:23.5%;height:7.2%}.mobile-links{display:none}footer{color:#ead9bb;text-align:center;padding:12px;font-size:12px;line-height:1.5}footer a{color:#f1c979}@media(max-width:700px){main{overflow:hidden}.hotspot{display:none}.mobile-links{display:grid;gap:12px;padding:18px 18px 24px;background:#2a1508}.mobile-links a{display:block;text-align:center;padding:16px 12px;border-radius:10px;font-size:17px;font-weight:700;line-height:1.35;text-decoration:none;background:linear-gradient(135deg,#e6b353,#94601b);color:white}.mobile-links a:last-child{background:#4c2b16;border:1px solid #b98c49}.mobile-links a:focus-visible{outline:3px solid #fff;outline-offset:3px}}
+</style></head><body>
+<main aria-label="TYMRAK portal welcome page"><h1 class="sr-only">Welcome to TYMRAK. Time. Tracked Right.</h1><img src="/tymrak-welcome-art.webp" fetchpriority="high" alt="TYMRAK welcome page: man working at a computer, Employee Portal and Manager Portal options, and time tracking features" width="1599" height="984"><a class="hotspot employee" href="/login.html" aria-label="Enter Employee Portal" title="Enter Employee Portal"></a><a class="hotspot manager" href="/manager-login.html" aria-label="Enter Manager Portal" title="Enter Manager Portal"></a></main>
+<nav class="mobile-links" aria-label="Portal access"><a href="/login.html">Enter Employee Portal →</a><a href="/manager-login.html">Enter Manager Portal →</a></nav>
 <footer>TYMRAK · Time. Tracked Right. · <a href="https://www.tymrak.com">Visit our website</a></footer>
 </body></html>

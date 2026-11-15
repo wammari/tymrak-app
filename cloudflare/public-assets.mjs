@@ -1,6 +1,6 @@
 // Explicit public surface. Never publish the repository root as an asset directory.
 export const publicAssets = [
-  'tymrak-theme.css', 'tymrak-logo.png', 'tymrak-logo-dark.png', 'tymrak-welcome-photo.webp', 'index.html', 'login.html', 'manager-login.html', 'activate.html',
+  'tymrak-theme.css', 'tymrak-logo.png', 'tymrak-logo-dark.png', 'tymrak-welcome-photo.webp', 'tymrak-welcome-art.webp', 'index.html', 'login.html', 'manager-login.html', 'activate.html',
   'employee.html', 'timecard.html', 'manager.html', 'workplaces.html',
   'password-recovery.html', 'reset-password.html', 'supabase-config.js',
   'geolocation.js', 'punch-client.js', 'workplace-map.js', 'workplaces-page.js', 'workplace-search.js',
