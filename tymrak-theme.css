@@ -2,15 +2,15 @@
 body{color:var(--ink);background-color:var(--bg)}
 /* Display the primary logo directly from the supplied brand board. No tracing,
    recolouring, regenerated lettering or bitmap edits. */
-.tymrak-brand-mark{position:relative;display:block;width:220px;max-width:100%;aspect-ratio:545/398;overflow:hidden;flex-shrink:0;mix-blend-mode:multiply;clip-path:polygon(23% 0,100% 0,100% 100%,0 100%,0 64%,23% 64%)}
+.tymrak-brand-mark{position:relative;display:block;width:220px;max-width:100%;aspect-ratio:526/396;flex-shrink:0}
 .tymrak-brand-mark img{position:absolute;display:block;width:100%;height:100%;left:0;top:0}
 .auth-page .tymrak-brand-mark{margin:0 auto 24px;width:230px}
 .auth-page{background:radial-gradient(ellipse at top left,#f2e5cc 0,transparent 55%),var(--bg)}
 .auth-page .card{border:1px solid var(--line);box-shadow:0 18px 50px #351b0c0d}
 .auth-page h1,.auth-page h2{color:var(--navy)}
 .header .tymrak-brand-mark{width:135px}
-.sidebar .tymrak-brand-mark{width:180px;background:#fbf8f3;border-radius:10px;mix-blend-mode:normal}
-.sidebar .tymrak-brand-mark img{mix-blend-mode:multiply}
+/* Dark-background logo variant, shown directly on the sidebar with no plate behind it. */
+.sidebar .tymrak-brand-mark{width:100%;max-width:200px}
 .sidebar .logo{padding:0 0 24px}
 .brand-home{display:inline-block;margin-bottom:16px}.brand-home .tymrak-brand-mark{width:155px}
 button,.button{transition:background-color .15s,box-shadow .15s}
