@@ -19,7 +19,7 @@ try {
       if(data.toString().includes('Ready on http://127.0.0.1:8787')) {clearTimeout(timeout);resolve();}
     });
   });
-  for(const [path,status] of [['/',200],['/employee.html',200],['/TYMRAK-approved-reference.png',200],
+  for(const [path,status] of [['/',200],['/employee.html',200],['/tymrak-logo.png',200],
     ['/api/public-config',200],['/api/employee-punch',401],['/api/_manager-auth.js',404],
     ['/.env',404],['/package.json',404],['/supabase/migrations/20261023213945_company_isolation.sql',404]]) {
     const response=await fetch('http://127.0.0.1:8787'+path);

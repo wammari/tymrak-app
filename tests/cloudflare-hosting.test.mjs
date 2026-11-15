@@ -92,3 +92,43 @@ test('Cloudflare staging origins are explicit and production callback rules stay
   assert.throws(()=>getSiteUrl({...settings,CLOUDFLARE_RELEASE_ENV:undefined}));
   assert.throws(()=>getSiteUrl({...settings,APP_ENV:'production'}));
 });
+
+test('static pages carry security headers and no page loads code from the jsDelivr CDN',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const w=createWorker({}), env={ASSETS:{fetch:async()=>new Response('<html></html>',{status:200,headers:{'Content-Type':'text/html'}})}};
+  const response=await w.fetch(request('/employee.html'),env);
+  assert.equal(response.status,200);
+  assert.match(response.headers.get('content-security-policy'),/frame-ancestors 'none'/);
+  assert.match(response.headers.get('content-security-policy'),/object-src 'none'/);
+  assert.equal(response.headers.get('x-frame-options'),'DENY');
+  assert.equal(response.headers.get('x-content-type-options'),'nosniff');
+  assert.match(response.headers.get('strict-transport-security'),/max-age=/);
+  assert.equal((await w.fetch(request('/'),env)).headers.get('x-frame-options'),'DENY');
+  for(const file of publicAssets.filter(f=>/\.(html|js)$/.test(f))) {
+    assert.doesNotMatch(await readFile(new URL('../'+file,import.meta.url),'utf8'),/cdn\.jsdelivr\.net/,file);
+  }
+  assert.ok(publicAssets.includes('supabase-js.bundle.js'));
+});
+
+test('native app origins get CORS on /api; web origins and other sites do not',()=>configured(async env=>{
+  const w=createWorker({'/api/test':async(req,res)=>res.status(200).json({ok:true})});
+  const pre=await w.fetch(request('/api/test',{method:'OPTIONS',headers:{Origin:'capacitor://localhost'}}),env);
+  assert.equal(pre.status,204);
+  assert.equal(pre.headers.get('access-control-allow-origin'),'capacitor://localhost');
+  assert.match(pre.headers.get('access-control-allow-headers'),/Authorization/);
+  assert.equal(pre.headers.get('access-control-allow-credentials'),null);
+  const ok=await w.fetch(request('/api/test',{method:'POST',headers:{Origin:'capacitor://localhost','Content-Type':'application/json'},body:'{}'}),env);
+  assert.equal(ok.headers.get('access-control-allow-origin'),'capacitor://localhost');
+  for(const origin of ['https://evil.example','null','http://localhost']) {
+    const other=await w.fetch(request('/api/test',{method:'OPTIONS',headers:{Origin:origin}}),env);
+    assert.equal(other.headers.get('access-control-allow-origin'),null,origin);
+  }
+}));
+
+test('vercel.json sends exactly the same security headers as the Cloudflare Worker',async()=>{
+  const {readFile}=await import('node:fs/promises');
+  const {STATIC_SECURITY_HEADERS}=await import('./_adapter-headers.mjs');
+  const vercel=JSON.parse(await readFile(new URL('../vercel.json',import.meta.url),'utf8'));
+  const rule=vercel.headers.find(entry=>entry.source==='/(.*)');
+  assert.deepEqual(Object.fromEntries(rule.headers.map(h=>[h.key,h.value])),STATIC_SECURITY_HEADERS);
+});

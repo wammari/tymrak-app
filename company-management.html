@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Company Management | TYMRAK</title><link rel="stylesheet" href="/tymrak-theme.css">
 <style>body{font:16px Arial,sans-serif;background:#fbf8f3;color:#35271e;margin:0}header{background:#351b0c;color:white;padding:22px 5%}main{max-width:900px;margin:36px auto;padding:0 20px}.card{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:18px 0}input{padding:12px;width:100%;box-sizing:border-box;margin:10px 0;border:1px solid #cbbca9;border-radius:6px}button{background:#8d5316;color:white;border:0;padding:12px 20px;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}a{color:#8d5316}li{padding:9px 0;border-bottom:1px solid #eee}#message{min-height:20px}</style></head>
 <body><header><strong>TYMRAK · Main Administrator</strong></header>
@@ -9,7 +9,7 @@
 <section class="card"><h2>Businesses</h2><p>Select a business to manage its workplaces and employees in the Manager Portal.</p><ul id="companies"><li>Verifying access…</li></ul></section></main>
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
-import {createClient} from "https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/+esm";
+import {createClient} from "/supabase-js.bundle.js";
 const config=await loadSupabaseConfiguration();
 const supabase=createClient(config.supabaseUrl,config.supabasePublishableKey);
 const message=document.getElementById("message"),list=document.getElementById("companies");

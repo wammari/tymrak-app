@@ -9,3 +9,7 @@ The former desktop welcome image and invisible link hotspots are replaced with r
 Validation: 145 tests passed, staging Worker dry-run passed and nine local runtime smoke checks passed with fake credentials. Application script blocks were compared against the previous staging commit. Browser visual acceptance remains required on mobile and desktop before production. The exact supplied board is 2.22 MB; it is reused through the browser cache rather than embedding repeated image data. A separately supplied optimized production logo could reduce the initial download later without changing the brand.
 
 Production launch remains separate: no production data, role, schema, credentials or DNS are changed by this visual update. No paid service is introduced.
+
+## Optimised logo (13 November 2026)
+
+The pages now load `tymrak-logo.png` (545x398, about 190 KB), an exact pixel crop (x=150, y=40) of the supplied board, replacing the 2.22 MB board that CSS used to crop in the browser. No recolouring or tracing. The full board and reference images are kept unpublished in `design-source/`.
