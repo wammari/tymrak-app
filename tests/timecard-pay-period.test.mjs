@@ -1,6 +1,11 @@
 import "./_test-environment.mjs";
 import assert from "node:assert/strict";
 import fs from "node:fs";
+import {
+    applyOvertime,
+    buildDailyRecords,
+    selectOvertimeRuleForPeriod
+} from "../timecard-calculation.js";
 
 const source =
     fs.readFileSync(
@@ -51,13 +56,10 @@ const functionNames = [
     "getPreviousPayPeriod",
     "getNextPayPeriod",
     "canNavigateToPayPeriod",
-    "selectOvertimeRuleForPeriod",
     "formatDate",
     "getDatePartsInEmployeeTimeZone",
     "createDateInEmployeeTimeZone",
-    "formatDuration",
-    "calculateGreaterDailyOrWeeklyOvertime",
-    "calculateDay"
+    "formatDuration"
 ];
 
 const functions =
@@ -69,6 +71,16 @@ const functions =
             ${functionNames.join(",")}
         };
     `)();
+
+// The overtime rule and daily calculations now live in the shared module that the
+// timecard page imports, so they are tested from there.
+functions.selectOvertimeRuleForPeriod = selectOvertimeRuleForPeriod;
+
+assert.match(
+    source,
+    /from "\.\/timecard-calculation\.js"/,
+    "timecard.html must use the shared timecard calculation"
+);
 
 function assertPeriod(
     period,
@@ -212,33 +224,33 @@ assert.throws(
         "OVERTIME_RULE_BOUNDARY"
 );
 
-const shift =
-    functions.calculateDay([
-        {
-            punch_type: "clock_in",
-            punched_at:
-                "2026-09-28T14:00:00.000Z"
-        },
-        {
-            punch_type: "clock_out",
-            punched_at:
-                "2026-09-29T02:00:00.000Z"
-        }
-    ]);
-
 const [calculatedShift] =
-    functions.calculateGreaterDailyOrWeeklyOvertime(
-        [{
-            dateKey: "2026-09-28",
-            workedMilliseconds:
-                shift.workedMilliseconds
-        }],
+    applyOvertime(
+        buildDailyRecords([
+            {
+                punch_type: "clock_in",
+                punched_at:
+                    "2026-09-28T14:00:00.000Z"
+            },
+            {
+                punch_type: "clock_out",
+                punched_at:
+                    "2026-09-29T02:00:00.000Z"
+            }
+        ], "America/Edmonton"),
         {
+            calculation_method: "greater_daily_or_weekly",
+            daily_overtime_enabled: true,
+            weekly_overtime_enabled: true,
             daily_threshold_hours: 8,
             weekly_threshold_hours: 44,
             week_start_day: 0
         }
     );
+
+const shift = calculatedShift;
+
+assert.equal(calculatedShift.date, "2026-09-28");
 
 assert.equal(
     functions.formatDuration(
