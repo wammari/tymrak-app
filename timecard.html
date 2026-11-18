@@ -394,6 +394,12 @@ tbody tr:last-child td {
 <script type="module">
 import { loadSupabaseConfiguration } from "./supabase-config.js";
 import { mountAccountDeletion } from "./account-deletion-ui.js";
+import {
+    applyOvertime,
+    buildDailyRecords,
+    dateKey,
+    selectOvertimeRuleForPeriod
+} from "./timecard-calculation.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
 const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
 const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
@@ -603,52 +609,6 @@ function getPayPeriodDateKeys(period) {
     };
 }
 
-function selectOvertimeRuleForPeriod(
-    overtimeRules,
-    startKey,
-    endKey
-) {
-
-    const matchingRules =
-        overtimeRules.filter(rule =>
-            rule.effective_from <= endKey &&
-            (
-                !rule.effective_to ||
-                rule.effective_to >= startKey
-            )
-        );
-
-    const coveringRules =
-        matchingRules.filter(rule =>
-            rule.effective_from <= startKey &&
-            (
-                !rule.effective_to ||
-                rule.effective_to >= endKey
-            )
-        );
-
-    if (matchingRules.length === 0) {
-        throw new Error(
-            "No overtime rule applies to this pay period."
-        );
-    }
-
-    if (
-        matchingRules.length !== 1 ||
-        coveringRules.length !== 1
-    ) {
-        const error = new Error(
-            "This pay period crosses an overtime-rule effective-date boundary and cannot be calculated as a single timecard."
-        );
-
-        error.code =
-            "OVERTIME_RULE_BOUNDARY";
-
-        throw error;
-    }
-
-    return coveringRules[0];
-}
 function formatDate(date) {
 
     return date.toLocaleDateString(
@@ -821,625 +781,6 @@ function escapeHTML(value) {
         .replaceAll("'", "&#039;");
 }
 
-function groupPunchesByDate(punches) {
-
-    const groups = {};
-
-    const dateFormatter =
-        new Intl.DateTimeFormat(
-            "en-CA",
-            {
-                timeZone: employeeTimeZone,
-                year: "numeric",
-                month: "2-digit",
-                day: "2-digit"
-            }
-        );
-
-    for (const punch of punches) {
-
-        const parts =
-            dateFormatter.formatToParts(
-                new Date(punch.punched_at)
-            );
-
-        const year =
-            parts.find(
-                part => part.type === "year"
-            ).value;
-
-        const month =
-            parts.find(
-                part => part.type === "month"
-            ).value;
-
-        const day =
-            parts.find(
-                part => part.type === "day"
-            ).value;
-
-        const key =
-            `${year}-${month}-${day}`;
-
-        if (!groups[key]) {
-            groups[key] = [];
-        }
-
-        groups[key].push(punch);
-    }
-
-    return groups;
-}
-function calculateWeeklyOvertime(
-    dailyRecords,
-    overtimeRule
-) {
-
-    if (
-        !overtimeRule ||
-        !overtimeRule.weekly_overtime_enabled ||
-        !overtimeRule.weekly_threshold_hours
-    ) {
-        return dailyRecords;
-    }
-
-
-    const weeklyThresholdMilliseconds =
-        Number(
-            overtimeRule.weekly_threshold_hours
-        ) *
-        60 *
-        60 *
-        1000;
-
-
-    const weekStartDay =
-        Number(
-            overtimeRule.week_start_day ?? 0
-        );
-
-
-    let currentWeekKey = null;
-    let accumulatedWeeklyMilliseconds = 0;
-
-
-    return dailyRecords.map(record => {
-
-        const date =
-            new Date(
-                record.dateKey +
-                "T12:00:00"
-            );
-
-
-        /*
-            Determine the beginning
-            of this employee's workweek.
-
-            0 = Sunday
-            1 = Monday
-            ...
-            6 = Saturday
-        */
-
-        const daysSinceWeekStart =
-            (
-                date.getDay() -
-                weekStartDay +
-                7
-            ) % 7;
-
-
-        const weekStart =
-            new Date(date);
-
-
-        weekStart.setDate(
-            date.getDate() -
-            daysSinceWeekStart
-        );
-
-
-        const weekKey =
-            weekStart.getFullYear() +
-            "-" +
-            String(
-                weekStart.getMonth() + 1
-            ).padStart(2, "0") +
-            "-" +
-            String(
-                weekStart.getDate()
-            ).padStart(2, "0");
-
-
-        if (weekKey !== currentWeekKey) {
-
-            currentWeekKey =
-                weekKey;
-
-            accumulatedWeeklyMilliseconds =
-                0;
-        }
-
-
-        const workedMilliseconds =
-            record.workedMilliseconds;
-
-
-        const remainingRegularMilliseconds =
-            Math.max(
-                0,
-                weeklyThresholdMilliseconds -
-                accumulatedWeeklyMilliseconds
-            );
-
-
-        const regularMilliseconds =
-            Math.min(
-                workedMilliseconds,
-                remainingRegularMilliseconds
-            );
-
-
-        const overtimeMilliseconds =
-            Math.max(
-                0,
-                workedMilliseconds -
-                regularMilliseconds
-            );
-
-
-        accumulatedWeeklyMilliseconds +=
-            workedMilliseconds;
-
-
-        return {
-            ...record,
-            regularMilliseconds,
-            overtimeMilliseconds,
-            weekKey
-        };
-    });
-}
-function calculateGreaterDailyOrWeeklyOvertime(
-    dailyRecords,
-    overtimeRule
-) {
-
-    if (
-        !overtimeRule ||
-        !overtimeRule.daily_threshold_hours ||
-        !overtimeRule.weekly_threshold_hours
-    ) {
-        return dailyRecords;
-    }
-
-
-    const dailyThresholdMilliseconds =
-        Number(
-            overtimeRule.daily_threshold_hours
-        ) *
-        60 *
-        60 *
-        1000;
-
-
-    const weeklyThresholdMilliseconds =
-        Number(
-            overtimeRule.weekly_threshold_hours
-        ) *
-        60 *
-        60 *
-        1000;
-
-
-    const weekStartDay =
-        Number(
-            overtimeRule.week_start_day ?? 0
-        );
-
-
-    /*
-        Group the daily records
-        into workweeks.
-    */
-
-    const weeks = {};
-
-
-    for (const record of dailyRecords) {
-
-        const date =
-            new Date(
-                record.dateKey +
-                "T12:00:00"
-            );
-
-
-        const daysSinceWeekStart =
-            (
-                date.getDay() -
-                weekStartDay +
-                7
-            ) % 7;
-
-
-        const weekStart =
-            new Date(date);
-
-
-        weekStart.setDate(
-            date.getDate() -
-            daysSinceWeekStart
-        );
-
-
-        const weekKey =
-            weekStart.getFullYear() +
-            "-" +
-            String(
-                weekStart.getMonth() + 1
-            ).padStart(2, "0") +
-            "-" +
-            String(
-                weekStart.getDate()
-            ).padStart(2, "0");
-
-
-        if (!weeks[weekKey]) {
-            weeks[weekKey] = [];
-        }
-
-
-        weeks[weekKey].push({
-            ...record,
-            weekKey
-        });
-    }
-
-
-    const calculatedRecords = [];
-
-
-    for (
-        const [weekKey, weekRecords]
-        of Object.entries(weeks)
-    ) {
-
-        weekRecords.sort(
-            (a, b) =>
-                a.dateKey.localeCompare(
-                    b.dateKey
-                )
-        );
-
-
-        /*
-            Calculate total daily overtime
-            for this workweek.
-        */
-
-        const totalDailyOvertime =
-            weekRecords.reduce(
-                (total, record) => {
-
-                    return total +
-                        Math.max(
-                            0,
-                            record.workedMilliseconds -
-                            dailyThresholdMilliseconds
-                        );
-                },
-                0
-            );
-
-
-        /*
-            Calculate total weekly overtime
-            for this workweek.
-        */
-
-        const totalWeeklyWorked =
-            weekRecords.reduce(
-                (total, record) =>
-                    total +
-                    record.workedMilliseconds,
-                0
-            );
-
-
-        const totalWeeklyOvertime =
-            Math.max(
-                0,
-                totalWeeklyWorked -
-                weeklyThresholdMilliseconds
-            );
-
-
-        /*
-            Alberta-style rule:
-            use whichever overtime total
-            is greater for the workweek.
-        */
-
-        const useDailyMethod =
-            totalDailyOvertime >
-            totalWeeklyOvertime;
-
-
-        if (useDailyMethod) {
-
-            for (const record of weekRecords) {
-
-                const overtimeMilliseconds =
-                    Math.max(
-                        0,
-                        record.workedMilliseconds -
-                        dailyThresholdMilliseconds
-                    );
-
-
-                const regularMilliseconds =
-                    record.workedMilliseconds -
-                    overtimeMilliseconds;
-
-
-                calculatedRecords.push({
-                    ...record,
-                    regularMilliseconds,
-                    overtimeMilliseconds,
-                    weekKey
-                });
-            }
-
-        } else {
-
-            /*
-                Weekly calculation won.
-
-                Allocate regular hours first,
-                then overtime after the weekly
-                threshold is reached.
-            */
-
-            let accumulatedWeeklyMilliseconds =
-                0;
-
-
-            for (const record of weekRecords) {
-
-                const remainingRegularMilliseconds =
-                    Math.max(
-                        0,
-                        weeklyThresholdMilliseconds -
-                        accumulatedWeeklyMilliseconds
-                    );
-
-
-                const regularMilliseconds =
-                    Math.min(
-                        record.workedMilliseconds,
-                        remainingRegularMilliseconds
-                    );
-
-
-                const overtimeMilliseconds =
-                    Math.max(
-                        0,
-                        record.workedMilliseconds -
-                        regularMilliseconds
-                    );
-
-
-                accumulatedWeeklyMilliseconds +=
-                    record.workedMilliseconds;
-
-
-                calculatedRecords.push({
-                    ...record,
-                    regularMilliseconds,
-                    overtimeMilliseconds,
-                    weekKey
-                });
-            }
-        }
-    }
-
-
-    return calculatedRecords.sort(
-        (a, b) =>
-            a.dateKey.localeCompare(
-                b.dateKey
-            )
-    );
-}
-function calculateDay(punches) {
-
-    let firstClockIn = null;
-    let lastClockOut = null;
-
-    let workStartedAt = null;
-    let breakStartedAt = null;
-
-    let workedMilliseconds = 0;
-    let breakMilliseconds = 0;
-
-    const sortedPunches =
-        [...punches].sort(
-            (a, b) =>
-                new Date(a.punched_at) -
-                new Date(b.punched_at)
-        );
-
-
-    for (const punch of sortedPunches) {
-
-        const time =
-            new Date(
-                punch.punched_at
-            ).getTime();
-
-
-        if (punch.punch_type === "clock_in") {
-
-            if (firstClockIn === null) {
-                firstClockIn =
-                    punch.punched_at;
-            }
-
-            /*
-                Start a new work session only
-                if one is not already open.
-            */
-
-            if (workStartedAt === null) {
-                workStartedAt = time;
-            }
-
-            breakStartedAt = null;
-
-
-        } else if (
-            punch.punch_type === "break_start"
-        ) {
-
-            if (workStartedAt !== null) {
-
-                workedMilliseconds +=
-                    Math.max(
-                        0,
-                        time - workStartedAt
-                    );
-
-                workStartedAt = null;
-            }
-
-            if (breakStartedAt === null) {
-                breakStartedAt = time;
-            }
-
-
-        } else if (
-            punch.punch_type === "break_end"
-        ) {
-
-            if (breakStartedAt !== null) {
-
-                breakMilliseconds +=
-                    Math.max(
-                        0,
-                        time - breakStartedAt
-                    );
-
-                breakStartedAt = null;
-            }
-
-            if (workStartedAt === null) {
-                workStartedAt = time;
-            }
-
-
-        } else if (
-            punch.punch_type === "clock_out"
-        ) {
-
-            if (workStartedAt !== null) {
-
-                workedMilliseconds +=
-                    Math.max(
-                        0,
-                        time - workStartedAt
-                    );
-
-                workStartedAt = null;
-            }
-
-            /*
-                If someone clocks out while
-                on break, close the break too.
-            */
-
-            if (breakStartedAt !== null) {
-
-                breakMilliseconds +=
-                    Math.max(
-                        0,
-                        time - breakStartedAt
-                    );
-
-                breakStartedAt = null;
-            }
-
-            lastClockOut =
-                punch.punched_at;
-        }
-    }
-
-
-    /*
-        For today's open shift, continue
-        counting until the current time.
-
-        Historical incomplete shifts will
-        later be flagged as Missing Punch.
-    */
-
-   const todayParts =
-    getDatePartsInEmployeeTimeZone(
-        new Date()
-    );
-
-const punchParts =
-    sortedPunches.length > 0
-        ? getDatePartsInEmployeeTimeZone(
-            new Date(
-                sortedPunches[0].punched_at
-            )
-        )
-        : null;
-
-const isToday =
-    punchParts &&
-    punchParts.year === todayParts.year &&
-    punchParts.month === todayParts.month &&
-    punchParts.day === todayParts.day;
-
-    if (
-        isToday &&
-        workStartedAt !== null
-    ) {
-
-        workedMilliseconds +=
-            Math.max(
-                0,
-                Date.now() -
-                workStartedAt
-            );
-    }
-
-
-    if (
-        isToday &&
-        breakStartedAt !== null
-    ) {
-
-        breakMilliseconds +=
-            Math.max(
-                0,
-                Date.now() -
-                breakStartedAt
-            );
-    }
-
-
-    return {
-        firstClockIn,
-        lastClockOut,
-        workedMilliseconds,
-        breakMilliseconds
-    };
-}
-
 function renderTimecard(
     punches,
     period
@@ -1449,7 +790,6 @@ function renderTimecard(
         !punches ||
         punches.length === 0
     ) {
-
         timecardBody.innerHTML = `
             <tr>
                 <td
@@ -1459,306 +799,153 @@ function renderTimecard(
                 </td>
             </tr>
         `;
-
         return;
     }
 
-
-    const groups =
-        groupPunchesByDate(
-            punches
-        );
-/*
-    Build daily records for the full
-    calculation range.
-
-    Some days may be before the visible
-    pay period but are required for
-    weekly overtime calculations.
-*/
-
-const dailyRecords =
-    Object.keys(groups)
-        .sort()
-        .map(dateKey => {
-
-            const result =
-                calculateDay(
-                    groups[dateKey]
-                );
-
-            return {
-                dateKey,
-                workedMilliseconds:
-                    result.workedMilliseconds
-            };
-        });
-
-
-let overtimeRecords;
-
-
-if (
-    currentOvertimeRule?.calculation_method ===
-    "greater_daily_or_weekly"
-) {
-
-    overtimeRecords =
-        calculateGreaterDailyOrWeeklyOvertime(
-            dailyRecords,
-            currentOvertimeRule
-        );
-
-} else {
-
     /*
-        Default calculation:
-        weekly overtime only.
+        Regular, overtime and double time come from the shared
+        calculation in /timecard-calculation.js, the same code the
+        manager timecards use. Days before the visible pay period are
+        included so weekly overtime is correct when a pay period starts
+        mid-week, then filtered out below.
     */
-
-    overtimeRecords =
-        calculateWeeklyOvertime(
-            dailyRecords,
+    const days =
+        applyOvertime(
+            buildDailyRecords(
+                punches,
+                employeeTimeZone,
+                { now: new Date() }
+            ),
             currentOvertimeRule
-        );
-}
-
-
-const overtimeByDate =
-    Object.fromEntries(
-        overtimeRecords.map(
-            record => [
-                record.dateKey,
-                record
-            ]
-        )
-    );
-
-const rows =
-    Object.keys(groups)
-        .sort()
-       .filter(dateKey => {
-
-    const startParts =
-        getDatePartsInEmployeeTimeZone(
-            period.start
-        );
-
-    const endParts =
-        getDatePartsInEmployeeTimeZone(
-            period.end
         );
 
     const startKey =
-        `${startParts.year}-${String(
-            startParts.month
-        ).padStart(2, "0")}-${String(
-            startParts.day
-        ).padStart(2, "0")}`;
+        dateKey(period.start, employeeTimeZone);
 
     const endKey =
-        `${endParts.year}-${String(
-            endParts.month
-        ).padStart(2, "0")}-${String(
-            endParts.day
-        ).padStart(2, "0")}`;
+        dateKey(period.end, employeeTimeZone);
 
-    return (
-        dateKey >= startKey &&
-        dateKey <= endKey
-    );
-})        .map(dateKey => {
+    const rows =
+        days
+            .filter(day =>
+                day.date >= startKey &&
+                day.date <= endKey
+            )
+            .map(day => {
 
-                const dayPunches =
-                    groups[dateKey];
-
-                const result =
-                    calculateDay(
-                        dayPunches
-                    );
-const overtimeRecord =
-    overtimeByDate[dateKey];
-
-
-const regular =
-    formatDuration(
-        overtimeRecord
-            ? overtimeRecord.regularMilliseconds
-            : result.workedMilliseconds
-    );
-
-
-const overtime =
-    formatDuration(
-        overtimeRecord
-            ? overtimeRecord.overtimeMilliseconds
-            : 0
-    );
-                const displayDate =
-                    new Date(
-                        dateKey +
-                        "T12:00:00"
-                    );
-
-                const total =
+                const overtime =
                     formatDuration(
-                        result.workedMilliseconds
+                        day.overtimeMilliseconds
+                    ) +
+                    (
+                        day.doubleTimeMilliseconds > 0
+                            ? " + " +
+                              formatDuration(
+                                  day.doubleTimeMilliseconds
+                              ) +
+                              " double time"
+                            : ""
                     );
 
-
-                /*
-                    Build the individual
-                    punch details for this day.
-                */
+                const punchLabels = {
+                    clock_in: "Clock In",
+                    clock_out: "Clock Out",
+                    break_start: "Break Start",
+                    break_end: "Break End"
+                };
 
                 const punchDetails =
-                    [...dayPunches]
-                        .sort(
-                            (a, b) =>
-                                new Date(a.punched_at) -
-                                new Date(b.punched_at)
-                        )
-                        .map(punch => {
-
-                            let punchLabel =
-                                punch.punch_type;
-
-                            if (
-                                punch.punch_type ===
-                                "clock_in"
-                            ) {
-                                punchLabel =
-                                    "Clock In";
-                            }
-
-                            if (
-                                punch.punch_type ===
-                                "clock_out"
-                            ) {
-                                punchLabel =
-                                    "Clock Out";
-                            }
-
-                            if (
-                                punch.punch_type ===
-                                "break_start"
-                            ) {
-                                punchLabel =
-                                    "Break Start";
-                            }
-
-                            if (
-                                punch.punch_type ===
-                                "break_end"
-                            ) {
-                                punchLabel =
-                                    "Break End";
-                            }
-
-
-                            return `
-                                <div class="punch-detail-item">
-
-                                    <span class="punch-type">
-                                        ${escapeHTML(
-                                            punchLabel
-                                        )}
-                                    </span>
-
-                                    <span>
-                                        ${escapeHTML(
-                                            formatTime(
-                                                punch.punched_at
-                                            )
-                                        )}
-                                    </span>
-
-                                </div>
-                            `;
-                        })
+                    day.punches
+                        .map(punch => `
+                            <div class="punch-detail-item">
+                                <span class="punch-type">
+                                    ${escapeHTML(
+                                        punchLabels[punch.punch_type] ||
+                                        punch.punch_type
+                                    )}
+                                </span>
+                                <span>
+                                    ${escapeHTML(
+                                        formatTime(
+                                            punch.punched_at
+                                        )
+                                    )}
+                                </span>
+                            </div>
+                        `)
                         .join("");
 
-
                 return `
-
                     <tr
                         class="timecard-row"
-                        data-date="${escapeHTML(dateKey)}">
-
+                        data-date="${escapeHTML(day.date)}">
                         <td>
                             <span class="pending">
                                 Pending
                             </span>
                         </td>
-
                         <td>
                             ${escapeHTML(
                                 formatDate(
-                                    displayDate
+                                    new Date(
+                                        day.date +
+                                        "T12:00:00"
+                                    )
                                 )
                             )}
                         </td>
-
                         <td>
                             ${escapeHTML(
                                 formatTime(
-                                    result.firstClockIn
+                                    day.clockIn
                                 )
                             )}
                         </td>
-
                         <td>
                             ${escapeHTML(
                                 formatTime(
-                                    result.lastClockOut
+                                    day.clockOut
                                 )
                             )}
                         </td>
-
                         <td>
                             —
                         </td>
-
-                       <td>
-    ${escapeHTML(total)}
-</td>
-
-<td>
-    ${escapeHTML(regular)}
-</td>
-
-<td>
-    ${escapeHTML(overtime)}
-</td>
-
+                        <td>
+                            ${escapeHTML(
+                                formatDuration(
+                                    day.workedMilliseconds
+                                )
+                            )}
+                        </td>
+                        <td>
+                            ${escapeHTML(
+                                formatDuration(
+                                    day.regularMilliseconds
+                                )
+                            )}
+                        </td>
+                        <td>
+                            ${escapeHTML(overtime)}
+                        </td>
                     </tr>
-
-
                     <tr
                         class="punch-detail-row"
-                        data-detail-date="${escapeHTML(dateKey)}">
-
+                        data-detail-date="${escapeHTML(day.date)}">
                         <td
                             colspan="8"
                             class="punch-detail-cell">
-
                             <div class="punch-details">
-
                                 <div class="punch-details-title">
                                     Punch Details
                                 </div>
-
                                 ${punchDetails}
-
                             </div>
-
                         </td>
-
                     </tr>
                 `;
             })
             .join("");
-
 
     timecardBody.innerHTML =
         rows;

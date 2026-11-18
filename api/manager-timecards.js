@@ -57,7 +57,7 @@ export default async function handler(req, res) {
       queryName: "active_employee_timecard_fields"
     });
     const rules = await query({
-      url: `${supabaseUrl}/rest/v1/overtime_rules?is_active=eq.true&is_default=eq.true&is_special_rule=eq.false&select=province_code,daily_threshold_hours,weekly_threshold_hours,daily_overtime_enabled,weekly_overtime_enabled,calculation_method,week_start_day,effective_from,effective_to`,
+      url: `${supabaseUrl}/rest/v1/overtime_rules?is_active=eq.true&is_default=eq.true&is_special_rule=eq.false&select=province_code,daily_threshold_hours,weekly_threshold_hours,daily_overtime_enabled,weekly_overtime_enabled,calculation_method,week_start_day,overtime_multiplier,double_time_threshold_hours,double_time_multiplier,holiday_rule,holiday_week_threshold_hours,holiday_reduction_hours,effective_from,effective_to`,
       secretKey, stage: "overtime_rules_query", resource: "overtime_rules",
       queryName: "default_jurisdiction_rules"
     });
