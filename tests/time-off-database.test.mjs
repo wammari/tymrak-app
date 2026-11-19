@@ -32,8 +32,8 @@ test.before(async () => {
       ('${emp}','${empUser}','${org}','New','Hire',current_date - interval '1 year','ON'),
       ('${veteran}','${veteranUser}','${org}','Old','Hand',current_date - interval '6 years','ON'),
       ('${sk}','${skUser}','${org}','Prairie','Worker',current_date - interval '2 years','SK'),
-      ('${pe}','${peUser}','${org}','Island','Worker',current_date - interval '2 years','PE');`);
-  for (const name of ['202611160001_time_off_core.sql', '202611160002_time_off_functions.sql', '202611160003_time_off_company_scope.sql', '202611190002_time_off_provinces.sql'])
+      ('${pe}','${peUser}','${org}','Island','Worker',current_date - interval '2 years','YT');`);
+  for (const name of ['202611160001_time_off_core.sql', '202611160002_time_off_functions.sql', '202611160003_time_off_company_scope.sql', '202611190002_time_off_provinces.sql', '202611190003_time_off_pei.sql'])
     await db.exec(fs.readFileSync(new URL('../supabase/migrations/' + name, import.meta.url), 'utf8'));
 });
 test.after(async () => db.close());
@@ -135,7 +135,9 @@ test('vacation tiers follow each province', async () => {
   assert.equal(await q('NB', '2019-01-01', '2027-01-01'), 15);   // 3 weeks at 8 years
   assert.equal(await q('NL', '2012-01-01', '2026-12-31'), 10);
   assert.equal(await q('NL', '2012-01-01', '2027-01-01'), 15);   // 3 weeks at 15 years
-  assert.equal(await q('PE', '2000-01-01', '2026-01-01'), 0);    // not enabled: no policy
+  assert.equal(await q('PE', '2023-01-01', '2027-12-31'), 10);   // 2 weeks under 5 years
+  assert.equal(await q('PE', '2023-01-01', '2028-01-01'), 15);   // 3 weeks at 5 years
+  assert.equal(await q('YT', '2000-01-01', '2026-01-01'), 0);    // not enabled: no policy
 });
 
 test('public holidays follow each province', async () => {
@@ -154,7 +156,12 @@ test('public holidays follow each province', async () => {
   assert.equal(await h('AB', '2026-07-02'), false);  // 1 July 2026 is a Wednesday
   assert.equal(await h('SK', '2029-07-02'), true);   // 1 July 2029 is a Sunday: observed Monday
   assert.equal(await h('ON', '2029-07-02'), false);
-  assert.equal(await h('PE', '2027-01-01'), false);  // not enabled
+  assert.equal(await h('PE', '2027-02-15'), true);   // Islander Day (3rd Monday of February)
+  assert.equal(await h('PE', '2027-11-11'), true);   // Remembrance Day
+  assert.equal(await h('PE', '2027-09-30'), true);   // Truth and Reconciliation
+  assert.equal(await h('PE', '2027-05-24'), false);  // Victoria Day is not a PEI paid holiday
+  assert.equal(await h('PE', '2027-12-26'), false);
+  assert.equal(await h('YT', '2027-01-01'), false);  // not enabled
 });
 
 test('each employee gets days and holidays for their own province', async () => {
@@ -170,7 +177,7 @@ test('provinces without a confirmed policy cannot request time off', async () =>
   assert.equal(view.supported, false);
   assert.equal((await request(peUser, day(3, 1), day(3, 2))).error, 'province_not_supported');
   const mgrView = (await one('select public.manager_time_off($1,$2) r', [mgr, org])).r;
-  assert.deepEqual(mgrView.unsupported.map(u => u.province), ['PE']);
+  assert.deepEqual(mgrView.unsupported.map(u => u.province), ['YT']);
   assert.ok(!mgrView.balances.some(b => b.employeeId === pe));
   assert.equal((await one('select public.set_time_off_entitlement($1,$2,$3,15) r', [mgr, org, pe])).r.error, 'province_not_supported');
 });
