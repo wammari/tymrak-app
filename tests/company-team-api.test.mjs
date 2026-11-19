@@ -33,10 +33,11 @@ function install({ role = "admin", grantResult = { success: true, role: "manager
     if (u.endsWith("/auth/v1/user")) return json({ id: ADMIN, email: "owner@a.test" });
     if (u.includes("/user_roles?")) return json([{ role, organization_id: COMPANY, organization: { name: "Company A", is_active: true } }]);
     if (u.endsWith("/rpc/manager_employee_scope")) return json({ employeeIds: [WORKER_EMPLOYEE] });
-    if (u.endsWith("/rpc/company_team")) return json({ members: team });
+    if (u.endsWith("/rpc/company_team")) return json({ members: team, workplaces: [{ id: WORKPLACE, name: "Main Street", isActive: true }] });
     if (u.endsWith("/rpc/grant_company_access")) return json(grantResult);
     if (u.endsWith("/rpc/revoke_company_access")) return json({ success: true });
-    if (u.includes("/workplaces?")) return json([{ id: WORKPLACE, name: "Main Street", is_active: true }]);
+    // Like production, the server may not read the workplaces table directly.
+    if (u.includes("/workplaces?")) return json({ code: "42501", message: "permission denied for table workplaces" }, 403);
     if (u.includes("/organizations?id=")) return json([{ id: COMPANY, name: "Company A" }]);
     if (u.includes("/employees?") && u.includes("email=ilike.")) return json([]);
     if (u.includes(`/employees?id=eq.${WORKER_EMPLOYEE}`)) return json([{ id: WORKER_EMPLOYEE, auth_user_id: WORKER_AUTH, first_name: "Will", last_name: "Worker" }]);
@@ -68,6 +69,7 @@ test("an admin sees the team, the workplaces, and employees who could be given a
     assert.deepEqual(res.payload.employees.map(e => e.name), ["Will Worker"], "not people already on the team, not the Main Administrator");
     assert.equal(JSON.stringify(res.payload.employees).includes(WORKER_AUTH), false, "login ids stay on the server");
     assert.equal(env.rpcCalls("company_team")[0].body.p_hidden_user, MAIN);
+    assert.equal(env.calls.some(c => c.url.includes("/workplaces?")), false, "workplaces come from company_team, not the table");
   } finally { env.restore(); }
 });
 
