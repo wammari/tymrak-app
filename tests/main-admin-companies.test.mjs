@@ -66,13 +66,12 @@ test("main administrator creates a company and receives admin membership",async(
   if(u.includes("/user_roles?"))return json([{organization_id:OTHER}]);
   if(u.includes("/organizations?")&&u.includes("is_active=eq.true"))return json([{id:OTHER}]);
   if(u.includes("/organizations?"))return json([]);
-  if(u.endsWith("/organizations")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json([{id:createdId,name:"New Bakery",is_active:true}],201);}
-  if(u.endsWith("/user_roles")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json({},201);}
+  if(u.endsWith("/rpc/create_company_with_admin")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json([{id:createdId,name:"New Bakery",is_active:true}]);}
   throw Error("unexpected request: "+u);
  };
  const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"New Bakery",payFrequency:"semi_monthly"}},response);
  assert.equal(response.statusCode,201);assert.equal(response.body.company.id,createdId);
- assert.deepEqual(writes,[{name:"New Bakery",is_active:true,pay_frequency:"semi_monthly",pay_period_anchor:null},{auth_user_id:ADMIN,organization_id:createdId,role:"admin"}]);
+ assert.deepEqual(writes,[{p_name:"New Bakery",p_pay_frequency:"semi_monthly",p_pay_period_anchor:null,p_admin_user_id:ADMIN}]);
 });
 test("duplicate company name blocks creation",async()=>{
  configure();let writes=0;global.fetch=async(url,options={})=>{
@@ -88,15 +87,15 @@ test("duplicate company name blocks creation",async()=>{
  assert.equal(response.statusCode,409);assert.equal(writes,0);
 });
 
-function creationFetch(writes,createdId){
+function creationFetch(writes,createdId,failCreation=false){
  return async(url,options={})=>{
   const u=String(url);
   if(u.includes("/auth/v1/user"))return json({id:ADMIN});
   if(u.includes("/user_roles?"))return json([{organization_id:OTHER}]);
   if(u.includes("/organizations?")&&u.includes("is_active=eq.true"))return json([{id:OTHER}]);
   if(u.includes("/organizations?"))return json([]);
-  if(u.endsWith("/organizations")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json([{id:createdId,name:"Weekly Cafe",is_active:true}],201);}
-  if(u.endsWith("/user_roles")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json({},201);}
+  if(u.endsWith("/rpc/create_company_with_admin")&&options.method==="POST"){writes.push(JSON.parse(options.body));return failCreation?json({message:"permission denied"},403):json([{id:createdId,name:"Weekly Cafe",is_active:true}]);}
+  if(options.method==="POST")throw Error("company creation must be a single database call: "+u);
   throw Error("unexpected request: "+u);
  };
 }
@@ -104,7 +103,7 @@ test("a weekly company is created with its first pay period start date",async()=
  configure();const writes=[];global.fetch=creationFetch(writes,"33333333-3333-4333-8333-333333333333");
  const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Weekly Cafe",payFrequency:"weekly",payPeriodAnchor:"2026-11-02"}},response);
  assert.equal(response.statusCode,201);
- assert.deepEqual(writes[0],{name:"Weekly Cafe",is_active:true,pay_frequency:"weekly",pay_period_anchor:"2026-11-02"});
+ assert.deepEqual(writes[0],{p_name:"Weekly Cafe",p_pay_frequency:"weekly",p_pay_period_anchor:"2026-11-02",p_admin_user_id:ADMIN});
 });
 test("a company cannot be created without a valid pay schedule",async()=>{
  for(const body of [{name:"No Schedule"},{name:"Bad Schedule",payFrequency:"fortnightly"},{name:"No Start",payFrequency:"biweekly"},{name:"Bad Start",payFrequency:"weekly",payPeriodAnchor:"2026-02-30"}]){
@@ -116,5 +115,11 @@ test("a company cannot be created without a valid pay schedule",async()=>{
 test("a monthly company ignores a stray start date",async()=>{
  configure();const writes=[];global.fetch=creationFetch(writes,"55555555-5555-4555-8555-555555555555");
  const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Monthly Shop",payFrequency:"monthly",payPeriodAnchor:"2026-11-02"}},response);
- assert.equal(response.statusCode,201);assert.equal(writes[0].pay_period_anchor,null);
+ assert.equal(response.statusCode,201);assert.equal(writes[0].p_pay_period_anchor,null);
+});
+
+test("if the database refuses, the admin is told nothing was saved and can retry",async()=>{
+ configure();const writes=[];global.fetch=creationFetch(writes,"66666666-6666-4666-8666-666666666666",true);
+ const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Refused Co",payFrequency:"monthly"}},response);
+ assert.equal(response.statusCode,502);assert.match(response.body.error,/Nothing was saved/);assert.doesNotMatch(response.body.error,/Do not retry/);
 });

@@ -59,21 +59,21 @@ export default async function handler(req, res) {
   if (!duplicate.ok) return res.status(502).json({ error: "Unable to verify company name" });
   if ((await duplicate.json()).length) return res.status(409).json({ error: "A company with this name already exists" });
 
-  const created = await fetch(`${supabaseUrl}/rest/v1/organizations`, {
-    method: "POST", headers: { ...headers, "Content-Type": "application/json", Prefer: "return=representation" },
-    body: JSON.stringify({ name, is_active: true, pay_frequency: schedule.frequency, pay_period_anchor: schedule.anchorDate })
+  // The company and its first administrator (the Main Administrator) are saved in one
+  // database transaction, so a company can never be left without an administrator.
+  const created = await fetch(`${supabaseUrl}/rest/v1/rpc/create_company_with_admin`, {
+    method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({
+      p_name: name, p_pay_frequency: schedule.frequency,
+      p_pay_period_anchor: schedule.anchorDate, p_admin_user_id: user.id
+    })
   });
-  if (!created.ok) return res.status(502).json({ error: "Unable to create company" });
-  const [company] = await created.json();
-  if (!UUID.test(company?.id || "")) return res.status(502).json({ error: "Invalid company creation response" });
-
-  const assignedRole = await fetch(`${supabaseUrl}/rest/v1/user_roles`, {
-    method: "POST", headers: { ...headers, "Content-Type": "application/json", Prefer: "return=minimal" },
-    body: JSON.stringify({ auth_user_id: user.id, organization_id: company.id, role: "admin" })
-  });
-  if (!assignedRole.ok) {
-    console.error("Company created without administrator membership; manual reconciliation required", { companyId: company.id });
-    return res.status(502).json({ error: "Company created but administrator assignment needs review. Do not retry; contact support.", companyId: company.id });
+  if (!created.ok) {
+    console.error("Company creation failed; nothing was saved", { status: created.status });
+    return res.status(502).json({ error: "Unable to create company. Nothing was saved, so you can try again." });
   }
+  const rows = await created.json();
+  const company = Array.isArray(rows) ? rows[0] : rows;
+  if (!UUID.test(company?.id || "")) return res.status(502).json({ error: "Invalid company creation response" });
   return res.status(201).json({ company });
 }
