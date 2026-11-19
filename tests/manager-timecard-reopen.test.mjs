@@ -9,7 +9,7 @@ function response() {
   return { statusCode: null, payload: null, setHeader() {}, status(code) { this.statusCode = code; return this; }, json(payload) { this.payload = payload; return this; } };
 }
 
-function environment(role = "admin") {
+function environment(role = "admin", syncs = []) {
   const originalFetch = global.fetch;
   const originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
@@ -24,6 +24,7 @@ function environment(role = "admin") {
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
     if (url.includes("/employees?") && url.includes("is_active=eq.true")) return new Response(JSON.stringify([{ id: "employee-1", province: "AB" }]));
+    if (url.includes("/accounting_timecard_syncs?")) return new Response(JSON.stringify(syncs));
     if (url.includes("/employees?") && url.includes("select=id,auth_user_id&limit=2")) return new Response(JSON.stringify([{id:"employee-1"}]));
     if (url.includes("/timecard_approvals?")) {
       let matches = approvals.filter(item => !url.includes("employee_id=eq.") || url.includes(`employee_id=eq.${item.employee_id}`));
@@ -193,4 +194,20 @@ test("non-JSON database errors retain operation and HTTP status", async () => {
     assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 500);
     assert.deepEqual(logs[0][1], { operation: "reopen_update", status: 503, code: null, message: null });
   } finally { console.error = originalError; env.restore(); }
+});
+
+test("a timecard sent to QuickBooks cannot be reopened", async () => {
+  for (const sync of [{ status: "synced", entries: [{ date: "2026-09-16" }] }, { status: "sending", entries: [] }, { status: "failed", entries: [{ date: "2026-09-16" }] }]) {
+    const env = environment("admin", [sync]);
+    try {
+      const res = await reopen({ employeeId: "employee-1", period: "2026-09-2" });
+      assert.equal(res.statusCode, 409);
+      assert.match(res.payload.error, /sent to QuickBooks and is locked/);
+      assert.equal(env.approvals[0].status, "approved");
+    } finally { env.restore(); }
+  }
+  const env = environment("admin", [{ status: "failed", entries: [] }]);
+  try {
+    assert.equal((await reopen({ employeeId: "employee-1", period: "2026-09-2" })).statusCode, 200, "nothing reached QuickBooks, so it can still be fixed");
+  } finally { env.restore(); }
 });

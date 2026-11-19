@@ -64,6 +64,14 @@ export default async function handler(req, res) {
     }), "approval_lookup", sensitiveValues);
     if (!existing.length) return res.status(404).json({ error: "Approved timecard not found" });
     if (existing[0].status !== "approved") return res.status(409).json({ error: "Timecard is not currently approved" });
+    // A timecard sent to QuickBooks is locked (the database refuses it too).
+    const synced = await readArray(await fetch(
+      `${supabaseUrl}/rest/v1/accounting_timecard_syncs?approval_id=eq.${encodeURIComponent(existing[0].id)}&select=status,entries`,
+      { headers: databaseHeaders(secretKey) }
+    ), "quickbooks_lock_lookup", sensitiveValues);
+    if (synced.some(row => row.status === "sending" || row.status === "synced" || (Array.isArray(row.entries) && row.entries.length))) {
+      return res.status(409).json({ error: "This timecard was sent to QuickBooks and is locked. Record any correction in the next pay period." });
+    }
 
     const reopenedAt = new Date().toISOString();
     const updated = await readArray(await fetch(`${base}&status=eq.approved&select=id,employee_id,status,period_start,period_end,work_timezone,reopened_by,reopened_at,reopen_reason`, {
