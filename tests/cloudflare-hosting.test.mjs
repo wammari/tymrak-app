@@ -38,7 +38,7 @@ test('real Worker public config and protected API routes keep existing authoriza
   assert.equal(body.siteUrl,settings.SITE_URL); assert.doesNotMatch(JSON.stringify(body),/sb_secret/);
   for(const path of ['employee-punch','employees','manager-session','manager-workplaces','manager-timecards',
     'manager-timecard-approvals','manager-timecard-reopen','send-invitation','resend-invitation',
-    'complete-activation','workplace-map-config']) {
+    'complete-activation','workplace-map-config','employee-time-off','manager-time-off']) {
     const res=await worker.fetch(request('/api/'+path,{method:path==='complete-activation'?'POST':'GET'}),env);
     assert.ok([401,405].includes(res.status),`${path}: ${res.status}`);
     assert.equal(res.headers.get('cache-control'),'no-store');
