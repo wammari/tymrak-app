@@ -20,6 +20,7 @@ function installEnvironment(role = "admin") {
     requests.push({ url, options });
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "approver-user-id", email: "manager@example.com" }));
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
     if (url.includes("/employees?") && url.includes("is_active=eq.true") && url.includes("select=id")) {
       return new Response(JSON.stringify([
         { id: "employee-1", province: "AB" },
@@ -86,6 +87,7 @@ test("manager timecards return a persisted approval as Approved", async () => {
   global.fetch = async url => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-id" }));
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([{ id: "employee-1", first_name: "Ada", last_name: "Lovelace", province: "AB" }]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));

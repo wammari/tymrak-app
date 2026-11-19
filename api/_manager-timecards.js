@@ -74,20 +74,37 @@ export function periodFromKey(key, now = new Date(), timeZone = "America/Toronto
   return period.key <= getCurrentPayPeriod(now, timeZone).key ? period : null;
 }
 
+// Calendar dates of a period: periods from pay-periods.js carry startKey/endKey; the
+// original semi-monthly period objects ({ year, month, half }) are still accepted.
+export function periodDateKeys(period) {
+  return period.startKey ? { startKey: period.startKey, endKey: period.endKey } : getPayPeriodDateKeys(period);
+}
+
+function zonedFromKey(key, timeZone, endOfDay = false) {
+  return zonedDate(Number(key.slice(0, 4)), Number(key.slice(5, 7)) - 1, Number(key.slice(8, 10)), timeZone, endOfDay);
+}
+
+// Exact start and end times of a period for an employee's time zone.
+export function periodInstants(period, timeZone = "America/Toronto") {
+  const { startKey, endKey } = periodDateKeys(period);
+  return { start: zonedFromKey(startKey, timeZone), end: zonedFromKey(endKey, timeZone, true) };
+}
+
 export function summarizeEmployee(employee, punches, rule, period, options = {}) {
   const timeZone = PROVINCE_TIME_ZONES[employee.province] || "America/Toronto";
-  const employeePeriod = getPayPeriod(period.year, period.month, period.half, timeZone);
   const allDays = applyOvertime(buildDailyRecords(punches, timeZone), rule, options);
-  const startKey = dateKey(employeePeriod.start, timeZone), endKey = dateKey(employeePeriod.end, timeZone);
+  const { startKey, endKey } = periodDateKeys(period);
   const days = allDays.filter(day => day.date >= startKey && day.date <= endKey);
   return { employee: { id: employee.id, first_name: employee.first_name, last_name: employee.last_name, province: employee.province },
     ...totalsFor(days),
     exceptionCount: days.filter(day => day.missingPunch).length, approvalStatus: "Not approved", days };
 }
 
+// Punches are loaded from the start of the workweek that contains the period's first day,
+// so weekly overtime is right when a pay period starts mid-week.
 export function calculationStart(period, weekStartDay = 0, timeZone = "America/Toronto") {
-  const parts = dateParts(period.start, timeZone);
-  const noon = new Date(Date.UTC(parts.year, parts.month - 1, parts.day, 12));
+  const { startKey } = periodDateKeys(period);
+  const noon = new Date(`${startKey}T12:00:00Z`);
   noon.setUTCDate(noon.getUTCDate() - ((noon.getUTCDay() - Number(weekStartDay) + 7) % 7));
   return zonedDate(noon.getUTCFullYear(), noon.getUTCMonth(), noon.getUTCDate(), timeZone);
 }

@@ -1,5 +1,6 @@
 import { getBearerToken, getSupabaseConfiguration } from "./_manager-auth.js";
 import { databaseHeaders } from "./_employee-management.js";
+import { normalizePaySchedule } from "../pay-periods.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -36,13 +37,21 @@ export default async function handler(req, res) {
   if (!(await activeMembership.json()).length) return res.status(403).json({ error: "Active administrator membership required" });
 
   if (req.method === "GET") {
-    const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,is_active,created_at&order=name.asc`, { headers });
+    const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,is_active,created_at,pay_frequency,pay_period_anchor&order=name.asc`, { headers });
     if (!response.ok) return res.status(502).json({ error: "Unable to list companies" });
     return res.status(200).json({ companies: await response.json() });
   }
 
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
   if (name.length < 2 || name.length > 150) return res.status(400).json({ error: "Company name must be 2–150 characters" });
+  // The pay schedule is chosen once, here, and is locked in the database afterwards.
+  if (typeof req.body?.payFrequency !== "string" || !req.body.payFrequency) return res.status(400).json({ error: "Choose a pay schedule" });
+  let schedule;
+  try {
+    schedule = normalizePaySchedule({ frequency: req.body.payFrequency, anchorDate: req.body.payPeriodAnchor || null });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
   const duplicate = await fetch(
     `${supabaseUrl}/rest/v1/organizations?select=id&name=ilike.${encodeURIComponent(name)}&limit=1`,
     { headers }
@@ -52,7 +61,7 @@ export default async function handler(req, res) {
 
   const created = await fetch(`${supabaseUrl}/rest/v1/organizations`, {
     method: "POST", headers: { ...headers, "Content-Type": "application/json", Prefer: "return=representation" },
-    body: JSON.stringify({ name, is_active: true })
+    body: JSON.stringify({ name, is_active: true, pay_frequency: schedule.frequency, pay_period_anchor: schedule.anchorDate })
   });
   if (!created.ok) return res.status(502).json({ error: "Unable to create company" });
   const [company] = await created.json();

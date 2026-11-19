@@ -1,7 +1,7 @@
 import { requireManager } from "./_manager-auth.js";
 import {canManageEmployee} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
-import { getPayPeriodDateKeys, periodFromKey } from "./_manager-timecards.js";
+import { loadPaySchedule, requestedPayPeriod } from "./_pay-schedule.js";
 
 const ID_PATTERN = /^[A-Za-z0-9-]{1,128}$/;
 
@@ -42,9 +42,11 @@ export default async function handler(req, res) {
     if (!canManageEmployee(authorization,employeeId)) return res.status(404).json({error:'Employee not found'});
     const reason = typeof req.body?.reason === "string" ? req.body.reason.trim() : "";
     if (reason.length > 1000) return res.status(400).json({ error: "Reopen reason must be 1000 characters or fewer" });
-    const period = periodFromKey(req.body?.period, new Date(), "America/Toronto");
+    // A period must be named: approving or reopening never defaults to "current".
+    if (typeof req.body?.period !== "string" || !req.body.period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
+    const period = requestedPayPeriod(req.body.period, await loadPaySchedule(authorization));
     if (!period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
-    const { startKey, endKey } = getPayPeriodDateKeys(period);
+    const { startKey, endKey } = period;
     const { supabaseUrl, secretKey } = authorization.configuration;
     const sensitiveValues = [secretKey, req.headers.authorization?.replace(/^Bearer\s+/i, "")];
     const owned = await readArray(await fetch(

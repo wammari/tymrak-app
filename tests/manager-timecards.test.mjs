@@ -22,6 +22,7 @@ async function withEnvironment(role, callback) {
     calls.push({ url, options });
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "user-1", email: "manager@example.com" }));
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
     if (url.includes("/rpc/manager_employee_scope")) return new Response(JSON.stringify({employeeIds:[]}));
     if (url.includes("/employees?")) return new Response(JSON.stringify([]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
@@ -149,6 +150,7 @@ test("API does not require an overtime rule for an employee with no punches", as
   global.fetch = async url => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
     if (url.includes("/employees?")) return new Response(JSON.stringify([
       { id: "employee-1", first_name: "No", last_name: "Punches", province: "YT" }
     ]));
@@ -179,6 +181,7 @@ test("Supabase failures log safe structured query diagnostics", async () => {
   global.fetch = async url => {
     if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
     if (url.includes("/employees?")) return new Response(JSON.stringify({
       code: "42703", message: "column employees.province does not exist"
     }), { status: 400 });

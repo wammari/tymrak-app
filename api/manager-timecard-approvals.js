@@ -1,7 +1,8 @@
 import { requireManager } from "./_manager-auth.js";
 import {canManageEmployee} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
-import { PROVINCE_TIME_ZONES, getPayPeriodDateKeys, periodFromKey } from "./_manager-timecards.js";
+import { PROVINCE_TIME_ZONES } from "./_manager-timecards.js";
+import { loadPaySchedule, requestedPayPeriod } from "./_pay-schedule.js";
 
 const ID_PATTERN = /^[A-Za-z0-9-]{1,128}$/;
 
@@ -24,9 +25,11 @@ export default async function handler(req, res) {
       .filter(id => typeof id === "string" && ID_PATTERN.test(id));
     if (!employeeIds.length) return res.status(400).json({ error: "Select at least one employee to approve" });
     if (employeeIds.some(id=>!canManageEmployee(authorization,id))) return res.status(400).json({error:'One or more selected employees are outside your workplaces'});
-    const period = periodFromKey(req.body?.period, new Date(), "America/Toronto");
+    // A period must be named: approving or reopening never defaults to "current".
+    if (typeof req.body?.period !== "string" || !req.body.period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
+    const period = requestedPayPeriod(req.body.period, await loadPaySchedule(authorization));
     if (!period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
-    const { startKey, endKey } = getPayPeriodDateKeys(period);
+    const { startKey, endKey } = period;
     const { supabaseUrl, secretKey } = authorization.configuration;
     const ids = `(${employeeIds.map(id => `"${id}"`).join(",")})`;
     const employees = await readArray(await fetch(
