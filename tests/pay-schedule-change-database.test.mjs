@@ -20,7 +20,7 @@ test.before(async()=>{
  create table punches(id bigserial primary key,employee_id uuid references employees(id),punch_type text,punched_at timestamptz,source text);
  alter table employees enable row level security;alter table punches enable row level security;
  grant all on employees,punches to authenticated;`);
- for(const name of ['202610010001_manager_roles.sql','202610040001_timecard_approvals.sql','202610080001_atomic_employee_activation.sql','202610230001_atomic_employee_punches.sql','20261023172638_manual_workplaces_geofenced_punches.sql','20261023213945_company_isolation.sql','20261023220346_manager_workplace_scope.sql','202611100001_multi_company_membership.sql','202611180001_company_pay_schedule.sql','202611190001_create_company_with_admin.sql','202611190002_pay_schedule_changes.sql'])
+ for(const name of ['202610010001_manager_roles.sql','202610040001_timecard_approvals.sql','202610080001_atomic_employee_activation.sql','202610230001_atomic_employee_punches.sql','20261023172638_manual_workplaces_geofenced_punches.sql','20261023213945_company_isolation.sql','20261023220346_manager_workplace_scope.sql','202611100001_multi_company_membership.sql','202611180001_company_pay_schedule.sql','202611190001_create_company_with_admin.sql','202611190004_pay_schedule_changes.sql'])
   await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.exec(`insert into organizations(id,name) values('${a}','Semi-monthly Co');
  insert into organizations(id,name,pay_frequency,pay_period_anchor) values('${b}','Weekly Co','weekly','2026-11-02');
