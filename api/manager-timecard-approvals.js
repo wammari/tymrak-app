@@ -33,11 +33,15 @@ export default async function handler(req, res) {
     const { supabaseUrl, secretKey } = authorization.configuration;
     const ids = `(${employeeIds.map(id => `"${id}"`).join(",")})`;
     const employees = await readArray(await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&organization_id=eq.${authorization.organizationId}&is_active=eq.true&select=id,province`,
+      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&organization_id=eq.${authorization.organizationId}&is_active=eq.true&select=id,province,auth_user_id`,
       { headers: databaseHeaders(secretKey) }
     ), "Approval employee validation failed");
     if (employees.length !== employeeIds.length) {
       return res.status(400).json({ error: "One or more selected employees are invalid or inactive" });
+    }
+    // Nobody approves their own timecard (the database refuses it too).
+    if (employees.some(employee => employee.auth_user_id && employee.auth_user_id === authorization.user.id)) {
+      return res.status(403).json({ error: "You can't approve your own timecard. Another manager or admin must approve it." });
     }
     const now = new Date().toISOString();
     const employeesById = new Map(employees.map(employee => [employee.id, employee]));

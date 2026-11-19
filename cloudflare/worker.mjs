@@ -2,6 +2,7 @@ import { createWorker } from './adapter.mjs';
 import publicConfig from '../api/public-config.js';
 import accountDeletion from '../api/account-deletion.js';
 import completeActivation from '../api/complete-activation.js';
+import companyTeam from '../api/company-team.js';
 import employeePunch from '../api/employee-punch.js';
 import employees from '../api/employees.js';
 import employeeTimeOff from '../api/employee-time-off.js';
@@ -19,6 +20,7 @@ export const routes = {
   '/api/public-config': publicConfig,
   '/api/account-deletion': accountDeletion,
   '/api/complete-activation': completeActivation,
+  '/api/company-team': companyTeam,
   '/api/employee-punch': employeePunch,
   '/api/employees': employees,
   '/api/employee-time-off': employeeTimeOff,

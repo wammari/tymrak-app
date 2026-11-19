@@ -56,7 +56,7 @@ export default async function handler(req, res) {
     const { startKey, endKey } = period;
 
     const employees = await query({
-      url: `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}${employeeScopeFilter(authorization)}&is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc,id.asc`,
+      url: `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}${employeeScopeFilter(authorization)}&is_active=eq.true&select=id,first_name,last_name,province,auth_user_id&order=last_name.asc,first_name.asc,id.asc`,
       secretKey, stage: "employees_query", resource: "employees",
       queryName: "active_employee_timecard_fields"
     });
@@ -98,7 +98,9 @@ export default async function handler(req, res) {
       const approval = approvals.find(record => record.employee_id === employee.id && record.status === "approved");
       if (employeePunches.length === 0) {
         return { ...summarizeEmployee(employee, [], null, period),
-          approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null };
+          approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null,
+          // The signed-in person's own timecard: someone else must approve or reopen it.
+          isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id };
       }
       if (applicable.length !== 1) {
         console.error("Manager timecard overtime rule resolution failed", {
@@ -115,7 +117,9 @@ export default async function handler(req, res) {
         throw error;
       }
       return { ...summarizeEmployee(employee, employeePunches, applicable[0], period),
-        approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null };
+        approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null,
+          // The signed-in person's own timecard: someone else must approve or reopen it.
+          isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id };
     });
     return res.status(200).json({
       period: {

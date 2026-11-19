@@ -152,7 +152,9 @@ export async function prepareExistingInvitationIdentity(configuration, employee,
   }
 }
 
-export async function sendActivationInvite(configuration, employee, companyName) {
+// extraData adds invitation metadata (e.g. { tymrak_access: "team" } for admin and
+// manager invitations); it is verified on the created account like the other fields.
+export async function sendActivationInvite(configuration, employee, companyName, extraData = {}) {
   if (typeof companyName !== 'string' || !companyName.trim()) {
     throw new Error('Verified company name is required before sending an invitation');
   }
@@ -167,7 +169,8 @@ export async function sendActivationInvite(configuration, employee, companyName)
           first_name: employee.firstName,
           last_name: employee.lastName,
           username: employee.username,
-          company_name: companyName.trim()
+          company_name: companyName.trim(),
+          ...extraData
         }
       })
     }
@@ -220,7 +223,8 @@ export async function sendActivationInvite(configuration, employee, companyName)
     metadata.first_name === employee.firstName &&
     metadata.last_name === employee.lastName &&
     metadata.username === employee.username &&
-    metadata.company_name === companyName.trim();
+    metadata.company_name === companyName.trim() &&
+    Object.entries(extraData).every(([key, value]) => metadata[key] === value);
   if (!safe) {
     const error = new Error(
       "Auth invitation identity could not be verified as a new, unconfirmed invited account. " +
