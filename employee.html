@@ -460,7 +460,7 @@ h2 {
     <div class="wide"><label for="toNote">Note (optional)</label><input id="toNote" maxlength="500"></div>
     <div class="wide"><button class="timeoff-submit" id="toSubmit" type="submit">Request time off</button></div>
 </form>
-<p class="meta" style="font-size:13px;color:#716254;margin:10px 0 0">Weekends and Ontario public holidays are not counted. Your manager approves requests.</p>
+<p class="meta" style="font-size:13px;color:#716254;margin:10px 0 0">Weekends and public holidays in your province are not counted. Your manager approves requests.</p>
 <div id="toNotice" class="timeoff-note" role="status"></div>
 <ul class="timeoff-list" id="toList"></ul>
 
@@ -1201,6 +1201,9 @@ async function timeOffRequest(method,query,body){
     return result;
 }
 function renderTimeOff(data){
+    const supported=data.supported!==false;
+    document.getElementById("timeOffForm").hidden=!supported;
+    if(!supported){toSay("bad",`Time off requests are not available yet for ${data.province||"your province"}. Please ask your manager.`)}
     document.getElementById("toRemaining").textContent=toDays(data.balance.remaining);
     document.getElementById("toUsed").textContent=toDays(data.balance.used);
     document.getElementById("toEntitled").textContent=toDays(data.balance.entitled);

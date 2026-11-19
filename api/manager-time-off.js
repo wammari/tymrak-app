@@ -10,7 +10,8 @@ const MESSAGES = {
   not_cancellable: 'This request can no longer be cancelled.',
   insufficient_balance: 'The employee does not have enough vacation days left to approve this request.',
   employee_not_found: 'That employee could not be found in your workplaces.',
-  below_ontario_minimum: 'Annual vacation cannot be below the Ontario minimum for this employee.',
+  below_legal_minimum: 'Annual vacation cannot be below the legal minimum for this employee\'s province.',
+  province_not_supported: 'Time off is not available yet for this employee\'s province.',
   invalid_request: 'This request is not valid.'
 };
 

@@ -6,6 +6,8 @@ import {PGlite} from '@electric-sql/pglite';
 const org = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa', other = 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb';
 const emp = '11111111-1111-4111-8111-111111111111', empUser = '22222222-2222-4222-8222-222222222222';
 const veteran = '33333333-3333-4333-8333-333333333333', veteranUser = '44444444-4444-4444-8444-444444444444';
+const sk = '77777777-7777-4777-8777-777777777777', skUser = '88888888-8888-4888-8888-888888888888';
+const pe = '99999999-9999-4999-8999-999999999999', peUser = 'cccccccc-cccc-4ccc-8ccc-cccccccccccc';
 const mgr = '55555555-5555-4555-8555-555555555555', outsider = '66666666-6666-4666-8666-666666666666';
 const nextYear = new Date().getUTCFullYear() + 1;
 const day = (m, d) => `${nextYear}-${String(m).padStart(2, '0')}-${String(d).padStart(2, '0')}`;
@@ -18,18 +20,20 @@ test.before(async () => {
     create schema auth;create table auth.users(id uuid primary key);create schema tymrak_private;
     create table public.organizations(id uuid primary key,name text,is_active boolean default true);
     create table public.employees(id uuid primary key,auth_user_id uuid,organization_id uuid,first_name text,last_name text,
-      hire_date date,is_active boolean default true,invitation_status text default 'Account Activated');
+      hire_date date,province text,is_active boolean default true,invitation_status text default 'Account Activated');
     create table public.user_roles(auth_user_id uuid,organization_id uuid,role text);
     create function tymrak_private.manager_can_access_employee(m uuid,e uuid) returns boolean language sql stable as $$
       select exists(select 1 from public.user_roles r join public.employees x on x.organization_id=r.organization_id
         where r.auth_user_id=m and x.id=e) $$;
-    insert into auth.users values('${empUser}'),('${veteranUser}'),('${mgr}'),('${outsider}');
+    insert into auth.users values('${empUser}'),('${veteranUser}'),('${mgr}'),('${outsider}'),('${skUser}'),('${peUser}');
     insert into public.organizations values('${org}','A'),('${other}','B');
     insert into public.user_roles values('${mgr}','${org}','manager'),('${outsider}','${other}','manager');
-    insert into public.employees(id,auth_user_id,organization_id,first_name,last_name,hire_date) values
-      ('${emp}','${empUser}','${org}','New','Hire',current_date - interval '1 year'),
-      ('${veteran}','${veteranUser}','${org}','Old','Hand',current_date - interval '6 years');`);
-  for (const name of ['202611160001_time_off_core.sql', '202611160002_time_off_functions.sql', '202611160003_time_off_company_scope.sql'])
+    insert into public.employees(id,auth_user_id,organization_id,first_name,last_name,hire_date,province) values
+      ('${emp}','${empUser}','${org}','New','Hire',current_date - interval '1 year','ON'),
+      ('${veteran}','${veteranUser}','${org}','Old','Hand',current_date - interval '6 years','ON'),
+      ('${sk}','${skUser}','${org}','Prairie','Worker',current_date - interval '2 years','SK'),
+      ('${pe}','${peUser}','${org}','Island','Worker',current_date - interval '2 years','PE');`);
+  for (const name of ['202611160001_time_off_core.sql', '202611160002_time_off_functions.sql', '202611160003_time_off_company_scope.sql', '202611190002_time_off_provinces.sql'])
     await db.exec(fs.readFileSync(new URL('../supabase/migrations/' + name, import.meta.url), 'utf8'));
 });
 test.after(async () => db.close());
@@ -41,17 +45,17 @@ const request = async (user, start, end, sh = 'full', eh = 'full') =>
 
 test('Ontario holidays are recognised, including the moving ones', async () => {
   const holidays = await db.query(`select d::date::text d from generate_series('2027-01-01'::date,'2027-12-31','1 day') g(d)
-    where tymrak_private.is_ontario_holiday(d::date) order by 1`);
+    where tymrak_private.is_public_holiday('ON', d::date) order by 1`);
   assert.deepEqual(holidays.rows.map(r => r.d), ['2027-01-01', '2027-02-15', '2027-03-26', '2027-05-24', '2027-07-01', '2027-09-06', '2027-10-11', '2027-12-25', '2027-12-26']);
 });
 
 test('working days skip weekends and holidays', async () => {
-  assert.equal(Number((await one(`select tymrak_private.working_days('2026-12-21','2026-12-31') n`)).n), 8);
-  assert.equal(Number((await one(`select tymrak_private.working_days('2027-06-05','2027-06-06') n`)).n), 0);
+  assert.equal(Number((await one(`select tymrak_private.working_days('ON','2026-12-21','2026-12-31') n`)).n), 8);
+  assert.equal(Number((await one(`select tymrak_private.working_days('ON','2027-06-05','2027-06-06') n`)).n), 0);
 });
 
 test('entitlement is 10 days, 15 from the fifth anniversary, never below the minimum', async () => {
-  const q = async (hire, on, ovr) => Number((await one('select tymrak_private.entitlement_as_of($1,$2,$3) n', [hire, on, ovr])).n);
+  const q = async (hire, on, ovr, prov = 'ON') => Number((await one('select tymrak_private.entitlement_as_of($1,$2,$3,$4) n', [prov, hire, on, ovr])).n);
   assert.equal(await q('2022-03-10', '2027-03-09', null), 10);
   assert.equal(await q('2022-03-10', '2027-03-10', null), 15);
   assert.equal(await q('2022-03-10', '2027-03-10', 12), 15);
@@ -104,8 +108,8 @@ test('manager decisions stay inside their own company', async () => {
   assert.equal((await one('select public.manager_time_off($1,$2) r', [outsider, org])).r.error, 'manager_required');
 });
 
-test('a manager can raise annual days but not go below the Ontario minimum', async () => {
-  assert.equal((await one('select public.set_time_off_entitlement($1,$2,$3,9) r', [mgr, org, emp])).r.error, 'below_ontario_minimum');
+test('a manager can raise annual days but not go below the legal minimum', async () => {
+  assert.equal((await one('select public.set_time_off_entitlement($1,$2,$3,9) r', [mgr, org, emp])).r.error, 'below_legal_minimum');
   assert.equal((await one('select public.set_time_off_entitlement($1,$2,$3,12.5) r', [mgr, org, emp])).r.success, true);
   const bal = (await one('select public.employee_time_off($1) r', [empUser])).r.balance;
   assert.equal(Number(bal.entitled), 12.5);
@@ -119,4 +123,54 @@ test('the ledger is append-only', async () => {
   await assert.rejects(db.query(`update public.time_off_ledger set days=99`), /append-only/);
   await db.exec('rollback to s');
   await assert.rejects(db.query('delete from public.time_off_ledger'), /append-only/);
+});
+
+test('vacation tiers follow each province', async () => {
+  const q = async (prov, hire, on) => Number((await one('select tymrak_private.policy_minimum_days($1,$2,$3) n', [prov, hire, on])).n);
+  assert.equal(await q('SK', '2025-01-01', '2025-06-01'), 15);   // 3 weeks from the start
+  assert.equal(await q('SK', '2015-01-01', '2025-01-01'), 20);   // 4 weeks at 10 years
+  assert.equal(await q('QC', '2024-03-01', '2027-02-28'), 10);
+  assert.equal(await q('QC', '2024-03-01', '2027-03-01'), 15);   // 3 weeks at 3 years
+  assert.equal(await q('NB', '2019-01-01', '2026-12-31'), 10);
+  assert.equal(await q('NB', '2019-01-01', '2027-01-01'), 15);   // 3 weeks at 8 years
+  assert.equal(await q('NL', '2012-01-01', '2026-12-31'), 10);
+  assert.equal(await q('NL', '2012-01-01', '2027-01-01'), 15);   // 3 weeks at 15 years
+  assert.equal(await q('PE', '2000-01-01', '2026-01-01'), 0);    // not enabled: no policy
+});
+
+test('public holidays follow each province', async () => {
+  const h = async (prov, date) => (await one('select tymrak_private.is_public_holiday($1,$2) b', [prov, date])).b;
+  assert.equal(await h('ON', '2027-12-26'), true);   // Boxing Day: Ontario only
+  assert.equal(await h('BC', '2027-12-26'), false);
+  assert.equal(await h('BC', '2027-08-02'), true);   // BC Day
+  assert.equal(await h('ON', '2027-08-02'), false);
+  assert.equal(await h('MB', '2027-09-30'), true);   // Orange Shirt Day
+  assert.equal(await h('AB', '2027-11-11'), true);   // Remembrance Day
+  assert.equal(await h('ON', '2027-11-11'), false);
+  assert.equal(await h('QC', '2027-06-24'), true);   // Fete nationale
+  assert.equal(await h('QC', '2027-05-24'), true);   // Patriots' Day = Victoria Day date
+  assert.equal(await h('NS', '2027-02-15'), true);   // Heritage Day
+  assert.equal(await h('NL', '2027-02-15'), false);
+  assert.equal(await h('AB', '2026-07-02'), false);  // 1 July 2026 is a Wednesday
+  assert.equal(await h('SK', '2029-07-02'), true);   // 1 July 2029 is a Sunday: observed Monday
+  assert.equal(await h('ON', '2029-07-02'), false);
+  assert.equal(await h('PE', '2027-01-01'), false);  // not enabled
+});
+
+test('each employee gets days and holidays for their own province', async () => {
+  const sask = (await one('select public.employee_time_off($1) r', [skUser])).r;
+  assert.equal(sask.supported, true); assert.equal(Number(sask.balance.entitled), 15);
+  const christmas = await request(skUser, day(12, 22), day(12, 24)); assert.equal(Number(christmas.days), 3);
+  const boxing = await request(empUser, day(12, 27), day(12, 31)); // Ontario: Boxing Day 26 is outside; all weekdays count
+  assert.equal(boxing.success, true);
+});
+
+test('provinces without a confirmed policy cannot request time off', async () => {
+  const view = (await one('select public.employee_time_off($1) r', [peUser])).r;
+  assert.equal(view.supported, false);
+  assert.equal((await request(peUser, day(3, 1), day(3, 2))).error, 'province_not_supported');
+  const mgrView = (await one('select public.manager_time_off($1,$2) r', [mgr, org])).r;
+  assert.deepEqual(mgrView.unsupported.map(u => u.province), ['PE']);
+  assert.ok(!mgrView.balances.some(b => b.employeeId === pe));
+  assert.equal((await one('select public.set_time_off_entitlement($1,$2,$3,15) r', [mgr, org, pe])).r.error, 'province_not_supported');
 });

@@ -38,7 +38,7 @@ test('employee API uses only the verified Auth ID and ignores any employee id in
 
 test('employee API maps business errors and hides outage details', async () => {
   setup();
-  for (const [result, status, expected] of [[{ error: 'insufficient_balance' }, 200, 409], [{ error: 'employee_unavailable' }, 200, 403], [{ code: 'XX000', message: 'secret' }, 500, 503]]) {
+  for (const [result, status, expected] of [[{ error: 'insufficient_balance' }, 200, 409], [{ error: 'employee_unavailable' }, 200, 403], [{ error: 'province_not_supported' }, 200, 409], [{ code: 'XX000', message: 'secret' }, 500, 503]]) {
     let calls = 0; global.fetch = async () => calls++ === 0 ? Response.json({ id: user }) : Response.json(result, { status });
     const r = res(); await employeeHandler(emp('POST', { startDate: '2027-03-01', endDate: '2027-03-02' }), r);
     assert.equal(r.code, expected); assert.doesNotMatch(JSON.stringify(r.body), /secret/);
@@ -82,6 +82,21 @@ test('employee page shows balance, request form and cancel without native dialog
   for (const id of ['toRemaining', 'timeOffForm', 'toList']) assert.match(page, new RegExp(`id="${id}"`));
   assert.match(page, /\/api\/employee-time-off/);
   assert.doesNotMatch(page, /\bconfirm\(/);
+});
+
+test('manager API reports a province without a confirmed policy clearly', async () => {
+  setup();
+  const org = '33333333-3333-4333-8333-333333333333';
+  global.fetch = async url => {
+    if (/auth\/v1\/user/.test(url)) return Response.json({ id: user, email: 'm@example.com' });
+    if (/user_roles/.test(url)) return Response.json([{ role: 'admin', organization_id: org, organization: { id: org, name: 'Co', is_active: true } }]);
+    if (/manager_employee_scope/.test(url)) return Response.json({ all: true, employee_ids: [] });
+    if (/rpc\/set_time_off_entitlement/.test(url)) return Response.json({ error: 'province_not_supported' });
+    return Response.json([]);
+  };
+  const r = res();
+  await managerHandler({ method: 'POST', headers: { authorization: 'Bearer session', 'x-tymrak-organization-id': org }, body: { action: 'set_entitlement', employeeId: reqId, annualDays: 15 } }, r);
+  assert.equal(r.code, 409); assert.match(r.body.error, /not available yet/);
 });
 
 test('Time Off endpoints are registered with the Cloudflare worker', () => {
