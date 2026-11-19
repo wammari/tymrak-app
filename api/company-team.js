@@ -85,15 +85,15 @@ async function listTeam(auth, res) {
   });
   if (team?.error) return refusal(res, team);
   const org = encodeURIComponent(organizationId);
-  const [workplaces, employees] = await Promise.all([
-    readRows(configuration, `workplaces?organization_id=eq.${org}&select=id,name,is_active&order=name.asc`),
-    readRows(configuration, `employees?organization_id=eq.${org}&is_active=eq.true&auth_user_id=not.is.null&select=id,first_name,last_name,email,auth_user_id&order=last_name.asc,first_name.asc`)
-  ]);
+  // Workplaces come from company_team(): the server may not read that table directly.
+  if (!Array.isArray(team.workplaces)) throw new Error("company_team did not return workplaces");
+  const employees = await readRows(configuration,
+    `employees?organization_id=eq.${org}&is_active=eq.true&auth_user_id=not.is.null&select=id,first_name,last_name,email,auth_user_id&order=last_name.asc,first_name.asc`);
   const members = new Set(team.members.map(member => member.authUserId));
   const hidden = protectedUser();
   return res.status(200).json({
     members: team.members,
-    workplaces: workplaces.map(w => ({ id: w.id, name: w.name, isActive: w.is_active !== false })),
+    workplaces: team.workplaces.map(w => ({ id: w.id, name: w.name, isActive: w.isActive !== false })),
     // Employees who could be given access on their own login (auth ids stay on the server).
     employees: employees.filter(e => !members.has(e.auth_user_id) && e.auth_user_id !== hidden)
       .map(e => ({ id: e.id, name: `${e.first_name || ""} ${e.last_name || ""}`.trim(), email: e.email || "" }))

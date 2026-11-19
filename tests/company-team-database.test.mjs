@@ -26,7 +26,7 @@ test.before(async()=>{
  create table punches(id bigserial primary key,employee_id uuid references employees(id),punch_type text,punched_at timestamptz,source text);
  alter table employees enable row level security;alter table punches enable row level security;
  grant all on employees,punches to authenticated;`);
- for(const name of ['202610010001_manager_roles.sql','202610040001_timecard_approvals.sql','202610040002_timecard_approval_audit.sql','202610040003_optional_timecard_reopen_reason.sql','202610070001_drop_obsolete_timecard_status_constraint.sql','202610080001_atomic_employee_activation.sql','202610230001_atomic_employee_punches.sql','20261023172638_manual_workplaces_geofenced_punches.sql','20261023213945_company_isolation.sql','20261023220346_manager_workplace_scope.sql','202611100001_multi_company_membership.sql','202611190005_company_team_access.sql'])
+ for(const name of ['202610010001_manager_roles.sql','202610040001_timecard_approvals.sql','202610040002_timecard_approval_audit.sql','202610040003_optional_timecard_reopen_reason.sql','202610070001_drop_obsolete_timecard_status_constraint.sql','202610080001_atomic_employee_activation.sql','202610230001_atomic_employee_punches.sql','20261023172638_manual_workplaces_geofenced_punches.sql','20261023213945_company_isolation.sql','20261023220346_manager_workplace_scope.sql','202611100001_multi_company_membership.sql','202611190005_company_team_access.sql','202611190006_company_team_workplaces.sql'])
   await db.exec(fs.readFileSync(new URL('../supabase/migrations/'+name,import.meta.url),'utf8'));
  await db.exec(`insert into organizations(id,name) values('${a}','Company A'),('${b}','Company B');
  insert into user_roles(auth_user_id,role,organization_id) values('${owner}','admin','${a}'),('${manager}','manager','${a}'),('${mainAdmin}','admin','${a}'),('${otherAdmin}','admin','${b}'),('${mainAdmin}','admin','${b}');
@@ -55,6 +55,13 @@ test('a company admin sees their team, without the Main Administrator',async()=>
  const me=members.find(m=>m.email==='owner@a.test');
  assert.equal(me.isYou,true);assert.equal(me.name,'Olivia Owner');assert.equal(me.employee.id,eOwner);
  assert.deepEqual(members.find(m=>m.role==='manager').workplaces,[{id:wA1,name:'Main Street'}]);
+});
+
+test('the team list includes the business\'s workplaces, even where the server cannot read that table',async()=>{
+ await db.exec('revoke all on public.workplaces from service_role');
+ const result=await team(owner);
+ assert.deepEqual(result.workplaces.map(w=>w.name),['Main Street','Mall Kiosk'],'only this business, sorted');
+ assert.equal(result.workplaces.every(w=>w.isActive===true),true);
 });
 
 test('managers and other companies cannot see or change the team',async()=>{
