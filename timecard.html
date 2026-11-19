@@ -403,7 +403,7 @@ import {
 import {
     DEFAULT_PAY_SCHEDULE,
     nextPayPeriod,
-    normalizePaySchedule,
+    normalizePayTimeline,
     payPeriodFor,
     previousPayPeriod
 } from "./pay-periods.js";
@@ -1255,8 +1255,9 @@ if (!employeeData.province) {
 
 
         /*
-            The company's pay schedule. The lookup returns only
-            this employee's own company schedule.
+            The company's pay schedule history: the schedule chosen
+            at sign-up, then any changes, each from its start date.
+            The lookup returns only this employee's own company.
         */
         const {
             data: scheduleRows,
@@ -1271,10 +1272,10 @@ if (!employeeData.province) {
         }
 
         paySchedule =
-            normalizePaySchedule(
+            normalizePayTimeline(
                 Array.isArray(scheduleRows)
-                    ? scheduleRows[0]
-                    : scheduleRows
+                    ? scheduleRows
+                    : [scheduleRows]
             );
 
         currentPayPeriod =

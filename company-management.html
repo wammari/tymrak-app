@@ -1,20 +1,20 @@
 <!doctype html>
 <html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Company Management | TYMRAK</title><link rel="stylesheet" href="/tymrak-theme.css">
-<style>body{font:16px Arial,sans-serif;background:#fbf8f3;color:#35271e;margin:0}header{background:#351b0c;color:white;padding:22px 5%}main{max-width:900px;margin:36px auto;padding:0 20px}.card{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:18px 0}input,select{padding:12px;width:100%;box-sizing:border-box;margin:10px 0;border:1px solid #cbbca9;border-radius:6px;font:inherit;background:white}label{display:block;margin-top:8px;font-weight:bold}.hint{color:#716254;font-size:14px;margin:0 0 12px}.schedule{color:#716254;font-size:14px}button{background:#8d5316;color:white;border:0;padding:12px 20px;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}a{color:#8d5316}li{padding:9px 0;border-bottom:1px solid #eee}#message{min-height:20px}</style></head>
+<style>body{font:16px Arial,sans-serif;background:#fbf8f3;color:#35271e;margin:0}header{background:#351b0c;color:white;padding:22px 5%}main{max-width:900px;margin:36px auto;padding:0 20px}.card{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:18px 0}input,select{padding:12px;width:100%;box-sizing:border-box;margin:10px 0;border:1px solid #cbbca9;border-radius:6px;font:inherit;background:white}label{display:block;margin-top:8px;font-weight:bold}.hint{color:#716254;font-size:14px;margin:0 0 12px}.schedule{color:#716254;font-size:14px}button{background:#8d5316;color:white;border:0;padding:12px 20px;border-radius:6px;cursor:pointer}button:disabled{opacity:.5}a{color:#8d5316}li{padding:12px 0;border-bottom:1px solid #eee}#message{min-height:20px}.row{display:flex;flex-wrap:wrap;align-items:center;gap:10px}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:8px 14px}.pending{margin:8px 0 0;color:#70400e;font-size:14px}.change{margin-top:12px;padding:16px;border:1px solid #e4d7c7;border-radius:8px;background:#fbf8f3}.change[hidden]{display:none}.change .actions{display:flex;gap:10px;flex-wrap:wrap}.error{color:#9b1c1c;font-size:14px;min-height:18px;margin:6px 0 0}</style></head>
 <body><header><strong>TYMRAK · Main Administrator</strong></header>
 <main><p><a href="/manager.html">← Back to Manager Portal</a></p>
 <h1>Company Management</h1><p>Create and manage independent TYMRAK businesses. Only the designated Main Administrator can access this page.</p>
-<section class="card"><h2>Add a new business</h2><form id="create"><label for="name">Business name</label><input id="name" maxlength="150" minlength="2" required placeholder="Registered business name"><label for="payFrequency">Pay schedule</label><select id="payFrequency" required><option value="" selected disabled>Choose how often this business pays employees</option><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi_monthly">Twice a month (1st–15th, 16th–end)</option><option value="monthly">Monthly</option></select><div id="anchorField" hidden><label for="payPeriodAnchor">First day of any pay period</label><input id="payPeriodAnchor" type="date"><p class="hint">Pick the start date of one of this business's pay periods, for example the Monday a current period began. Every other period is counted from it.</p></div><p class="hint">The pay schedule is set once and cannot be changed after the company is created.</p><button id="submit" type="submit">Create Company</button></form><p id="message" role="status"></p></section>
+<section class="card"><h2>Add a new business</h2><form id="create"><label for="name">Business name</label><input id="name" maxlength="150" minlength="2" required placeholder="Registered business name"><label for="payFrequency">Pay schedule</label><select id="payFrequency" required><option value="" selected disabled>Choose how often this business pays employees</option><option value="weekly">Weekly</option><option value="biweekly">Every two weeks</option><option value="semi_monthly">Twice a month (1st–15th, 16th–end)</option><option value="monthly">Monthly</option></select><div id="anchorField" hidden><label for="payPeriodAnchor">First day of any pay period</label><input id="payPeriodAnchor" type="date"><p class="hint">Pick the start date of one of this business's pay periods, for example the Monday a current period began. Every other period is counted from it.</p></div><p class="hint">You can change a pay schedule later, from a future pay period. Periods that have already started never change.</p><button id="submit" type="submit">Create Company</button></form><p id="message" role="status"></p></section>
 <section class="card"><h2>Businesses</h2><p>Select a business to manage its workplaces and employees in the Manager Portal.</p><ul id="companies"><li>Verifying access…</li></ul></section></main>
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
 import {createClient} from "/supabase-js.bundle.js";
+import {allowedChangeDates,earliestChangeDate,normalizePayTimeline,PAY_FREQUENCY_LABELS,scheduleChangePreview} from "./pay-periods.js";
 const config=await loadSupabaseConfiguration();
 const supabase=createClient(config.supabaseUrl,config.supabasePublishableKey);
 const message=document.getElementById("message"),list=document.getElementById("companies");
 const frequency=document.getElementById("payFrequency"),anchorField=document.getElementById("anchorField"),anchor=document.getElementById("payPeriodAnchor");
-const scheduleNames={weekly:"Weekly",biweekly:"Every two weeks",semi_monthly:"Twice a month",monthly:"Monthly"};
 function syncAnchor(){const needed=frequency.value==="weekly"||frequency.value==="biweekly";anchorField.hidden=!needed;anchor.required=needed;if(!needed)anchor.value=""}
 frequency.addEventListener("change",syncAnchor);
 async function request(method="GET",body){
@@ -25,11 +25,79 @@ async function request(method="GET",body){
  if(!response.ok)throw new Error(data.error||"Company management unavailable");
  return data;
 }
+let today=null;
+const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
+const longDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",weekday:"short",year:"numeric",month:"short",day:"numeric"});
+const timelineOf=company=>normalizePayTimeline(company.paySchedule.history.map(entry=>({id:entry.id,pay_frequency:entry.frequency,pay_period_anchor:entry.anchorDate,effective_from:entry.effectiveFrom})));
+const shortDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"});
+function scheduleChanger(company){
+ const timeline=timelineOf(company),current=company.paySchedule.frequency;
+ const earliest=earliestChangeDate(timeline,today);
+ const choose=el("select",{required:true});
+ choose.append(el("option",{value:"",selected:true,disabled:true,textContent:"Choose the new pay schedule"}));
+ for(const [value,label] of Object.entries(PAY_FREQUENCY_LABELS))if(value!==current)choose.append(el("option",{value,textContent:label}));
+ // Twice a month and monthly start on fixed days, so they get a list. Weekly and every
+ // two weeks can start any day (that day sets the weekday), so they get a date picker.
+ const list=el("select"),picker=el("input",{type:"date"});
+ const startField=el("div",{},el("label",{textContent:"Starts on"}));
+ const preview=el("p",{className:"hint"}),error=el("p",{className:"error",role:"alert"});
+ const save=el("button",{type:"submit",textContent:"Schedule change",disabled:true});
+ const close=el("button",{type:"button",className:"secondary",textContent:"Close"});
+ const startValue=()=>choose.value==="weekly"||choose.value==="biweekly"?picker.value:list.value;
+ function showPreview(){
+  error.textContent="";
+  const change={frequency:choose.value,effectiveFrom:startValue()};
+  const result=change.frequency&&change.effectiveFrom?scheduleChangePreview(timeline,change,today):null;
+  save.disabled=!result;
+  if(!result){preview.textContent=change.effectiveFrom?"That date can't be used. Choose a date after the current pay period ends.":"";return}
+  const first=`The first ${PAY_FREQUENCY_LABELS[change.frequency].toLowerCase()} period is ${shortDate(result.firstNewPeriod.startKey)} – ${shortDate(result.firstNewPeriod.endKey)}.`;
+  preview.textContent=result.shortPeriod
+   ?`The pay period starting ${shortDate(result.shortPeriod.startKey)} will end early on ${shortDate(result.shortPeriod.endKey)} (a short ${result.shortPeriod.days}-day period). ${first} Earlier periods don't change.`
+   :`The current schedule's last period ends ${shortDate(result.lastOldPeriod.endKey)}. ${first} Earlier periods don't change.`;
+ }
+ choose.addEventListener("change",()=>{
+  const daily=choose.value==="weekly"||choose.value==="biweekly";
+  if(daily){picker.min=earliest;picker.value=earliest;startField.replaceChildren(startField.firstChild,picker,el("p",{className:"hint",textContent:"Pay periods will start on this day of the week."}))}
+  else{const dates=allowedChangeDates(timeline,choose.value,today);list.replaceChildren(...dates.map(key=>el("option",{value:key,textContent:longDate(key)})));startField.replaceChildren(startField.firstChild,list)}
+  showPreview();
+ });
+ list.addEventListener("change",showPreview);picker.addEventListener("input",showPreview);
+ const form=el("form",{className:"change",hidden:true},
+  el("label",{textContent:"New pay schedule"}),choose,startField,preview,
+  el("div",{className:"actions"},save,close),error);
+ close.addEventListener("click",()=>{form.hidden=true});
+ form.addEventListener("submit",async event=>{
+  event.preventDefault();save.disabled=true;error.textContent="";
+  const effectiveFrom=startValue();
+  try{await request("PATCH",{companyId:company.id,payFrequency:choose.value,effectiveFrom});message.textContent=`${company.name}: pay schedule changes to ${PAY_FREQUENCY_LABELS[choose.value]} from ${longDate(effectiveFrom)}`;await refresh()}
+  catch(problem){error.textContent=problem.message;save.disabled=false}
+ });
+ return form;
+}
+function companyRow(company){
+ const manage=el("button",{type:"button",textContent:"Manage "+company.name,disabled:!company.is_active});
+ manage.addEventListener("click",()=>{const url=new URL("/manager.html",location.origin);url.searchParams.set("organization_id",company.id);location.assign(url.toString())});
+ const row=el("div",{className:"row"},manage,el("span",{className:"schedule",textContent:company.paySchedule.description}));
+ if(!company.is_active)row.append(" (Inactive)");
+ const li=el("li",{},row);
+ const waiting=company.paySchedule.upcomingChange;
+ if(waiting){
+  const cancel=el("button",{type:"button",className:"secondary",textContent:"Cancel change"});
+  cancel.addEventListener("click",async()=>{cancel.disabled=true;try{await request("DELETE",{companyId:company.id,changeId:waiting.id});message.textContent=`${company.name}: scheduled pay schedule change cancelled`;await refresh()}catch(problem){message.textContent=problem.message;cancel.disabled=false}});
+  li.append(el("div",{className:"row pending"},el("span",{textContent:`Changing to ${waiting.description} from ${longDate(waiting.effectiveFrom)}`}),cancel));
+ }else if(company.is_active){
+  const form=scheduleChanger(company);
+  const open=el("button",{type:"button",className:"secondary",textContent:"Change pay schedule"});
+  open.addEventListener("click",()=>{form.hidden=!form.hidden});
+  row.append(open);li.append(form);
+ }
+ return li;
+}
 async function refresh(){
  const data=await request();
- list.replaceChildren();
- for(const company of data.companies){const li=document.createElement("li");const button=document.createElement("button");button.type="button";button.textContent="Manage "+company.name;button.disabled=!company.is_active;button.addEventListener("click",()=>{const url=new URL("/manager.html",location.origin);url.searchParams.set("organization_id",company.id);location.assign(url.toString())});li.append(button);const schedule=document.createElement("span");schedule.className="schedule";schedule.textContent=" · "+(scheduleNames[company.pay_frequency]||"Twice a month")+(company.pay_period_anchor?" from "+company.pay_period_anchor:"");li.append(schedule);if(!company.is_active)li.append(" (Inactive)");list.append(li)}
- if(!data.companies.length){const li=document.createElement("li");li.textContent="No companies yet";list.append(li)}
+ today=data.today;
+ list.replaceChildren(...data.companies.map(companyRow));
+ if(!data.companies.length)list.append(el("li",{textContent:"No companies yet"}));
 }
 try{await refresh()}catch(error){document.getElementById("create").hidden=true;list.textContent="Access unavailable";message.textContent=error.message}
 document.getElementById("create").addEventListener("submit",async event=>{
