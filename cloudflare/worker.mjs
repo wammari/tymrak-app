@@ -4,6 +4,8 @@ import accountDeletion from '../api/account-deletion.js';
 import completeActivation from '../api/complete-activation.js';
 import employeePunch from '../api/employee-punch.js';
 import employees from '../api/employees.js';
+import employeeTimeOff from '../api/employee-time-off.js';
+import managerTimeOff from '../api/manager-time-off.js';
 import managerSession from '../api/manager-session.js';
 import managerWorkplaces from '../api/manager-workplaces.js';
 import managerTimecards from '../api/manager-timecards.js';
@@ -19,6 +21,8 @@ export const routes = {
   '/api/complete-activation': completeActivation,
   '/api/employee-punch': employeePunch,
   '/api/employees': employees,
+  '/api/employee-time-off': employeeTimeOff,
+  '/api/manager-time-off': managerTimeOff,
   '/api/manager-session': managerSession,
   '/api/manager-workplaces': managerWorkplaces,
   '/api/manager-timecards': managerTimecards,

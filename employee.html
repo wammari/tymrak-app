@@ -349,6 +349,12 @@ h2 {
     }
 }
 
+
+.timeoff-balance{display:flex;gap:24px;flex-wrap:wrap;margin:14px 0 20px}.timeoff-balance div{min-width:110px}.timeoff-balance strong{display:block;font-size:26px;color:#351b0c}.timeoff-balance span{font-size:13px;color:#716254}
+.timeoff-form{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;align-items:end}.timeoff-form label{display:block;font-size:13px;font-weight:600;margin-bottom:4px}.timeoff-form input,.timeoff-form select{width:100%;padding:10px;border:1px solid #e4d7c7;border-radius:8px;font:inherit}.timeoff-form .wide{grid-column:1/-1}
+.timeoff-submit{padding:12px 20px;border:0;border-radius:9px;background:#8d5316;color:#fff;font-weight:700;cursor:pointer}.timeoff-submit:disabled{opacity:.6;cursor:not-allowed}
+.timeoff-note{margin:12px 0 0;padding:11px;border-radius:8px;display:none}.timeoff-note.ok{display:block;background:#eaf6ec;color:#1d5c2e}.timeoff-note.bad{display:block;background:#fdecea;color:#b42318}
+.timeoff-list{list-style:none;margin:20px 0 0;padding:0}.timeoff-list li{display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap;padding:12px 0;border-top:1px solid #e4d7c7}.timeoff-list .when{font-weight:600}.timeoff-list .meta{font-size:13px;color:#716254}.timeoff-cancel{border:0;background:none;color:#b42318;font-weight:600;cursor:pointer;text-decoration:underline}
 </style>
 
 <meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css">
@@ -436,6 +442,27 @@ h2 {
     </div>
 
 </div>
+
+</section>
+<section class="card" id="timeOffCard">
+
+<h2>Time Off</h2>
+<div class="timeoff-balance" aria-live="polite">
+    <div><strong id="toRemaining">–</strong><span>Vacation days left</span></div>
+    <div><strong id="toUsed">–</strong><span>Used this year</span></div>
+    <div><strong id="toEntitled">–</strong><span>Entitled this year</span></div>
+</div>
+<form id="timeOffForm" class="timeoff-form">
+    <div><label for="toStart">First day</label><input id="toStart" type="date" required></div>
+    <div><label for="toStartHalf">First day length</label><select id="toStartHalf"><option value="full">Full day</option><option value="pm">Afternoon only</option></select></div>
+    <div><label for="toEnd">Last day</label><input id="toEnd" type="date" required></div>
+    <div><label for="toEndHalf">Last day length</label><select id="toEndHalf"><option value="full">Full day</option><option value="am">Morning only</option></select></div>
+    <div class="wide"><label for="toNote">Note (optional)</label><input id="toNote" maxlength="500"></div>
+    <div class="wide"><button class="timeoff-submit" id="toSubmit" type="submit">Request time off</button></div>
+</form>
+<p class="meta" style="font-size:13px;color:#716254;margin:10px 0 0">Weekends and public holidays in your province are not counted. Your manager approves requests.</p>
+<div id="toNotice" class="timeoff-note" role="status"></div>
+<ul class="timeoff-list" id="toList"></ul>
 
 </section>
 <section class="card">
@@ -1160,6 +1187,54 @@ setInterval(
 
 
 loadEmployee();
+
+const toNotice=document.getElementById("toNotice");
+function toSay(kind,text){toNotice.className="timeoff-note "+kind;toNotice.textContent=text}
+function toDays(value){const n=Number(value);return Number.isInteger(n)?String(n):n.toFixed(1)}
+function toDate(value){const [y,m,d]=value.split("-").map(Number);return new Date(Date.UTC(y,m-1,d)).toLocaleDateString([],{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"})}
+async function timeOffRequest(method,query,body){
+    const {data,error}=await supabase.auth.getSession();
+    if(error||!data.session) throw new Error("Session expired. Please sign in again.");
+    const response=await fetch("/api/employee-time-off"+(query||""),{method,cache:"no-store",headers:{Authorization:`Bearer ${data.session.access_token}`,...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const result=await response.json().catch(()=>({}));
+    if(!response.ok) throw new Error(result.error||"Time off is unavailable right now.");
+    return result;
+}
+function renderTimeOff(data){
+    const supported=data.supported!==false;
+    document.getElementById("timeOffForm").hidden=!supported;
+    if(!supported){toSay("bad",`Time off requests are not available yet for ${data.province||"your province"}. Please ask your manager.`)}
+    document.getElementById("toRemaining").textContent=toDays(data.balance.remaining);
+    document.getElementById("toUsed").textContent=toDays(data.balance.used);
+    document.getElementById("toEntitled").textContent=toDays(data.balance.entitled);
+    const list=document.getElementById("toList");list.replaceChildren();
+    for(const r of data.requests){
+        const li=document.createElement("li");const left=document.createElement("div");
+        const when=document.createElement("div");when.className="when";
+        when.textContent=r.startDate===r.endDate?toDate(r.startDate):`${toDate(r.startDate)} – ${toDate(r.endDate)}`;
+        const meta=document.createElement("div");meta.className="meta";
+        meta.textContent=`${toDays(r.days)} day${Number(r.days)===1?"":"s"} · ${r.status.charAt(0).toUpperCase()+r.status.slice(1)}`+(r.decisionNote?` · ${r.decisionNote}`:"");
+        left.append(when,meta);li.append(left);
+        const upcoming=r.endDate>=new Date().toLocaleDateString("en-CA");
+        if(upcoming&&(r.status==="pending"||r.status==="approved")){
+            const b=document.createElement("button");b.type="button";b.className="timeoff-cancel";b.textContent="Cancel";
+            let armed=false;b.addEventListener("click",async()=>{if(!armed){armed=true;b.textContent="Tap again to confirm";setTimeout(()=>{armed=false;b.textContent="Cancel"},4000);return}b.disabled=true;try{await timeOffRequest("DELETE","?id="+encodeURIComponent(r.id));await loadTimeOff();toSay("ok","Request cancelled.")}catch(error){toSay("bad",error.message);b.disabled=false}});
+            li.append(b);
+        }
+        list.append(li);
+    }
+}
+async function loadTimeOff(){
+    try{renderTimeOff(await timeOffRequest("GET"))}catch(error){toSay("bad",error.message)}
+}
+document.getElementById("timeOffForm").addEventListener("submit",async event=>{
+    event.preventDefault();const button=document.getElementById("toSubmit");button.disabled=true;toNotice.className="timeoff-note";
+    try{
+        const result=await timeOffRequest("POST","",{startDate:document.getElementById("toStart").value,endDate:document.getElementById("toEnd").value,startHalf:document.getElementById("toStartHalf").value,endHalf:document.getElementById("toEndHalf").value,note:document.getElementById("toNote").value.trim()||null});
+        document.getElementById("timeOffForm").reset();await loadTimeOff();toSay("ok",`Request sent for ${toDays(result.days)} day${Number(result.days)===1?"":"s"}. Your manager will review it.`);
+    }catch(error){toSay("bad",error.message)}finally{button.disabled=false}
+});
+loadTimeOff();
 
 </script>
 
