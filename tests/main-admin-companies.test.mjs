@@ -156,7 +156,7 @@ test("changes that would move a started or misaligned period never reach the dat
  const from=firstOfMonthAhead(2);
  for(const body of [
   {companyId:COMPANY,payFrequency:"biweekly",effectiveFrom:todayKey()},
-  {companyId:COMPANY,payFrequency:"biweekly",effectiveFrom:from.slice(0,8)+"02"},
+  {companyId:COMPANY,payFrequency:"monthly",effectiveFrom:from.slice(0,8)+"02"},
   {companyId:COMPANY,payFrequency:"semi_monthly",effectiveFrom:from},
   {companyId:COMPANY,payFrequency:"fortnightly",effectiveFrom:from},
   {companyId:"not-a-company",payFrequency:"monthly",effectiveFrom:from}

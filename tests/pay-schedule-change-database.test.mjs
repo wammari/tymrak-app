@@ -34,7 +34,10 @@ test.afterEach(async()=>db.exec('rollback'));
 // Dates relative to today in Toronto, the calendar the database uses for "today".
 const today=dateKey(new Date(),'America/Toronto');
 const firstOfMonth=monthsAhead=>{const d=new Date(`${today.slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()+monthsAhead);return d.toISOString().slice(0,10);};
-const future=firstOfMonth(2), later=firstOfMonth(4), notABoundary=future.slice(0,8)+'02';
+const future=firstOfMonth(2), later=firstOfMonth(4);
+// A date after today inside the current twice-a-month period, if today is not its last day.
+const semiEnd=Number(today.slice(8))<=15?today.slice(0,8)+'15':new Date(Date.UTC(+today.slice(0,4),+today.slice(5,7),0)).toISOString().slice(0,10);
+const insideCurrent=semiEnd>today?semiEnd:null;
 const change='select * from change_company_pay_schedule($1,$2,$3,$4)';
 
 async function refused(role,sql,args){
@@ -59,13 +62,20 @@ test('a twice-a-month company can switch to every two weeks from a future 1st of
  assert.deepEqual(saved,[{changed_by:ua}]);
 });
 
+test('a change inside a future period is allowed and shortens only that period',async()=>{
+ const inside=future.slice(0,8)+'10';
+ const {rows:[saved]}=await asServer(change,[a,'biweekly',inside,ua]);
+ assert.equal(dateKey(saved.effective_from,'UTC'),inside);
+});
+
 test('changes that would move a started or misaligned period are refused',async()=>{
  const cases=[
   [[a,'monthly',today,ua],/future date/],
   [[a,'monthly','2020-01-01',ua],/future date/],
   [[a,'semi_monthly',future,ua],/already uses this pay schedule/],
-  [[a,'biweekly',notABoundary,ua],/current pay periods/],
   [[b,'monthly',nextWeeklyStartNotFirst(),ua],/own pay periods/],
+  [[a,'monthly',future.slice(0,8)+'02',ua],/own pay periods/],
+  ...(insideCurrent?[[[a,'biweekly',insideCurrent,ua],/already started/]]:[]),
   [[a,'fortnightly',future,ua],/check|constraint|own pay periods/],
   [['99999999-9999-4999-8999-999999999999','monthly',future,ua],/Company not found/]
  ];
@@ -103,9 +113,10 @@ test('a change that has already started cannot be cancelled, and the next change
  let boundary=new Date(`${started}T12:00:00Z`);
  while(boundary.toISOString().slice(0,10)<=today)boundary.setUTCDate(boundary.getUTCDate()+14);
  const key=boundary.toISOString().slice(0,10);
- const offBoundary=new Date(boundary.getTime()+7*86400000).toISOString().slice(0,10);
- const error=await refused('service_role',change,[a,'weekly',offBoundary,ua]);
- assert.match(error.message,/current pay periods/);
+ // The day before that boundary is inside the current two-week period, which has started.
+ const insideStarted=new Date(boundary.getTime()-86400000).toISOString().slice(0,10);
+ const error=await refused('service_role',change,[a,'weekly',insideStarted,ua]);
+ assert.match(error.message,/already started|future date/);
  const {rows:[next]}=await asServer(change,[a,'weekly',key,ua]);
  assert.equal(next.pay_frequency,'weekly');
 });

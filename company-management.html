@@ -10,7 +10,7 @@
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
 import {createClient} from "/supabase-js.bundle.js";
-import {allowedChangeDates,normalizePayTimeline,PAY_FREQUENCY_LABELS} from "./pay-periods.js";
+import {allowedChangeDates,earliestChangeDate,normalizePayTimeline,PAY_FREQUENCY_LABELS,scheduleChangePreview} from "./pay-periods.js";
 const config=await loadSupabaseConfiguration();
 const supabase=createClient(config.supabaseUrl,config.supabasePublishableKey);
 const message=document.getElementById("message"),list=document.getElementById("companies");
@@ -29,29 +29,47 @@ let today=null;
 const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
 const longDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",weekday:"short",year:"numeric",month:"short",day:"numeric"});
 const timelineOf=company=>normalizePayTimeline(company.paySchedule.history.map(entry=>({id:entry.id,pay_frequency:entry.frequency,pay_period_anchor:entry.anchorDate,effective_from:entry.effectiveFrom})));
+const shortDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"});
 function scheduleChanger(company){
  const timeline=timelineOf(company),current=company.paySchedule.frequency;
+ const earliest=earliestChangeDate(timeline,today);
  const choose=el("select",{required:true});
  choose.append(el("option",{value:"",selected:true,disabled:true,textContent:"Choose the new pay schedule"}));
  for(const [value,label] of Object.entries(PAY_FREQUENCY_LABELS))if(value!==current)choose.append(el("option",{value,textContent:label}));
- const start=el("select",{required:true,disabled:true});
- const note=el("p",{className:"hint"}),error=el("p",{className:"error",role:"alert"});
+ // Twice a month and monthly start on fixed days, so they get a list. Weekly and every
+ // two weeks can start any day (that day sets the weekday), so they get a date picker.
+ const list=el("select"),picker=el("input",{type:"date"});
+ const startField=el("div",{},el("label",{textContent:"Starts on"}));
+ const preview=el("p",{className:"hint"}),error=el("p",{className:"error",role:"alert"});
  const save=el("button",{type:"submit",textContent:"Schedule change",disabled:true});
  const close=el("button",{type:"button",className:"secondary",textContent:"Close"});
+ const startValue=()=>choose.value==="weekly"||choose.value==="biweekly"?picker.value:list.value;
+ function showPreview(){
+  error.textContent="";
+  const change={frequency:choose.value,effectiveFrom:startValue()};
+  const result=change.frequency&&change.effectiveFrom?scheduleChangePreview(timeline,change,today):null;
+  save.disabled=!result;
+  if(!result){preview.textContent=change.effectiveFrom?"That date can't be used. Choose a date after the current pay period ends.":"";return}
+  const first=`The first ${PAY_FREQUENCY_LABELS[change.frequency].toLowerCase()} period is ${shortDate(result.firstNewPeriod.startKey)} – ${shortDate(result.firstNewPeriod.endKey)}.`;
+  preview.textContent=result.shortPeriod
+   ?`The pay period starting ${shortDate(result.shortPeriod.startKey)} will end early on ${shortDate(result.shortPeriod.endKey)} (a short ${result.shortPeriod.days}-day period). ${first} Earlier periods don't change.`
+   :`The current schedule's last period ends ${shortDate(result.lastOldPeriod.endKey)}. ${first} Earlier periods don't change.`;
+ }
  choose.addEventListener("change",()=>{
-  const dates=allowedChangeDates(timeline,choose.value,today);
-  start.replaceChildren(...dates.map(key=>el("option",{value:key,textContent:longDate(key)})));
-  start.disabled=save.disabled=!dates.length;
-  note.textContent=dates.length?"Only dates where a current pay period ends and a new one can begin are listed. Every period before that date stays as it is.":"No suitable start date in the next two years. Choose a different schedule.";
+  const daily=choose.value==="weekly"||choose.value==="biweekly";
+  if(daily){picker.min=earliest;picker.value=earliest;startField.replaceChildren(startField.firstChild,picker,el("p",{className:"hint",textContent:"Pay periods will start on this day of the week."}))}
+  else{const dates=allowedChangeDates(timeline,choose.value,today);list.replaceChildren(...dates.map(key=>el("option",{value:key,textContent:longDate(key)})));startField.replaceChildren(startField.firstChild,list)}
+  showPreview();
  });
+ list.addEventListener("change",showPreview);picker.addEventListener("input",showPreview);
  const form=el("form",{className:"change",hidden:true},
-  el("label",{textContent:"New pay schedule"}),choose,
-  el("label",{textContent:"Starts on"}),start,note,
+  el("label",{textContent:"New pay schedule"}),choose,startField,preview,
   el("div",{className:"actions"},save,close),error);
  close.addEventListener("click",()=>{form.hidden=true});
  form.addEventListener("submit",async event=>{
   event.preventDefault();save.disabled=true;error.textContent="";
-  try{await request("PATCH",{companyId:company.id,payFrequency:choose.value,effectiveFrom:start.value});message.textContent=`${company.name}: pay schedule changes to ${PAY_FREQUENCY_LABELS[choose.value]} from ${longDate(start.value)}`;await refresh()}
+  const effectiveFrom=startValue();
+  try{await request("PATCH",{companyId:company.id,payFrequency:choose.value,effectiveFrom});message.textContent=`${company.name}: pay schedule changes to ${PAY_FREQUENCY_LABELS[choose.value]} from ${longDate(effectiveFrom)}`;await refresh()}
   catch(problem){error.textContent=problem.message;save.disabled=false}
  });
  return form;

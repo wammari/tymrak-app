@@ -94,13 +94,14 @@ export function payPeriodFor(dateKey, scheduleInput) {
   const index = segmentIndexAt(timeline, dateKey);
   const segment = timeline.segments[index], next = timeline.segments[index + 1];
   const period = periodUnder(dateKey, segment.schedule);
-  // Changes always start on a shared period boundary, so a period never straddles one.
-  // This only guards against a bad history row: the period is cut at the change date.
+  // The last period before a change ends the day before the change: when the change date
+  // is not one of the old schedule's period starts, that period is a short one.
   let { startKey, endKey } = period;
   if (segment.from && startKey < segment.from) startKey = segment.from;
   if (next && endKey >= next.from) endKey = addDays(next.from, -1);
   if (startKey === period.startKey && endKey === period.endKey) return period;
-  return Object.freeze({ key: startKey, startKey, endKey, frequency: segment.schedule.frequency });
+  return Object.freeze({ key: startKey === period.startKey ? period.key : startKey, startKey, endKey,
+    frequency: segment.schedule.frequency, shortened: true });
 }
 
 function periodUnder(dateKey, schedule) {
@@ -148,7 +149,8 @@ export function describePaySchedule(scheduleInput) {
 
 // ---- Changing a schedule ---------------------------------------------------------------
 // The same rules are enforced again by the database (change_company_pay_schedule), so a
-// change can never move a period that has already started.
+// change can never move a period that has already started. If the change date falls
+// inside a future period of the old schedule, that period ends early (a short period).
 
 function startsPeriodUnder(dateKey, schedule) {
   return periodUnder(dateKey, schedule).startKey === dateKey;
@@ -175,21 +177,45 @@ export function scheduleChangeProblem(input, change, todayKey) {
   if (pendingScheduleChange(timeline, todayKey)) return "This company already has a pay schedule change waiting to start. Cancel it first.";
   const current = scheduleOn(timeline, addDays(from, -1));
   if (current.frequency === change.frequency) return "The company already uses this pay schedule";
-  if (payPeriodFor(from, timeline).startKey !== from) return "The new pay schedule must start on the first day of one of the company's current pay periods";
+  if (payPeriodFor(from, timeline).startKey <= todayKey) return "That date falls inside a pay period that has already started. Choose a date after it ends.";
   if (!startsPeriodUnder(from, newScheduleFrom(change.frequency, from))) return "The new pay schedule must start on the first day of one of its own pay periods";
   return null;
 }
 
-// The next dates a change to `frequency` could start on: future dates where a current
-// pay period ends and a period of the new schedule can begin.
+// The earliest date any change could start: the first day after the current pay period.
+export function earliestChangeDate(input, todayKey) {
+  const timeline = normalizePayTimeline(input);
+  if (!isDateKey(todayKey) || pendingScheduleChange(timeline, todayKey)) return null;
+  return addDays(payPeriodFor(todayKey, timeline).endKey, 1);
+}
+
+// What a change would do: the short period it creates (if any) and the first new period.
+export function scheduleChangePreview(input, change, todayKey) {
+  const timeline = normalizePayTimeline(input);
+  if (scheduleChangeProblem(timeline, change, todayKey)) return null;
+  const from = change.effectiveFrom;
+  const last = payPeriodFor(addDays(from, -1), timeline);
+  const natural = periodUnder(addDays(from, -1), scheduleOn(timeline, addDays(from, -1)));
+  const newSchedule = newScheduleFrom(change.frequency, from);
+  const first = periodUnder(from, newSchedule);
+  const days = (start, end) => Math.round((toTime(end) - toTime(start)) / DAY) + 1;
+  return {
+    lastOldPeriod: { startKey: last.startKey, endKey: addDays(from, -1) },
+    shortPeriod: natural.endKey >= from ? { startKey: last.startKey, endKey: addDays(from, -1), days: days(last.startKey, addDays(from, -1)) } : null,
+    firstNewPeriod: { startKey: first.startKey, endKey: first.endKey }
+  };
+}
+
+// The next dates a change to `frequency` could start on. Twice-a-month and monthly
+// schedules can only start on the 1st (or 16th); weekly and every-two-weeks schedules can
+// start on any day from the earliest date, which also sets the weekday periods start on.
 export function allowedChangeDates(input, frequency, todayKey, count = 6, horizonDays = 730) {
   const timeline = normalizePayTimeline(input);
-  if (!isDateKey(todayKey) || !PAY_FREQUENCIES.includes(frequency) || pendingScheduleChange(timeline, todayKey)) return [];
+  const earliest = earliestChangeDate(timeline, todayKey);
+  if (!earliest || !PAY_FREQUENCIES.includes(frequency)) return [];
   const dates = [], limit = addDays(todayKey, horizonDays);
-  let period = nextPayPeriod(payPeriodFor(todayKey, timeline), timeline);
-  while (dates.length < count && period.startKey <= limit) {
-    if (!scheduleChangeProblem(timeline, { frequency, effectiveFrom: period.startKey }, todayKey)) dates.push(period.startKey);
-    period = nextPayPeriod(period, timeline);
+  for (let date = earliest; dates.length < count && date <= limit; date = addDays(date, 1)) {
+    if (!scheduleChangeProblem(timeline, { frequency, effectiveFrom: date }, todayKey)) dates.push(date);
   }
   return dates;
 }

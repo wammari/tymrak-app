@@ -83,7 +83,7 @@ test("schedules are validated", () => {
 });
 
 // ---- Schedule changes -----------------------------------------------------------------
-import { allowedChangeDates, normalizePayTimeline, payTimelineSummary, scheduleChangeProblem, scheduleOn } from "../pay-periods.js";
+import { allowedChangeDates, earliestChangeDate, normalizePayTimeline, payTimelineSummary, scheduleChangePreview, scheduleChangeProblem, scheduleOn } from "../pay-periods.js";
 
 const switched = normalizePayTimeline({ pay_frequency: "semi_monthly", pay_period_anchor: null,
   pay_schedule_changes: [{ id: 7, pay_frequency: "biweekly", pay_period_anchor: "2027-01-01", effective_from: "2027-01-01" }] });
@@ -114,14 +114,15 @@ test("period codes are read with the schedule in effect on that date", () => {
   assert.equal(payPeriodFromKey("2027-01-08", switched, "2027-02-01"), null, "not a two-week boundary");
 });
 
-test("a change must start on a future date shared by both schedules", () => {
+test("a change must start on a future date the new schedule allows, in a period that has not started", () => {
   const semi = { pay_frequency: "semi_monthly", pay_period_anchor: null };
   const ok = change => scheduleChangeProblem(semi, change, "2026-11-19");
   assert.equal(ok({ frequency: "biweekly", effectiveFrom: "2027-01-01" }), null);
   assert.equal(ok({ frequency: "biweekly", effectiveFrom: "2026-12-16" }), null);
   assert.equal(ok({ frequency: "monthly", effectiveFrom: "2027-01-01" }), null);
   assert.match(ok({ frequency: "monthly", effectiveFrom: "2026-12-16" }), /its own pay periods/);
-  assert.match(ok({ frequency: "biweekly", effectiveFrom: "2026-12-10" }), /current pay periods/);
+  assert.equal(ok({ frequency: "biweekly", effectiveFrom: "2026-12-10" }), null, "Dec 1–15 has not started, so it can end early");
+  assert.match(ok({ frequency: "biweekly", effectiveFrom: "2026-11-25" }), /already started/, "Nov 16–30 has started");
   assert.match(ok({ frequency: "biweekly", effectiveFrom: "2026-11-16" }), /future date/);
   assert.match(ok({ frequency: "semi_monthly", effectiveFrom: "2027-01-01" }), /already uses/);
   assert.match(ok({ frequency: "yearly", effectiveFrom: "2027-01-01" }), /Choose the new pay schedule/);
@@ -131,9 +132,10 @@ test("a change must start on a future date shared by both schedules", () => {
 test("the offered start dates are exactly the allowed ones", () => {
   const semi = { pay_frequency: "semi_monthly", pay_period_anchor: null };
   assert.deepEqual(allowedChangeDates(semi, "monthly", "2026-11-19", 3), ["2026-12-01", "2027-01-01", "2027-02-01"]);
-  assert.deepEqual(allowedChangeDates(semi, "weekly", "2026-11-19", 2), ["2026-12-01", "2026-12-16"]);
+  assert.deepEqual(allowedChangeDates(semi, "weekly", "2026-11-19", 2), ["2026-12-01", "2026-12-02"], "weekly can start any day, which sets its weekday");
   assert.deepEqual(allowedChangeDates(switched, "monthly", "2026-11-19"), [], "nothing while a change is waiting");
   const weekly = { frequency: "weekly", anchorDate: "2026-11-02" };
+  assert.deepEqual(allowedChangeDates(weekly, "monthly", "2026-11-19", 3), ["2026-12-01", "2027-01-01", "2027-02-01"]);
   for (const date of allowedChangeDates(weekly, "monthly", "2026-11-19")) {
     assert.equal(date.slice(8), "01");
     assert.equal(scheduleChangeProblem(weekly, { frequency: "monthly", effectiveFrom: date }, "2026-11-19"), null);
@@ -148,4 +150,25 @@ test("the summary shows today's schedule and the change that is waiting", () => 
   assert.equal(after.frequency, "biweekly");
   assert.equal(after.upcomingChange, null);
   assert.equal(after.history.length, 2);
+});
+
+test("a change inside a future period ends that period early, and only that one", () => {
+  const biweekly = { frequency: "biweekly", anchorDate: "2026-11-01" };
+  const preview = scheduleChangePreview(biweekly, { frequency: "monthly", effectiveFrom: "2027-01-01" }, "2026-11-19");
+  assert.deepEqual(preview.shortPeriod, { startKey: "2026-12-27", endKey: "2026-12-31", days: 5 });
+  assert.deepEqual(preview.firstNewPeriod, { startKey: "2027-01-01", endKey: "2027-01-31" });
+  const clean = scheduleChangePreview({ pay_frequency: "semi_monthly" }, { frequency: "biweekly", effectiveFrom: "2027-01-01" }, "2026-11-19");
+  assert.equal(clean.shortPeriod, null, "Jan 1 already starts a twice-a-month period");
+  assert.equal(scheduleChangePreview(biweekly, { frequency: "monthly", effectiveFrom: "2026-11-20" }, "2026-11-19"), null);
+  const after = normalizePayTimeline({ ...biweekly, pay_schedule_changes: [{ pay_frequency: "monthly", pay_period_anchor: null, effective_from: "2027-01-01" }] });
+  assert.equal(span(payPeriodFor("2026-12-26", after)), "2026-12-13..2026-12-26", "the period before is untouched");
+  assert.equal(span(payPeriodFor("2026-12-29", after)), "2026-12-27..2026-12-31");
+  assert.equal(span(nextPayPeriod(payPeriodFor("2026-12-29", after), after)), "2027-01-01..2027-01-31");
+  assert.equal(payPeriodFromKey("2026-12-27", after, "2027-02-02").endKey, "2026-12-31");
+});
+
+test("the earliest change date is the day after the current pay period", () => {
+  assert.equal(earliestChangeDate({ pay_frequency: "semi_monthly" }, "2026-11-19"), "2026-12-01");
+  assert.equal(earliestChangeDate({ frequency: "biweekly", anchorDate: "2026-11-01" }, "2026-11-19"), "2026-11-29");
+  assert.equal(earliestChangeDate(switched, "2026-11-19"), null, "not while a change is waiting");
 });
