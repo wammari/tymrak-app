@@ -50,10 +50,14 @@ export default async function handler(req, res) {
     const { supabaseUrl, secretKey } = authorization.configuration;
     const sensitiveValues = [secretKey, req.headers.authorization?.replace(/^Bearer\s+/i, "")];
     const owned = await readArray(await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${authorization.organizationId}&select=id&limit=2`,
+      `${supabaseUrl}/rest/v1/employees?id=eq.${encodeURIComponent(employeeId)}&organization_id=eq.${authorization.organizationId}&select=id,auth_user_id&limit=2`,
       { headers: databaseHeaders(secretKey) }
     ), "employee_ownership", sensitiveValues);
     if (owned.length !== 1) return res.status(404).json({ error: "Employee not found" });
+    // Nobody reopens their own timecard (the database refuses it too).
+    if (owned[0].auth_user_id && owned[0].auth_user_id === authorization.user.id) {
+      return res.status(403).json({ error: "You can't reopen your own timecard. Another manager or admin must reopen it." });
+    }
     const base = `${supabaseUrl}/rest/v1/timecard_approvals?employee_id=eq.${encodeURIComponent(employeeId)}&period_start=eq.${startKey}&period_end=eq.${endKey}`;
     const existing = await readArray(await fetch(`${base}&select=id,status`, {
       headers: databaseHeaders(secretKey)

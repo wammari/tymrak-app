@@ -1,0 +1,98 @@
+<!doctype html><html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Team | TYMRAK</title>
+<style>body{font:16px system-ui;background:#fbf8f3;color:#35271e;margin:0}main{max-width:960px;margin:32px auto;padding:24px}a{color:#70400e}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}h2{margin-top:0}label{display:block;margin:14px 0 6px;font-weight:600}input,select{display:block;box-sizing:border-box;width:100%;padding:10px;font:inherit;border:1px solid #cbbca9;border-radius:6px;background:white}input[type=checkbox],input[type=radio]{display:inline;width:auto;margin:0 8px 0 0}button{font:inherit;padding:10px 18px;background:#8d5316;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:7px 12px}.danger{background:white;color:#9b1c1c;border:1px solid #9b1c1c;padding:7px 12px}.row{display:grid;grid-template-columns:1fr 1fr;gap:16px}.choice{display:flex;gap:20px;flex-wrap:wrap;margin:6px 0 4px}.choice label{font-weight:400;margin:0;display:flex;align-items:center}.hint{color:#716254;font-size:14px;margin:6px 0}.places{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:6px;margin-top:6px}.places label{font-weight:400;margin:0;display:flex;align-items:center}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:12px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}.badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:700}.badge.invited{background:#fff4df;color:#9a6700}.badge.active{background:#e8f7ef;color:#176b36}.muted{color:#716254;font-size:14px}.actions{display:flex;gap:8px;flex-wrap:wrap}.edit{background:#fbf8f3;border:1px solid #e4d7c7;border-radius:8px;padding:14px;margin-top:10px}.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.success{display:block;background:#e8f7ee;color:#176b36}.notice.error{display:block;background:#fdeaea;color:#a32020}[hidden]{display:none!important}@media(max-width:640px){.row{grid-template-columns:1fr}main{padding:16px}th:nth-child(3),td:nth-child(3){display:none}}</style>
+<meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css"></head>
+<body class="workspace-page"><main><a class="brand-home" href="/manager.html" aria-label="TYMRAK manager portal"><span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span></a><a href="/manager.html">← Manager portal</a>
+<h1>Team</h1><p>Give people access to the Manager Portal for <strong id="companyName">this business</strong>. <strong>Admins</strong> see and manage everything. <strong>Managers</strong> only see employees at the workplaces you choose. Nobody can approve their own timecard.</p>
+<div id="notice" class="notice" role="status">Verifying access…</div>
+<div id="app" hidden>
+<section><h2>People with access</h2><table><thead><tr><th>Person</th><th>Access</th><th>Workplaces</th><th></th></tr></thead><tbody id="members"></tbody></table></section>
+<section><h2>Give someone access</h2><form id="add">
+ <div class="choice" role="radiogroup" aria-label="Who"><label><input type="radio" name="kind" value="employee" checked>Existing employee</label><label><input type="radio" name="kind" value="new">New person (send an invitation)</label></div>
+ <div id="employeeFields"><label for="employee">Employee</label><select id="employee"></select><p class="hint">They keep their usual login and can also sign in to the Manager Portal.</p></div>
+ <div id="newFields" hidden><div class="row"><div><label for="firstName">First name</label><input id="firstName" maxlength="60" autocomplete="off"></div><div><label for="lastName">Last name</label><input id="lastName" maxlength="60" autocomplete="off"></div></div>
+  <label for="email">Email</label><input id="email" type="email" maxlength="254" autocomplete="off"><p class="hint">They'll get an email to create a password, then sign in to the Manager Portal.</p></div>
+ <label for="role">Access</label><select id="role"><option value="manager">Manager: only chosen workplaces</option><option value="admin">Admin: everything in this business</option></select>
+ <div id="placesField"><label>Workplaces</label><div class="places" id="places"></div></div>
+ <p><button id="addButton" type="submit">Give access</button></p>
+</form></section>
+</div></main>
+<script type="module">
+import {loadSupabaseConfiguration} from "./supabase-config.js";
+import {createClient} from "/supabase-js.bundle.js";
+const $=id=>document.getElementById(id);
+const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
+const selectedCompanyId=sessionStorage.getItem("tymrak-company-id");
+let client,team=null;
+function notice(type,text){const n=$("notice");n.className="notice "+type;n.textContent=text;n.scrollIntoView({block:"nearest"})}
+async function request(url,method="GET",body){
+ const {data:{session}}=await client.auth.getSession();if(!session)throw new Error("Sign in to the Manager Portal first.");
+ const response=await fetch(url,{method,headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json",...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const data=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(data.error||"Team access is unavailable. Please try again.");
+ return data;
+}
+function workplaceBoxes(container,chosen=[]){
+ container.replaceChildren(...team.workplaces.map(w=>el("label",{},el("input",{type:"checkbox",value:w.id,checked:chosen.includes(w.id)}),w.name+(w.isActive?"":" (inactive)"))));
+ if(!team.workplaces.length)container.append(el("p",{className:"hint",textContent:"Add a workplace on the Locations page first. Managers need at least one."}));
+}
+const checked=container=>[...container.querySelectorAll("input[type=checkbox]:checked")].map(box=>box.value);
+function editor(member,cell){
+ const role=el("select",{},el("option",{value:"manager",textContent:"Manager"}),el("option",{value:"admin",textContent:"Admin"}));role.value=member.role;
+ const places=el("div",{className:"places"});workplaceBoxes(places,member.workplaces.map(w=>w.id));
+ const placesField=el("div",{},el("label",{textContent:"Workplaces"}),places);placesField.hidden=member.role!=="manager";
+ role.addEventListener("change",()=>{placesField.hidden=role.value!=="manager"});
+ const save=el("button",{type:"button",textContent:"Save"}),cancel=el("button",{type:"button",className:"secondary",textContent:"Cancel"});
+ const box=el("div",{className:"edit"},el("label",{textContent:"Access"}),role,placesField,el("div",{className:"actions"},save,cancel));
+ cancel.addEventListener("click",()=>box.remove());
+ save.addEventListener("click",async()=>{save.disabled=true;try{await request("/api/company-team","PATCH",{authUserId:member.authUserId,role:role.value,workplaceIds:role.value==="manager"?checked(places):[]});notice("success",`${member.name||member.email}'s access was updated.`);await load()}catch(error){notice("error",error.message);save.disabled=false}});
+ cell.append(box);
+}
+function renderMembers(){
+ const rows=$("members");rows.replaceChildren();
+ for(const member of team.members){
+  const who=el("td",{},el("div",{textContent:member.name||member.email}),el("div",{className:"muted",textContent:(member.name?member.email:"")+(member.employee?" · also an employee":"")}));
+  const access=el("td",{},el("div",{textContent:member.role==="admin"?"Admin":"Manager"}),el("span",{className:"badge "+member.status,textContent:member.status==="invited"?"Invitation sent":"Active"}));
+  const places=el("td",{className:"muted",textContent:member.role==="admin"?"All workplaces":(member.workplaces.map(w=>w.name).join(", ")||"None")});
+  const actions=el("td");
+  if(member.isYou){actions.append(el("span",{className:"muted",textContent:"You"}))}
+  else{
+   const change=el("button",{type:"button",className:"secondary",textContent:"Change"});
+   const remove=el("button",{type:"button",className:"danger",textContent:"Remove access"});
+   change.addEventListener("click",()=>{if(!who.querySelector(".edit"))editor(member,who)});
+   remove.addEventListener("click",async()=>{if(!confirm(`Remove ${member.name||member.email}'s Manager Portal access? ${member.employee?"Their employee login keeps working.":""}`))return;remove.disabled=true;try{await request("/api/company-team","DELETE",{authUserId:member.authUserId});notice("success",`${member.name||member.email} no longer has Manager Portal access.`);await load()}catch(error){notice("error",error.message);remove.disabled=false}});
+   actions.append(el("div",{className:"actions"},change,remove));
+  }
+  rows.append(el("tr",{},who,access,places,actions));
+ }
+}
+function renderForm(){
+ const select=$("employee");select.replaceChildren(...team.employees.map(e=>el("option",{value:e.id,textContent:e.email?`${e.name} (${e.email})`:e.name})));
+ if(!team.employees.length)select.append(el("option",{value:"",textContent:"No employees available. Everyone already has access, or nobody has accepted an invitation yet."}));
+ workplaceBoxes($("places"));
+}
+function syncForm(){
+ const kind=document.querySelector("input[name=kind]:checked").value;
+ $("employeeFields").hidden=kind!=="employee";$("newFields").hidden=kind!=="new";
+ $("placesField").hidden=$("role").value!=="manager";
+}
+async function load(){team=await request("/api/company-team");renderMembers();renderForm();syncForm()}
+document.querySelectorAll("input[name=kind]").forEach(radio=>radio.addEventListener("change",syncForm));
+$("role").addEventListener("change",syncForm);
+$("add").addEventListener("submit",async event=>{
+ event.preventDefault();const button=$("addButton");button.disabled=true;
+ const kind=document.querySelector("input[name=kind]:checked").value,role=$("role").value;
+ const body={kind,role,workplaceIds:role==="manager"?checked($("places")):[]};
+ if(kind==="employee")body.employeeId=$("employee").value;else Object.assign(body,{firstName:$("firstName").value.trim(),lastName:$("lastName").value.trim(),email:$("email").value.trim()});
+ try{const result=await request("/api/company-team","POST",body);notice("success",result.message||"Access given.");event.target.reset();await load()}
+ catch(error){notice("error",error.message)}finally{button.disabled=false}
+});
+try{
+ const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
+ const session=await request("/api/manager-session");
+ if(!session.authorized||!session.organizationId)throw new Error("Choose your business in the Manager Portal first.");
+ if(session.role!=="admin")throw new Error("Only this business's admins can manage team access.");
+ const company=(session.availableOrganizations||[]).find(o=>o.organizationId===session.organizationId);
+ if(company?.name)$("companyName").textContent=company.name;
+ await load();$("notice").className="notice";$("app").hidden=false;
+}catch(error){notice("error",error.message)}
+</script></body></html>

@@ -197,6 +197,9 @@ const message = document.getElementById("message");
 const passwordInput = document.getElementById("password");
 const confirmInput = document.getElementById("confirmPassword");
 let invitationUserId = null;
+// Admin and manager invitations (Team page) have no employee record: once the password is
+// saved they are done, and they sign in to the Manager Portal.
+let teamInvitation = false;
 let passwordSaved = false;
 let busy = false;
 button.disabled = true;
@@ -237,6 +240,11 @@ async function prepareActivation() {
             throw new Error("Invitation identity could not be verified");
         }
         invitationUserId = data.user.id;
+        teamInvitation = data.user.user_metadata?.tymrak_access === "team";
+        if (teamInvitation) {
+            document.getElementById("activationDescription").textContent =
+                "Create a password for your TYMRAK Manager Portal account.";
+        }
         button.disabled = false;
     } catch {
         form.style.display = "none";
@@ -306,10 +314,19 @@ form.addEventListener("submit", async event => {
                 throw new Error("Password saved, but the account identity could not be verified. Please contact your manager.");
             }
         }
+        const portalLink = document.getElementById("portalLink");
+        if (teamInvitation) {
+            form.style.display = "none";
+            showMessage("success", "✓ Your password is saved. Sign in to the Manager Portal with your email and new password.");
+            portalLink.href = "/manager-login.html";
+            portalLink.textContent = "Continue to the Manager Portal";
+            portalLink.hidden = false;
+            portalLink.style.display = "block";
+            return;
+        }
         await completeActivation();
         form.style.display = "none";
         showMessage("success", "✓ Account activated successfully! Your TYMRAK account is ready.");
-        const portalLink = document.getElementById("portalLink");
         portalLink.hidden = false;
         portalLink.style.display = "block";
     } catch (error) {

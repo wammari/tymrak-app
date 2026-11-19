@@ -24,7 +24,7 @@ function environment(role = "admin") {
     if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role, organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
     if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
     if (url.includes("/employees?") && url.includes("is_active=eq.true")) return new Response(JSON.stringify([{ id: "employee-1", province: "AB" }]));
-    if (url.includes("/employees?") && url.includes("select=id&limit=2")) return new Response(JSON.stringify([{id:"employee-1"}]));
+    if (url.includes("/employees?") && url.includes("select=id,auth_user_id&limit=2")) return new Response(JSON.stringify([{id:"employee-1"}]));
     if (url.includes("/timecard_approvals?")) {
       let matches = approvals.filter(item => !url.includes("employee_id=eq.") || url.includes(`employee_id=eq.${item.employee_id}`));
       if (url.includes("employee_id=in.")) matches = matches.filter(item => url.includes(item.employee_id));

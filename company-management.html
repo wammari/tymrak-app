@@ -77,7 +77,10 @@ function scheduleChanger(company){
 function companyRow(company){
  const manage=el("button",{type:"button",textContent:"Manage "+company.name,disabled:!company.is_active});
  manage.addEventListener("click",()=>{const url=new URL("/manager.html",location.origin);url.searchParams.set("organization_id",company.id);location.assign(url.toString())});
- const row=el("div",{className:"row"},manage,el("span",{className:"schedule",textContent:company.paySchedule.description}));
+ // Shortcut to invite this business's admins and managers (the Main Administrator is an admin of every business).
+ const teamButton=el("button",{type:"button",className:"secondary",textContent:"Team access",disabled:!company.is_active});
+ teamButton.addEventListener("click",()=>{try{sessionStorage.setItem("tymrak-company-id",company.id)}catch{}location.assign("/team.html")});
+ const row=el("div",{className:"row"},manage,teamButton,el("span",{className:"schedule",textContent:company.paySchedule.description}));
  if(!company.is_active)row.append(" (Inactive)");
  const li=el("li",{},row);
  const waiting=company.paySchedule.upcomingChange;
