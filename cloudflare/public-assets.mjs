@@ -4,5 +4,5 @@ export const publicAssets = [
   'employee.html', 'timecard.html', 'manager.html', 'workplaces.html',
   'password-recovery.html', 'reset-password.html', 'supabase-config.js',
   'geolocation.js', 'punch-client.js', 'workplace-map.js', 'workplaces-page.js', 'workplace-search.js',
-  'supabase-js.bundle.js', 'api-base.js', 'account-deletion-ui.js', 'password-toggle.js', 'timecard-calculation.js'
+  'supabase-js.bundle.js', 'api-base.js', 'account-deletion-ui.js', 'password-toggle.js', 'timecard-calculation.js', 'pay-periods.js'
 ];

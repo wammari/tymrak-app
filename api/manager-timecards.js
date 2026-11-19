@@ -2,7 +2,9 @@ import { requireManager } from "./_manager-auth.js";
 import { databaseRows } from "./_database-pages.js";
 import {employeeScopeFilter} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
-import { PROVINCE_TIME_ZONES, calculationStart, getCurrentPayPeriod, getPayPeriod, getPayPeriodDateKeys, periodFromKey, summarizeEmployee } from "./_manager-timecards.js";
+import { PROVINCE_TIME_ZONES, calculationStart, periodInstants, summarizeEmployee } from "./_manager-timecards.js";
+import { loadPaySchedule, requestedPayPeriod } from "./_pay-schedule.js";
+import { describePaySchedule, nextPayPeriod, previousPayPeriod } from "../pay-periods.js";
 
 async function safeSupabaseError(response) {
   try {
@@ -45,11 +47,13 @@ export default async function handler(req, res) {
     const authorization = await requireManager(req);
     if (!authorization.ok) return res.status(authorization.status).json({ error: authorization.error });
     const { supabaseUrl, secretKey } = authorization.configuration;
-    const current = getCurrentPayPeriod(new Date(), "America/Toronto");
+    const schedule = await loadPaySchedule(authorization);
+    const now = new Date();
+    const current = requestedPayPeriod(null, schedule, now);
     const requested = Array.isArray(req.query?.period) ? req.query.period[0] : req.query?.period;
-    const period = requested ? periodFromKey(requested, new Date(), "America/Toronto") : current;
+    const period = requested ? requestedPayPeriod(requested, schedule, now) : current;
     if (!period) return res.status(400).json({ error: "Select a valid current or previous pay period" });
-    const { startKey, endKey } = getPayPeriodDateKeys(period);
+    const { startKey, endKey } = period;
 
     const employees = await query({
       url: `${supabaseUrl}/rest/v1/employees?organization_id=eq.${authorization.organizationId}${employeeScopeFilter(authorization)}&is_active=eq.true&select=id,first_name,last_name,province&order=last_name.asc,first_name.asc,id.asc`,
@@ -67,11 +71,11 @@ export default async function handler(req, res) {
     if (employeeIds.length) {
       const earliest = Math.min(...employees.map(employee => {
         const zone = PROVINCE_TIME_ZONES[employee.province] || "America/Toronto";
-        return calculationStart(getPayPeriod(period.year, period.month, period.half, zone), 0, zone).getTime();
+        return calculationStart(period, 0, zone).getTime();
       }));
       const latest = Math.max(...employees.map(employee => {
         const zone = PROVINCE_TIME_ZONES[employee.province] || "America/Toronto";
-        return getPayPeriod(period.year, period.month, period.half, zone).end.getTime();
+        return periodInstants(period, zone).end.getTime();
       })) + 24 * 60 * 60 * 1000;
       const ids = `(${employeeIds.map(id => `"${String(id).replaceAll('"', '')}"`).join(",")})`;
       punches = await query({
@@ -116,12 +120,17 @@ export default async function handler(req, res) {
     return res.status(200).json({
       period: {
         key: period.key,
-        start: period.start.toISOString(),
-        end: period.end.toISOString(),
+        start: periodInstants(period, "America/Toronto").start.toISOString(),
+        end: periodInstants(period, "America/Toronto").end.toISOString(),
         startDate: startKey,
         endDate: endKey,
-        current: period.key === current.key
+        current: period.key === current.key,
+        // The manager page moves between periods with these codes, so it never has to know
+        // how this company's schedule works.
+        previousKey: previousPayPeriod(period, schedule).key,
+        nextKey: period.key === current.key ? null : nextPayPeriod(period, schedule).key
       },
+      paySchedule: { ...schedule, description: describePaySchedule(schedule) },
       timecards: cards,
       approvalPersistence: false
     });

@@ -70,9 +70,9 @@ test("main administrator creates a company and receives admin membership",async(
   if(u.endsWith("/user_roles")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json({},201);}
   throw Error("unexpected request: "+u);
  };
- const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"New Bakery"}},response);
+ const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"New Bakery",payFrequency:"semi_monthly"}},response);
  assert.equal(response.statusCode,201);assert.equal(response.body.company.id,createdId);
- assert.deepEqual(writes,[{name:"New Bakery",is_active:true},{auth_user_id:ADMIN,organization_id:createdId,role:"admin"}]);
+ assert.deepEqual(writes,[{name:"New Bakery",is_active:true,pay_frequency:"semi_monthly",pay_period_anchor:null},{auth_user_id:ADMIN,organization_id:createdId,role:"admin"}]);
 });
 test("duplicate company name blocks creation",async()=>{
  configure();let writes=0;global.fetch=async(url,options={})=>{
@@ -84,6 +84,37 @@ test("duplicate company name blocks creation",async()=>{
   if(u.includes("name=ilike."))return json([{id:OTHER}]);
   throw Error("unexpected request: "+u);
  };
- const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Existing Business"}},response);
+ const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Existing Business",payFrequency:"monthly"}},response);
  assert.equal(response.statusCode,409);assert.equal(writes,0);
+});
+
+function creationFetch(writes,createdId){
+ return async(url,options={})=>{
+  const u=String(url);
+  if(u.includes("/auth/v1/user"))return json({id:ADMIN});
+  if(u.includes("/user_roles?"))return json([{organization_id:OTHER}]);
+  if(u.includes("/organizations?")&&u.includes("is_active=eq.true"))return json([{id:OTHER}]);
+  if(u.includes("/organizations?"))return json([]);
+  if(u.endsWith("/organizations")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json([{id:createdId,name:"Weekly Cafe",is_active:true}],201);}
+  if(u.endsWith("/user_roles")&&options.method==="POST"){writes.push(JSON.parse(options.body));return json({},201);}
+  throw Error("unexpected request: "+u);
+ };
+}
+test("a weekly company is created with its first pay period start date",async()=>{
+ configure();const writes=[];global.fetch=creationFetch(writes,"33333333-3333-4333-8333-333333333333");
+ const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Weekly Cafe",payFrequency:"weekly",payPeriodAnchor:"2026-11-02"}},response);
+ assert.equal(response.statusCode,201);
+ assert.deepEqual(writes[0],{name:"Weekly Cafe",is_active:true,pay_frequency:"weekly",pay_period_anchor:"2026-11-02"});
+});
+test("a company cannot be created without a valid pay schedule",async()=>{
+ for(const body of [{name:"No Schedule"},{name:"Bad Schedule",payFrequency:"fortnightly"},{name:"No Start",payFrequency:"biweekly"},{name:"Bad Start",payFrequency:"weekly",payPeriodAnchor:"2026-02-30"}]){
+  configure();const writes=[];global.fetch=creationFetch(writes,"44444444-4444-4444-8444-444444444444");
+  const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body},response);
+  assert.equal(response.statusCode,400,body.name);assert.equal(writes.length,0,body.name);
+ }
+});
+test("a monthly company ignores a stray start date",async()=>{
+ configure();const writes=[];global.fetch=creationFetch(writes,"55555555-5555-4555-8555-555555555555");
+ const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Monthly Shop",payFrequency:"monthly",payPeriodAnchor:"2026-11-02"}},response);
+ assert.equal(response.statusCode,201);assert.equal(writes[0].pay_period_anchor,null);
 });

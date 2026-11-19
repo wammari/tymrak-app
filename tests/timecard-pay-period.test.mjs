@@ -6,6 +6,8 @@ import {
     buildDailyRecords,
     selectOvertimeRuleForPeriod
 } from "../timecard-calculation.js";
+import * as payPeriods from "../pay-periods.js";
+import { dateKey } from "../timecard-calculation.js";
 
 const source =
     fs.readFileSync(
@@ -51,8 +53,8 @@ function extractFunction(name) {
 }
 
 const functionNames = [
+    "toEmployeePeriod",
     "getCurrentPayPeriod",
-    "getPayPeriod",
     "getPreviousPayPeriod",
     "getNextPayPeriod",
     "canNavigateToPayPeriod",
@@ -62,15 +64,37 @@ const functionNames = [
     "formatDuration"
 ];
 
-const functions =
-    Function(`
+// The page's own period functions, run with the shared pay-periods.js they import.
+function pageFunctions(paySchedule) {
+    return Function(
+        "payPeriodFor", "previousPayPeriod", "nextPayPeriod", "dateKey", "paySchedule",
+        `
         let employeeTimeZone = "America/Edmonton";
         let currentPayPeriod = null;
         ${functionNames.map(extractFunction).join("\n")}
         return {
             ${functionNames.join(",")}
         };
-    `)();
+    `)(payPeriods.payPeriodFor, payPeriods.previousPayPeriod, payPeriods.nextPayPeriod, dateKey, paySchedule);
+}
+
+const functions = pageFunctions(payPeriods.DEFAULT_PAY_SCHEDULE);
+functions.getPayPeriod = (year, month, half) =>
+    functions.getCurrentPayPeriod(
+        new Date(Date.UTC(year, month, half === 1 ? 10 : 20, 18))
+    );
+
+assert.match(
+    source,
+    /from "\.\/pay-periods\.js"/,
+    "timecard.html must use the shared pay periods"
+);
+
+assert.match(
+    source,
+    /supabase\.rpc\(\s*"employee_pay_schedule"\s*\)/,
+    "timecard.html must load the company's own pay schedule"
+);
 
 // The overtime rule and daily calculations now live in the shared module that the
 // timecard page imports, so they are tested from there.
@@ -272,6 +296,16 @@ assert.equal(
     ),
     "04:00"
 );
+
+// A weekly company: periods run Monday to Sunday from its start date, and the page
+// moves a week at a time without reaching into the future.
+const weekly = pageFunctions({ frequency: "weekly", anchorDate: "2026-11-02" });
+const thisWeek = weekly.getCurrentPayPeriod(new Date("2026-11-18T18:00:00.000Z"));
+assert.equal(weekly.formatDate(thisWeek.start), "Nov 16, 2026");
+assert.equal(weekly.formatDate(thisWeek.end), "Nov 22, 2026");
+assert.equal(weekly.formatDate(weekly.getPreviousPayPeriod(thisWeek).start), "Nov 9, 2026");
+assert.equal(weekly.canNavigateToPayPeriod(weekly.getNextPayPeriod(thisWeek), thisWeek), false);
+assert.equal(weekly.canNavigateToPayPeriod(thisWeek, thisWeek), true);
 
 console.log(
     "Timecard pay-period navigation tests passed."

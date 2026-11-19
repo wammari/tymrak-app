@@ -400,6 +400,13 @@ import {
     dateKey,
     selectOvertimeRuleForPeriod
 } from "./timecard-calculation.js";
+import {
+    DEFAULT_PAY_SCHEDULE,
+    nextPayPeriod,
+    normalizePaySchedule,
+    payPeriodFor,
+    previousPayPeriod
+} from "./pay-periods.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
 const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
 const SUPABASE_PUBLISHABLE_KEY = deploymentConfiguration.supabasePublishableKey;
@@ -450,162 +457,84 @@ const logoutButton =
 
 let employee = null;
 let currentPayPeriod = null;
+let paySchedule = DEFAULT_PAY_SCHEDULE;
 let selectedPayPeriod = null;
 
 
 /*
-    Current MVP pay period:
-    Semi-monthly
-
-    1st - 15th
-    16th - last day
+    Pay periods follow the company's own schedule (weekly, every
+    two weeks, semi-monthly or monthly), worked out by the shared
+    /pay-periods.js used by the manager timecards too. Each period
+    keeps its calendar dates (startKey, endKey) and exact start and
+    end times in the employee's time zone (start, end).
 */
+
+function toEmployeePeriod(period) {
+
+    const [startYear, startMonth, startDay] =
+        period.startKey.split("-").map(Number);
+
+    const [endYear, endMonth, endDay] =
+        period.endKey.split("-").map(Number);
+
+    return {
+        ...period,
+        start:
+            createDateInEmployeeTimeZone(
+                startYear,
+                startMonth - 1,
+                startDay,
+                0, 0, 0, 0
+            ),
+        end:
+            createDateInEmployeeTimeZone(
+                endYear,
+                endMonth - 1,
+                endDay,
+                23, 59, 59, 999
+            )
+    };
+}
 
 function getCurrentPayPeriod(date = new Date()) {
 
-    const now =
-        getDatePartsInEmployeeTimeZone(date);
-
-    return getPayPeriod(
-        now.year,
-        now.month - 1,
-        now.day <= 15 ? 1 : 2
+    return toEmployeePeriod(
+        payPeriodFor(
+            dateKey(date, employeeTimeZone),
+            paySchedule
+        )
     );
-}
-
-function getPayPeriod(
-    year,
-    month,
-    half
-) {
-
-    const normalizedMonth =
-        new Date(
-            Date.UTC(year, month, 1)
-        );
-
-    year =
-        normalizedMonth.getUTCFullYear();
-
-    month =
-        normalizedMonth.getUTCMonth();
-
-    let start;
-    let end;
-
-    if (half === 1) {
-
-   start =
-    createDateInEmployeeTimeZone(
-        year,
-        month,
-        1,
-        0, 0, 0, 0
-    );
-
-end =
-    createDateInEmployeeTimeZone(
-        year,
-        month,
-        15,
-        23, 59, 59, 999
-    );
-
-    } else {
-
-    start =
-    createDateInEmployeeTimeZone(
-        year,
-        month,
-        16,
-        0, 0, 0, 0
-    );
-
-end =
-    createDateInEmployeeTimeZone(
-        year,
-        month + 1,
-        0,
-        23, 59, 59, 999
-    );
-    }
-
-    return {
-        start,
-        end,
-        year,
-        month,
-        half,
-        key:
-            `${year}-${String(
-                month + 1
-            ).padStart(2, "0")}-${half}`
-    };
 }
 
 function getPreviousPayPeriod(period) {
 
-    return period.half === 2
-        ? getPayPeriod(
-            period.year,
-            period.month,
-            1
-        )
-        : getPayPeriod(
-            period.year,
-            period.month - 1,
-            2
-        );
+    return toEmployeePeriod(
+        previousPayPeriod(period, paySchedule)
+    );
 }
 
 function getNextPayPeriod(period) {
 
-    return period.half === 1
-        ? getPayPeriod(
-            period.year,
-            period.month,
-            2
-        )
-        : getPayPeriod(
-            period.year,
-            period.month + 1,
-            1
-        );
+    return toEmployeePeriod(
+        nextPayPeriod(period, paySchedule)
+    );
 }
 
 function canNavigateToPayPeriod(
     period,
     maximumPeriod = currentPayPeriod
 ) {
-
-    return (
+    return Boolean(
         maximumPeriod &&
-        period.key <= maximumPeriod.key
+        period.startKey <= maximumPeriod.startKey
     );
 }
 
 function getPayPeriodDateKeys(period) {
 
-    const start =
-        getDatePartsInEmployeeTimeZone(
-            period.start
-        );
-
-    const end =
-        getDatePartsInEmployeeTimeZone(
-            period.end
-        );
-
-    const toDateKey = parts =>
-        `${parts.year}-${String(
-            parts.month
-        ).padStart(2, "0")}-${String(
-            parts.day
-        ).padStart(2, "0")}`;
-
     return {
-        startKey: toDateKey(start),
-        endKey: toDateKey(end)
+        startKey: period.startKey,
+        endKey: period.endKey
     };
 }
 
@@ -1324,6 +1253,29 @@ if (!employeeData.province) {
         employeeInfo.textContent =
             details.join(" • ");
 
+
+        /*
+            The company's pay schedule. The lookup returns only
+            this employee's own company schedule.
+        */
+        const {
+            data: scheduleRows,
+            error: scheduleError
+        } =
+            await supabase.rpc(
+                "employee_pay_schedule"
+            );
+
+        if (scheduleError) {
+            throw scheduleError;
+        }
+
+        paySchedule =
+            normalizePaySchedule(
+                Array.isArray(scheduleRows)
+                    ? scheduleRows[0]
+                    : scheduleRows
+            );
 
         currentPayPeriod =
             getCurrentPayPeriod();
