@@ -307,6 +307,25 @@ assert.equal(weekly.formatDate(weekly.getPreviousPayPeriod(thisWeek).start), "No
 assert.equal(weekly.canNavigateToPayPeriod(weekly.getNextPayPeriod(thisWeek), thisWeek), false);
 assert.equal(weekly.canNavigateToPayPeriod(thisWeek, thisWeek), true);
 
+// A company that switched from twice a month to every two weeks on Nov 16: the page
+// shows the new two-week period and steps back into the old twice-a-month one.
+const switched = pageFunctions(payPeriods.normalizePayTimeline([
+    { pay_frequency: "semi_monthly", pay_period_anchor: null, effective_from: null },
+    { pay_frequency: "biweekly", pay_period_anchor: "2026-11-16", effective_from: "2026-11-16" }
+]));
+const firstTwoWeeks = switched.getCurrentPayPeriod(new Date("2026-11-20T18:00:00.000Z"));
+assert.equal(switched.formatDate(firstTwoWeeks.start), "Nov 16, 2026");
+assert.equal(switched.formatDate(firstTwoWeeks.end), "Nov 29, 2026");
+const lastHalfMonth = switched.getPreviousPayPeriod(firstTwoWeeks);
+assert.equal(switched.formatDate(lastHalfMonth.start), "Nov 1, 2026");
+assert.equal(switched.formatDate(lastHalfMonth.end), "Nov 15, 2026");
+
+assert.match(
+    source,
+    /normalizePayTimeline\(/,
+    "timecard.html must read the full schedule history"
+);
+
 console.log(
     "Timecard pay-period navigation tests passed."
 );

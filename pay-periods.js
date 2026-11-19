@@ -2,7 +2,11 @@
 // It works on calendar dates ("YYYY-MM-DD") only; each caller turns a period's dates into
 // exact times in the employee's own time zone. No imports, so it runs in Node and browsers.
 //
-// A business picks one schedule at sign-up (organizations.pay_frequency):
+// A business picks a schedule at sign-up (organizations.pay_frequency). The Main
+// Administrator can later change it from a future pay period (pay_schedule_changes);
+// earlier periods always keep the schedule they had. Every function below accepts either
+// one schedule or a company's whole schedule history (a "timeline").
+//
 //   weekly        7-day periods, starting on pay_period_anchor and every 7 days from it
 //   biweekly      14-day periods, starting on pay_period_anchor and every 14 days from it
 //   semi_monthly  1st-15th and 16th-last day of the month (the original Tymrak schedule)
@@ -53,10 +57,53 @@ function build(schedule, startKey, endKey) {
   return Object.freeze({ key: periodKey(schedule, startKey), startKey, endKey, frequency: schedule.frequency });
 }
 
-// The pay period that contains the given date.
+// A company's schedules over time: the one chosen at sign-up (from: null), then each
+// change from its effective date. Accepts a timeline, a single schedule, an organizations
+// row with embedded pay_schedule_changes, or the rows of employee_pay_schedule().
+export function normalizePayTimeline(input) {
+  if (input && Array.isArray(input.segments)) return input;
+  const rows = Array.isArray(input) ? input : [input, ...((input && input.pay_schedule_changes) || [])];
+  const startOf = row => (row && (row.effective_from ?? row.effectiveFrom)) || null;
+  const original = rows.find(row => row && !startOf(row)) ?? null;
+  const changes = rows.filter(row => row && startOf(row)).map(row => {
+    const from = startOf(row);
+    if (!isDateKey(from)) throw new Error("Invalid pay schedule change date");
+    return Object.freeze({ from, id: row.id ?? null, schedule: normalizePaySchedule(row) });
+  }).sort((a, b) => a.from.localeCompare(b.from));
+  return Object.freeze({ segments: Object.freeze([
+    Object.freeze({ from: null, id: null, schedule: normalizePaySchedule(original) }), ...changes
+  ]) });
+}
+
+function segmentIndexAt(timeline, dateKey) {
+  let index = 0;
+  timeline.segments.forEach((segment, position) => { if (segment.from && segment.from <= dateKey) index = position; });
+  return index;
+}
+
+// The schedule in effect on a given date.
+export function scheduleOn(input, dateKey) {
+  const timeline = normalizePayTimeline(input);
+  return timeline.segments[segmentIndexAt(timeline, dateKey)].schedule;
+}
+
+// The pay period that contains the given date, under the schedule in effect that day.
 export function payPeriodFor(dateKey, scheduleInput) {
-  const schedule = normalizePaySchedule(scheduleInput);
   if (!isDateKey(dateKey)) throw new Error("Invalid date");
+  const timeline = normalizePayTimeline(scheduleInput);
+  const index = segmentIndexAt(timeline, dateKey);
+  const segment = timeline.segments[index], next = timeline.segments[index + 1];
+  const period = periodUnder(dateKey, segment.schedule);
+  // Changes always start on a shared period boundary, so a period never straddles one.
+  // This only guards against a bad history row: the period is cut at the change date.
+  let { startKey, endKey } = period;
+  if (segment.from && startKey < segment.from) startKey = segment.from;
+  if (next && endKey >= next.from) endKey = addDays(next.from, -1);
+  if (startKey === period.startKey && endKey === period.endKey) return period;
+  return Object.freeze({ key: startKey, startKey, endKey, frequency: segment.schedule.frequency });
+}
+
+function periodUnder(dateKey, schedule) {
   const year = Number(dateKey.slice(0, 4)), month = Number(dateKey.slice(5, 7)), day = Number(dateKey.slice(8, 10));
   const monthPrefix = dateKey.slice(0, 8);
   const last = String(lastDayOfMonth(year, month)).padStart(2, "0");
@@ -79,11 +126,13 @@ export function nextPayPeriod(period, schedule) { return payPeriodFor(addDays(pe
 // Turns a period code back into a period. Returns null for codes that are not a real
 // period of this schedule, or that are after the current period (todayKey's period).
 export function payPeriodFromKey(key, scheduleInput, todayKey) {
-  const schedule = normalizePaySchedule(scheduleInput);
+  const schedule = normalizePayTimeline(scheduleInput);
   let startKey = null;
   const legacy = LEGACY_SEMI_MONTHLY_KEY.exec(key || "");
-  if (legacy && schedule.frequency === "semi_monthly") startKey = `${legacy[1]}-${legacy[2]}-${legacy[3] === "1" ? "01" : "16"}`;
-  else if (isDateKey(key)) startKey = key;
+  if (legacy) {
+    const candidate = `${legacy[1]}-${legacy[2]}-${legacy[3] === "1" ? "01" : "16"}`;
+    if (isDateKey(candidate) && scheduleOn(schedule, candidate).frequency === "semi_monthly") startKey = candidate;
+  } else if (isDateKey(key)) startKey = key;
   if (!startKey || !isDateKey(startKey)) return null;
   const period = payPeriodFor(startKey, schedule);
   if (period.startKey !== startKey) return null;
@@ -95,4 +144,67 @@ export function describePaySchedule(scheduleInput) {
   const schedule = normalizePaySchedule(scheduleInput);
   const label = PAY_FREQUENCY_LABELS[schedule.frequency];
   return schedule.anchorDate ? `${label}, periods starting ${schedule.anchorDate}` : label;
+}
+
+// ---- Changing a schedule ---------------------------------------------------------------
+// The same rules are enforced again by the database (change_company_pay_schedule), so a
+// change can never move a period that has already started.
+
+function startsPeriodUnder(dateKey, schedule) {
+  return periodUnder(dateKey, schedule).startKey === dateKey;
+}
+
+function newScheduleFrom(frequency, effectiveFrom) {
+  // Weekly and every-two-weeks periods are counted from the change date itself.
+  return normalizePaySchedule({ frequency, anchorDate: frequency === "weekly" || frequency === "biweekly" ? effectiveFrom : null });
+}
+
+// The change waiting to start (effective after today), if any.
+export function pendingScheduleChange(input, todayKey) {
+  const last = normalizePayTimeline(input).segments.at(-1);
+  return last.from && last.from > todayKey ? last : null;
+}
+
+// Why a change is not allowed, or null when it is.
+export function scheduleChangeProblem(input, change, todayKey) {
+  const timeline = normalizePayTimeline(input);
+  const from = change && change.effectiveFrom;
+  if (!PAY_FREQUENCIES.includes(change && change.frequency)) return "Choose the new pay schedule";
+  if (!isDateKey(from)) return "Choose the date the new pay schedule starts";
+  if (!isDateKey(todayKey) || from <= todayKey) return "A new pay schedule can only start on a future date";
+  if (pendingScheduleChange(timeline, todayKey)) return "This company already has a pay schedule change waiting to start. Cancel it first.";
+  const current = scheduleOn(timeline, addDays(from, -1));
+  if (current.frequency === change.frequency) return "The company already uses this pay schedule";
+  if (payPeriodFor(from, timeline).startKey !== from) return "The new pay schedule must start on the first day of one of the company's current pay periods";
+  if (!startsPeriodUnder(from, newScheduleFrom(change.frequency, from))) return "The new pay schedule must start on the first day of one of its own pay periods";
+  return null;
+}
+
+// The next dates a change to `frequency` could start on: future dates where a current
+// pay period ends and a period of the new schedule can begin.
+export function allowedChangeDates(input, frequency, todayKey, count = 6, horizonDays = 730) {
+  const timeline = normalizePayTimeline(input);
+  if (!isDateKey(todayKey) || !PAY_FREQUENCIES.includes(frequency) || pendingScheduleChange(timeline, todayKey)) return [];
+  const dates = [], limit = addDays(todayKey, horizonDays);
+  let period = nextPayPeriod(payPeriodFor(todayKey, timeline), timeline);
+  while (dates.length < count && period.startKey <= limit) {
+    if (!scheduleChangeProblem(timeline, { frequency, effectiveFrom: period.startKey }, todayKey)) dates.push(period.startKey);
+    period = nextPayPeriod(period, timeline);
+  }
+  return dates;
+}
+
+// What the company uses now and any change waiting to start, for display.
+export function payTimelineSummary(input, todayKey) {
+  const timeline = normalizePayTimeline(input);
+  const current = scheduleOn(timeline, todayKey);
+  const pending = pendingScheduleChange(timeline, todayKey);
+  return {
+    frequency: current.frequency, anchorDate: current.anchorDate, description: describePaySchedule(current),
+    upcomingChange: pending ? { id: pending.id, effectiveFrom: pending.from, frequency: pending.schedule.frequency,
+      description: describePaySchedule(pending.schedule) } : null,
+    history: timeline.segments.map(segment => ({ id: segment.id, effectiveFrom: segment.from,
+      frequency: segment.schedule.frequency, anchorDate: segment.schedule.anchorDate,
+      description: describePaySchedule(segment.schedule) }))
+  };
 }

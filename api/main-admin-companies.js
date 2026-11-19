@@ -1,12 +1,14 @@
 import { getBearerToken, getSupabaseConfiguration } from "./_manager-auth.js";
 import { databaseHeaders } from "./_employee-management.js";
-import { normalizePaySchedule } from "../pay-periods.js";
+import { normalizePaySchedule, normalizePayTimeline, payTimelineSummary, scheduleChangeProblem } from "../pay-periods.js";
+import { todayKey } from "./_pay-schedule.js";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const SCHEDULE_FIELDS = "pay_frequency,pay_period_anchor,pay_schedule_changes(id,pay_frequency,pay_period_anchor,effective_from)";
 
 export default async function handler(req, res) {
-  if (!["GET", "POST"].includes(req.method)) {
-    res.setHeader("Allow", "GET, POST");
+  if (!["GET", "POST", "PATCH", "DELETE"].includes(req.method)) {
+    res.setHeader("Allow", "GET, POST, PATCH, DELETE");
     return res.status(405).json({ error: "Method not allowed" });
   }
   const configuration = getSupabaseConfiguration();
@@ -37,10 +39,18 @@ export default async function handler(req, res) {
   if (!(await activeMembership.json()).length) return res.status(403).json({ error: "Active administrator membership required" });
 
   if (req.method === "GET") {
-    const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,is_active,created_at,pay_frequency,pay_period_anchor&order=name.asc`, { headers });
+    const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,is_active,created_at,${SCHEDULE_FIELDS}&order=name.asc`, { headers });
     if (!response.ok) return res.status(502).json({ error: "Unable to list companies" });
-    return res.status(200).json({ companies: await response.json() });
+    const today = todayKey();
+    const companies = (await response.json()).map(company => {
+      const { pay_schedule_changes: changes, ...rest } = company;
+      return { ...rest, paySchedule: payTimelineSummary(company, today) };
+    });
+    return res.status(200).json({ today, companies });
   }
+
+  if (req.method === "PATCH") return changeSchedule(req, res, { supabaseUrl, headers, user });
+  if (req.method === "DELETE") return cancelScheduleChange(req, res, { supabaseUrl, headers });
 
   const name = typeof req.body?.name === "string" ? req.body.name.trim() : "";
   if (name.length < 2 || name.length > 150) return res.status(400).json({ error: "Company name must be 2–150 characters" });
@@ -76,4 +86,60 @@ export default async function handler(req, res) {
   const company = Array.isArray(rows) ? rows[0] : rows;
   if (!UUID.test(company?.id || "")) return res.status(502).json({ error: "Invalid company creation response" });
   return res.status(201).json({ company });
+}
+
+// The database refuses changes with a plain-language reason (check_violation); pass that on.
+async function databaseRefusal(response) {
+  try {
+    const body = await response.json();
+    return response.status === 400 && body?.code === "23514" && typeof body.message === "string" ? body.message : null;
+  } catch { return null; }
+}
+
+// Schedules a pay schedule change from a future period. The rules are checked here for a
+// clear message, and again by the database, which has the final say.
+async function changeSchedule(req, res, { supabaseUrl, headers, user }) {
+  const companyId = req.body?.companyId, frequency = req.body?.payFrequency, effectiveFrom = req.body?.effectiveFrom;
+  if (!UUID.test(companyId || "")) return res.status(400).json({ error: "Choose a company" });
+  const lookup = await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${encodeURIComponent(companyId)}&select=id,${SCHEDULE_FIELDS}&limit=1`, { headers });
+  if (!lookup.ok) return res.status(502).json({ error: "Unable to load the company's pay schedule" });
+  const [company] = await lookup.json();
+  if (!company) return res.status(404).json({ error: "Company not found" });
+  const today = todayKey();
+  const problem = scheduleChangeProblem(normalizePayTimeline(company), { frequency, effectiveFrom }, today);
+  if (problem) return res.status(400).json({ error: problem });
+  const saved = await fetch(`${supabaseUrl}/rest/v1/rpc/change_company_pay_schedule`, {
+    method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_organization_id: companyId, p_pay_frequency: frequency, p_effective_from: effectiveFrom, p_changed_by: user.id })
+  });
+  if (!saved.ok) {
+    const reason = await databaseRefusal(saved);
+    if (reason) return res.status(400).json({ error: reason });
+    console.error("Pay schedule change failed", { companyId, status: saved.status });
+    return res.status(502).json({ error: "Unable to change the pay schedule. Nothing was changed." });
+  }
+  const rows = await saved.json();
+  const change = Array.isArray(rows) ? rows[0] : rows;
+  const updated = normalizePayTimeline({ ...company, pay_schedule_changes: [...(company.pay_schedule_changes || []), change] });
+  return res.status(200).json({ change, paySchedule: payTimelineSummary(updated, today) });
+}
+
+// Cancels a change that has not started yet.
+async function cancelScheduleChange(req, res, { supabaseUrl, headers }) {
+  const companyId = req.body?.companyId, changeId = Number(req.body?.changeId);
+  if (!UUID.test(companyId || "") || !Number.isSafeInteger(changeId) || changeId <= 0) {
+    return res.status(400).json({ error: "Choose the pay schedule change to cancel" });
+  }
+  const cancelled = await fetch(`${supabaseUrl}/rest/v1/rpc/cancel_pay_schedule_change`, {
+    method: "POST", headers: { ...headers, "Content-Type": "application/json" },
+    body: JSON.stringify({ p_organization_id: companyId, p_change_id: changeId })
+  });
+  if (!cancelled.ok) {
+    console.error("Pay schedule change cancellation failed", { companyId, status: cancelled.status });
+    return res.status(502).json({ error: "Unable to cancel the pay schedule change" });
+  }
+  if ((await cancelled.json()) !== true) {
+    return res.status(409).json({ error: "That change has already started or no longer exists. Refresh the page." });
+  }
+  return res.status(200).json({ cancelled: true });
 }

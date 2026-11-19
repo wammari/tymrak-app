@@ -123,3 +123,93 @@ test("if the database refuses, the admin is told nothing was saved and can retry
  const response=res();await handler({method:"POST",headers:{authorization:"Bearer token"},body:{name:"Refused Co",payFrequency:"monthly"}},response);
  assert.equal(response.statusCode,502);assert.match(response.body.error,/Nothing was saved/);assert.doesNotMatch(response.body.error,/Do not retry/);
 });
+
+// ---- Changing a pay schedule ----------------------------------------------------------
+import { todayKey } from "../api/_pay-schedule.js";
+const COMPANY = "77777777-7777-4777-8777-777777777777";
+function firstOfMonthAhead(months){const d=new Date(`${todayKey().slice(0,7)}-01T12:00:00Z`);d.setUTCMonth(d.getUTCMonth()+months);return d.toISOString().slice(0,10);}
+function scheduleFetch(calls,{company={id:COMPANY,pay_frequency:"semi_monthly",pay_period_anchor:null,pay_schedule_changes:[]},change,cancel=true,refusal}={}){
+ return async(url,options={})=>{
+  const u=String(url);calls.push([u,options.method||"GET",options.body?JSON.parse(options.body):null]);
+  if(u.includes("/auth/v1/user"))return json({id:ADMIN});
+  if(u.includes("/user_roles?"))return json([{organization_id:OTHER}]);
+  if(u.includes("/organizations?")&&u.includes("is_active=eq.true"))return json([{id:OTHER}]);
+  if(u.includes(`/organizations?id=eq.${COMPANY}`))return json(company?[company]:[]);
+  if(u.endsWith("/rpc/change_company_pay_schedule"))return refusal?json(refusal,400):json([change]);
+  if(u.endsWith("/rpc/cancel_pay_schedule_change"))return json(cancel);
+  throw Error("unexpected request: "+u);
+ };
+}
+const rpcCalls=calls=>calls.filter(([u])=>u.includes("/rpc/"));
+
+test("the Main Administrator schedules a change from a future 1st of the month",async()=>{
+ configure();const calls=[];const from=firstOfMonthAhead(2);
+ global.fetch=scheduleFetch(calls,{change:{id:9,organization_id:COMPANY,pay_frequency:"biweekly",pay_period_anchor:from,effective_from:from}});
+ const response=res();await handler({method:"PATCH",headers:{authorization:"Bearer token"},body:{companyId:COMPANY,payFrequency:"biweekly",effectiveFrom:from}},response);
+ assert.equal(response.statusCode,200);
+ assert.deepEqual(rpcCalls(calls)[0][2],{p_organization_id:COMPANY,p_pay_frequency:"biweekly",p_effective_from:from,p_changed_by:ADMIN});
+ assert.equal(response.body.paySchedule.frequency,"semi_monthly","the current schedule is unchanged until the change starts");
+ assert.equal(response.body.paySchedule.upcomingChange.effectiveFrom,from);
+});
+
+test("changes that would move a started or misaligned period never reach the database",async()=>{
+ const from=firstOfMonthAhead(2);
+ for(const body of [
+  {companyId:COMPANY,payFrequency:"biweekly",effectiveFrom:todayKey()},
+  {companyId:COMPANY,payFrequency:"biweekly",effectiveFrom:from.slice(0,8)+"02"},
+  {companyId:COMPANY,payFrequency:"semi_monthly",effectiveFrom:from},
+  {companyId:COMPANY,payFrequency:"fortnightly",effectiveFrom:from},
+  {companyId:"not-a-company",payFrequency:"monthly",effectiveFrom:from}
+ ]){
+  configure();const calls=[];global.fetch=scheduleFetch(calls);
+  const response=res();await handler({method:"PATCH",headers:{authorization:"Bearer token"},body},response);
+  assert.equal(response.statusCode,400,JSON.stringify(body));assert.equal(rpcCalls(calls).length,0,JSON.stringify(body));
+ }
+});
+
+test("only one change can wait at a time",async()=>{
+ configure();const calls=[];const waiting=firstOfMonthAhead(2);
+ global.fetch=scheduleFetch(calls,{company:{id:COMPANY,pay_frequency:"semi_monthly",pay_period_anchor:null,pay_schedule_changes:[{id:3,pay_frequency:"monthly",pay_period_anchor:null,effective_from:waiting}]}});
+ const response=res();await handler({method:"PATCH",headers:{authorization:"Bearer token"},body:{companyId:COMPANY,payFrequency:"biweekly",effectiveFrom:firstOfMonthAhead(4)}},response);
+ assert.equal(response.statusCode,400);assert.match(response.body.error,/Cancel it first/);assert.equal(rpcCalls(calls).length,0);
+});
+
+test("the database's reason is shown when it refuses a change",async()=>{
+ configure();const calls=[];
+ global.fetch=scheduleFetch(calls,{refusal:{code:"23514",message:"This company already has a pay schedule change waiting to start. Cancel it first."}});
+ const response=res();await handler({method:"PATCH",headers:{authorization:"Bearer token"},body:{companyId:COMPANY,payFrequency:"monthly",effectiveFrom:firstOfMonthAhead(2)}},response);
+ assert.equal(response.statusCode,400);assert.match(response.body.error,/waiting to start/);
+});
+
+test("a waiting change can be cancelled; a started one cannot",async()=>{
+ configure();let calls=[];global.fetch=scheduleFetch(calls,{cancel:true});
+ let response=res();await handler({method:"DELETE",headers:{authorization:"Bearer token"},body:{companyId:COMPANY,changeId:9}},response);
+ assert.equal(response.statusCode,200);assert.deepEqual(rpcCalls(calls)[0][2],{p_organization_id:COMPANY,p_change_id:9});
+ configure();calls=[];global.fetch=scheduleFetch(calls,{cancel:false});
+ response=res();await handler({method:"DELETE",headers:{authorization:"Bearer token"},body:{companyId:COMPANY,changeId:9}},response);
+ assert.equal(response.statusCode,409);
+ configure();calls=[];global.fetch=scheduleFetch(calls);
+ response=res();await handler({method:"DELETE",headers:{authorization:"Bearer token"},body:{companyId:COMPANY,changeId:"x"}},response);
+ assert.equal(response.statusCode,400);assert.equal(rpcCalls(calls).length,0);
+});
+
+test("only the Main Administrator can change or cancel a schedule",async()=>{
+ configure();let calls=0;global.fetch=async()=>{calls++;return json({id:OTHER})};
+ for(const method of ["PATCH","DELETE"]){const response=res();await handler({method,headers:{authorization:"Bearer token"},body:{companyId:COMPANY,payFrequency:"monthly",effectiveFrom:firstOfMonthAhead(2),changeId:1}},response);assert.equal(response.statusCode,403,method);}
+ assert.equal(calls,2,"stops after checking who is signed in");
+});
+
+test("the company list shows each company's current schedule and any waiting change",async()=>{
+ configure();const waiting=firstOfMonthAhead(2);
+ global.fetch=async url=>{const u=String(url);
+  if(u.includes("/auth/v1/user"))return json({id:ADMIN});
+  if(u.includes("/user_roles?"))return json([{organization_id:OTHER}]);
+  if(u.includes("is_active=eq.true"))return json([{id:OTHER}]);
+  if(u.includes("/organizations?select="))return json([{id:COMPANY,name:"Test company",is_active:true,pay_frequency:"semi_monthly",pay_period_anchor:null,pay_schedule_changes:[{id:4,pay_frequency:"monthly",pay_period_anchor:null,effective_from:waiting}]}]);
+  throw Error("unexpected request: "+u);};
+ const response=res();await handler({method:"GET",headers:{authorization:"Bearer token"}},response);
+ assert.equal(response.statusCode,200);
+ const [company]=response.body.companies;
+ assert.equal(company.paySchedule.frequency,"semi_monthly");assert.equal(company.paySchedule.upcomingChange.id,4);
+ assert.equal(company.pay_schedule_changes,undefined);assert.equal(response.body.today,todayKey());
+});

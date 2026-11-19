@@ -3,8 +3,8 @@ import { databaseRows } from "./_database-pages.js";
 import {employeeScopeFilter} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES, calculationStart, periodInstants, summarizeEmployee } from "./_manager-timecards.js";
-import { loadPaySchedule, requestedPayPeriod } from "./_pay-schedule.js";
-import { describePaySchedule, nextPayPeriod, previousPayPeriod } from "../pay-periods.js";
+import { loadPaySchedule, requestedPayPeriod, todayKey } from "./_pay-schedule.js";
+import { nextPayPeriod, payTimelineSummary, previousPayPeriod } from "../pay-periods.js";
 
 async function safeSupabaseError(response) {
   try {
@@ -130,7 +130,7 @@ export default async function handler(req, res) {
         previousKey: previousPayPeriod(period, schedule).key,
         nextKey: period.key === current.key ? null : nextPayPeriod(period, schedule).key
       },
-      paySchedule: { ...schedule, description: describePaySchedule(schedule) },
+      paySchedule: payTimelineSummary(schedule, todayKey(now)),
       timecards: cards,
       approvalPersistence: false
     });

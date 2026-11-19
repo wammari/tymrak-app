@@ -128,3 +128,23 @@ test("timecards are not shown with a guessed schedule when the schedule cannot b
     } finally { env.restore(); }
   }
 });
+
+test("after a schedule change, managers see old periods under the old schedule and new ones under the new", async () => {
+  const env = install({ pay_frequency: "semi_monthly", pay_period_anchor: null,
+    pay_schedule_changes: [{ id: 1, pay_frequency: "biweekly", pay_period_anchor: "2026-11-16", effective_from: "2026-11-16" }] });
+  try {
+    const before = await getTimecards("2026-11-1");
+    assert.equal(before.statusCode, 200);
+    assert.deepEqual([before.payload.period.startDate, before.payload.period.endDate], ["2026-11-01", "2026-11-15"]);
+    assert.equal(before.payload.period.nextKey, "2026-11-16", "the next period is the first two-week one");
+    const after = await getTimecards("2026-11-16");
+    assert.equal(after.statusCode, 200);
+    assert.deepEqual([after.payload.period.startDate, after.payload.period.endDate], ["2026-11-16", "2026-11-29"]);
+    assert.equal(after.payload.period.previousKey, "2026-11-1");
+    assert.equal((await getTimecards("2026-11-2")).statusCode, 400, "the old second-half code no longer exists");
+    const approve = response();
+    await approvalHandler({ method: "POST", headers: { authorization: "Bearer manager" }, body: { employeeIds: ["employee-1"], period: "2026-11-16" } }, approve);
+    assert.equal(approve.statusCode, 200);
+    assert.deepEqual([env.approvals[0].period_start, env.approvals[0].period_end], ["2026-11-16", "2026-11-29"]);
+  } finally { env.restore(); }
+});
