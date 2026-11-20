@@ -103,8 +103,8 @@ function renderPayroll(){
  }
  const change=button("Change answer",!answer,"secondary");change.textContent="Change answer";
  if(answer)box.append(el("p",{textContent:"You run payroll in QuickBooks Online. Approved regular hours are sent as time entries, and QuickBooks adds them to each paycheque in the pay period."}),change);
- else box.append(el("p",{textContent:"You don't run payroll in QuickBooks Online, so Tymrak doesn't send hours there. For payroll, give your accountant or payroll service the approved timecards from the Manager Portal."}),
-  el("p",{},el("a",{href:"/manager.html",textContent:"Go to approved timecards →"})),change);
+ else box.append(el("p",{textContent:"You don't run payroll in QuickBooks Online, so Tymrak doesn't send hours there. For payroll, give your accountant or payroll service the payroll report: approved regular, overtime and double time hours for each pay period."}),
+  el("p",{},el("a",{href:"/payroll-report.html",textContent:"Open the payroll report →"})),change);
 }
 async function load(key=periodKey){
  data=await request("GET",undefined,key?`?period=${encodeURIComponent(key)}`:"");
