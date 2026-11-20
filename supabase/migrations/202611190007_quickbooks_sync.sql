@@ -12,6 +12,10 @@ create table public.accounting_connections (
   realm_id text not null check (realm_id ~ '^[0-9]{1,32}$'),
   company_name text check (company_name is null or length(company_name) <= 200),
   environment text not null check (environment in ('sandbox', 'production')),
+  -- The admin's answer to "Do you run payroll in QuickBooks Online?" (null until answered).
+  -- Hours are only sent when it is true: businesses that pay people some other way
+  -- (an accountant, another payroll provider) get nothing from time entries.
+  runs_payroll boolean,
   access_token_encrypted text not null,
   refresh_token_encrypted text not null,
   access_expires_at timestamptz not null,

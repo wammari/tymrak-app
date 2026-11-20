@@ -94,7 +94,8 @@ async function pageData(db, auth, config, periodKey) {
   return {
     configured: Boolean(config),
     environment: config?.environment || null,
-    connection: connection ? { companyName: connection.company_name, environment: connection.environment, connectedAt: connection.connected_at, problem: connectionProblem } : null,
+    connection: connection ? { companyName: connection.company_name, environment: connection.environment, connectedAt: connection.connected_at,
+      runsPayroll: connection.runs_payroll ?? null, problem: connectionProblem } : null,
     employees: employees.map(e => {
       const link = links.find(l => l.employee_id === e.id);
       return { id: e.id, name: `${e.first_name} ${e.last_name}`.trim(), email: e.email || "", link: link ? { externalId: link.external_id, externalName: link.external_name, matchedBy: link.matched_by } : null };
@@ -135,6 +136,9 @@ async function claim(db, auth, approvalId, employeeId, realmId, now) {
 async function sendPeriod(db, auth, config, periodKey) {
   const connection = await loadConnection(db, auth.organizationId);
   if (!connection) return { status: 400, body: { error: "Connect QuickBooks first." } };
+  if (connection.runs_payroll !== true) {
+    return { status: 409, body: { error: "Hours are only sent to businesses that run payroll in QuickBooks Online. Answer the payroll question first." } };
+  }
   const period = requestedPayPeriod(periodKey, await loadPaySchedule(auth));
   if (!period) return { status: 400, body: { error: "Select a valid current or previous pay period" } };
   const client = clientFor(config, db, connection);
@@ -218,6 +222,7 @@ export default async function handler(req, res) {
       if (previous && previous.realm_id !== realmId) {
         // A different QuickBooks company: old employee matches no longer apply.
         await db(`employee_accounting_links?organization_id=eq.${auth.organizationId}`, { method: "DELETE", prefer: "return=minimal" });
+        record.runs_payroll = null; // a different QuickBooks company: ask again
       }
       await db("accounting_connections?on_conflict=organization_id", { method: "POST", body: record, prefer: "resolution=merge-duplicates,return=minimal" });
       return res.status(200).json({ success: true, companyName: record.company_name });
@@ -230,6 +235,16 @@ export default async function handler(req, res) {
         await db(`accounting_connections?organization_id=eq.${auth.organizationId}`, { method: "DELETE", prefer: "return=minimal" });
       }
       return res.status(200).json({ success: true });
+    }
+
+    if (action === "set_payroll") {
+      const runsPayroll = req.body?.runsPayroll;
+      if (typeof runsPayroll !== "boolean") return res.status(400).json({ error: "Answer yes or no." });
+      const connection = await loadConnection(db, auth.organizationId);
+      if (!connection) return res.status(400).json({ error: "Connect QuickBooks first." });
+      await db(`accounting_connections?organization_id=eq.${auth.organizationId}`, { method: "PATCH",
+        body: { runs_payroll: runsPayroll, updated_at: new Date().toISOString() }, prefer: "return=minimal" });
+      return res.status(200).json({ success: true, runsPayroll });
     }
 
     if (action === "match" || action === "auto_match") {

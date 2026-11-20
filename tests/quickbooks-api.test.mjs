@@ -35,7 +35,7 @@ function workWeek(employeeId) {
 }
 
 // Fake Supabase + Intuit for one company. State is kept so several calls can be chained.
-function install({ role = "admin", configured = true, connected = true, links = [], syncs = [], batchFails = () => false, qbEmployees } = {}) {
+function install({ role = "admin", configured = true, connected = true, runsPayroll = true, links = [], syncs = [], batchFails = () => false, qbEmployees } = {}) {
   const original = global.fetch, env = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "server-secret";
@@ -44,7 +44,7 @@ function install({ role = "admin", configured = true, connected = true, links = 
   else for (const k of ["QUICKBOOKS_CLIENT_ID", "QUICKBOOKS_CLIENT_SECRET", "QUICKBOOKS_TOKEN_KEY"]) delete process.env[k];
   const config = configured ? quickBooksConfig(process.env) : null;
   const state = {
-    connection: connected && config ? { organization_id: COMPANY, realm_id: "9130", company_name: "Ana's Bakery", environment: "sandbox", connected_at: "2026-11-01T00:00:00Z",
+    connection: connected && config ? { organization_id: COMPANY, realm_id: "9130", company_name: "Ana's Bakery", environment: "sandbox", runs_payroll: runsPayroll, connected_at: "2026-11-01T00:00:00Z",
       ...tokenRecord(config, { access_token: "access", refresh_token: "refresh", expires_in: 3600 }) } : null,
     links: links.map(l => ({ organization_id: COMPANY, external_name: null, matched_by: "manual", ...l })),
     syncs: new Map(syncs.map(s => [s.approval_id, { organization_id: COMPANY, realm_id: "9130", entries: [], manual_hours: [], error: null, attempted_at: new Date().toISOString(), ...s }])),
@@ -174,6 +174,7 @@ test("connecting signs the request to this admin and company, and stores tokens 
     await call("POST", { action: "complete", code: "auth-code-2", state: signState({ organizationId: COMPANY, userId: ADMIN }, fake.config.key), realmId: "4620" });
     assert.equal(fake.state.connection.realm_id, "4620");
     assert.equal(fake.state.links.length, 0);
+    assert.equal(fake.state.connection.runs_payroll, null, "a different QuickBooks company: the payroll question is asked again");
   } finally { fake.restore(); }
 });
 
@@ -280,4 +281,36 @@ test("future or made-up pay periods are refused", async () => {
     assert.equal((await call("POST", { action: "sync" })).statusCode, 400);
     assert.equal((await call("GET", undefined, { period: "nonsense" })).statusCode, 400);
   } finally { fake.restore(); }
+});
+
+test("hours are only sent once the business says it runs payroll in QuickBooks", async () => {
+  for (const answer of [null, false]) {
+    const fake = install({ runsPayroll: answer, links: [{ employee_id: ANA, external_id: "7" }] });
+    try {
+      const page = await call("GET", undefined, { period: PERIOD.key });
+      assert.equal(page.payload.connection.runsPayroll, answer);
+      const sent = await call("POST", { action: "sync", period: PERIOD.key });
+      assert.equal(sent.statusCode, 409);
+      assert.match(sent.payload.error, /run payroll in QuickBooks Online/);
+      assert.equal(fake.state.batches.length, 0);
+      assert.equal(fake.state.syncs.size, 0, "nothing is recorded or locked");
+    } finally { fake.restore(); }
+  }
+  const fake = install({ runsPayroll: null, links: [{ employee_id: ANA, external_id: "7" }] });
+  try {
+    assert.equal((await call("POST", { action: "set_payroll", runsPayroll: "yes" })).statusCode, 400);
+    assert.equal((await call("POST", { action: "set_payroll", runsPayroll: true })).statusCode, 200);
+    assert.equal(fake.state.connection.runs_payroll, true);
+    assert.equal((await call("POST", { action: "sync", period: PERIOD.key })).statusCode, 200);
+    assert.ok(fake.state.batches.length > 0);
+    assert.equal((await call("POST", { action: "set_payroll", runsPayroll: false })).statusCode, 200);
+    assert.equal(fake.state.connection.runs_payroll, false);
+  } finally { fake.restore(); }
+});
+
+test("the payroll answer can't be saved before connecting, or by a manager", async () => {
+  let fake = install({ connected: false });
+  try { assert.equal((await call("POST", { action: "set_payroll", runsPayroll: true })).statusCode, 400); } finally { fake.restore(); }
+  fake = install({ role: "manager" });
+  try { assert.equal((await call("POST", { action: "set_payroll", runsPayroll: false })).statusCode, 403); } finally { fake.restore(); }
 });

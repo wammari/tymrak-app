@@ -1,11 +1,12 @@
 <!doctype html><html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QuickBooks | TYMRAK</title>
-<style>body{font:16px system-ui;background:#fbf8f3;color:#35271e;margin:0}main{max-width:980px;margin:32px auto;padding:24px}a{color:#70400e}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}h2{margin-top:0}select{box-sizing:border-box;width:100%;padding:9px;font:inherit;border:1px solid #cbbca9;border-radius:6px;background:white}button{font:inherit;padding:10px 18px;background:#8d5316;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:8px 14px}.danger{background:white;color:#9b1c1c;border:1px solid #9b1c1c;padding:8px 14px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}.muted,.hint{color:#716254;font-size:14px}.badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:700}.badge.synced{background:#e8f7ef;color:#176b36}.badge.failed{background:#fdeaea;color:#a32020}.badge.sending{background:#fff4df;color:#9a6700}.badge.not_sent{background:#f1f3f6;color:#5e6674}.badge.sandbox{background:#fff4df;color:#9a6700}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.period{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.period strong{min-width:220px;text-align:center}.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.success{display:block;background:#e8f7ee;color:#176b36}.notice.error{display:block;background:#fdeaea;color:#a32020}.notice.info{display:block;background:#fff4df;color:#70400e}.manual{margin-top:6px;font-size:14px;color:#70400e}[hidden]{display:none!important}@media(max-width:640px){main{padding:16px}}</style>
+<style>body{font:16px system-ui;background:#fbf8f3;color:#35271e;margin:0}main{max-width:980px;margin:32px auto;padding:24px}a{color:#70400e}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}h2{margin-top:0}select{box-sizing:border-box;width:100%;padding:9px;font:inherit;border:1px solid #cbbca9;border-radius:6px;background:white}button{font:inherit;padding:10px 18px;background:#8d5316;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:8px 14px}.danger{background:white;color:#9b1c1c;border:1px solid #9b1c1c;padding:8px 14px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}.muted,.hint{color:#716254;font-size:14px}.badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:700}.badge.synced{background:#e8f7ef;color:#176b36}.badge.failed{background:#fdeaea;color:#a32020}.badge.sending{background:#fff4df;color:#9a6700}.badge.not_sent{background:#f1f3f6;color:#5e6674}.badge.sandbox{background:#fff4df;color:#9a6700}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.period{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.period strong{min-width:220px;text-align:center}.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.success{display:block;background:#e8f7ee;color:#176b36}.notice.error{display:block;background:#fdeaea;color:#a32020}.notice.info{display:block;background:#fff4df;color:#70400e}.choices{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px}.manual{margin-top:6px;font-size:14px;color:#70400e}[hidden]{display:none!important}@media(max-width:640px){main{padding:16px}}</style>
 <meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css"></head>
 <body class="workspace-page"><main><a class="brand-home" href="/manager.html" aria-label="TYMRAK manager portal"><span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span></a><a href="/manager.html">← Manager portal</a>
 <h1>QuickBooks</h1><p>Send approved timecards to QuickBooks Online as time entries for <strong id="companyName">this business</strong>. QuickBooks Online Payroll adds time entries in a pay period to each employee's regular pay hours when you run payroll.</p>
 <div id="notice" class="notice" role="status">Loading…</div>
 <div id="app" hidden>
 <section><h2>Connection</h2><div id="connection"></div></section>
+<section id="payrollSection" hidden><h2>Payroll</h2><div id="payroll"></div></section>
 <section id="matchSection" hidden><h2>Match employees</h2><p class="hint">Tell Tymrak which QuickBooks employee each person is. Unmatched employees' hours aren't sent.</p><p><button id="autoMatch" type="button" class="secondary">Match by email and name</button></p><table><thead><tr><th>Tymrak employee</th><th>QuickBooks employee</th></tr></thead><tbody id="matches"></tbody></table></section>
 <section id="sendSection" hidden><h2>Send approved timecards</h2>
  <div class="period"><button id="previous" type="button" class="secondary">← Previous</button><strong id="periodLabel"></strong><button id="next" type="button" class="secondary">Next →</button></div>
@@ -90,11 +91,28 @@ function renderTimecards(){
  $("send").disabled=!waiting||!data.connection||Boolean(data.connection?.problem);
  $("send").textContent=waiting?`Send ${waiting} approved ${waiting===1?"timecard":"timecards"}`:"Everything here is sent";
 }
+function renderPayroll(){
+ const box=$("payroll"),answer=data.connection.runsPayroll;box.replaceChildren();
+ const choose=async value=>{try{await request("POST",{action:"set_payroll",runsPayroll:value});notice("success",value?"Saved. Next, match your employees.":"Saved. Tymrak won't send hours to QuickBooks.");await load()}catch(error){notice("error",error.message)}};
+ const button=(text,value,cls="")=>{const b=el("button",{type:"button",className:cls,textContent:text});b.addEventListener("click",()=>{b.disabled=true;choose(value)});return b};
+ if(answer===null){
+  box.append(el("p",{},el("strong",{textContent:"Do you run payroll in QuickBooks Online?"})),
+   el("p",{className:"hint",textContent:"Choose yes if you pay employees with QuickBooks Online Payroll. Choose no if your accountant, another payroll service (such as Wagepoint or ADP) or you pay them some other way."}),
+   el("div",{className:"choices"},button("Yes, we run payroll in QuickBooks",true),button("No, or not sure",false,"secondary")));
+  return;
+ }
+ const change=button("Change answer",!answer,"secondary");change.textContent="Change answer";
+ if(answer)box.append(el("p",{textContent:"You run payroll in QuickBooks Online. Approved regular hours are sent as time entries, and QuickBooks adds them to each paycheque in the pay period."}),change);
+ else box.append(el("p",{textContent:"You don't run payroll in QuickBooks Online, so Tymrak doesn't send hours there. For payroll, give your accountant or payroll service the approved timecards from the Manager Portal."}),
+  el("p",{},el("a",{href:"/manager.html",textContent:"Go to approved timecards →"})),change);
+}
 async function load(key=periodKey){
  data=await request("GET",undefined,key?`?period=${encodeURIComponent(key)}`:"");
  renderConnection();
- const ready=Boolean(data.connection)&&!data.connection.problem;
- $("matchSection").hidden=!ready;$("sendSection").hidden=!ready;
+ const connected=Boolean(data.connection)&&!data.connection.problem;
+ const ready=connected&&data.connection.runsPayroll===true;
+ $("payrollSection").hidden=!connected;$("matchSection").hidden=!ready;$("sendSection").hidden=!ready;
+ if(connected)renderPayroll();
  if(ready){renderMatches();renderTimecards()}
 }
 $("previous").addEventListener("click",()=>load(data.period.previousKey).catch(e=>notice("error",e.message)));
@@ -118,7 +136,7 @@ try{
  if(params.has("code")||params.has("error")){
   history.replaceState(null,"",location.pathname);
   if(params.get("error"))notice("error","QuickBooks wasn't connected"+(params.get("error")==="access_denied"?": access was declined.":"."));
-  else{notice("info","Finishing the QuickBooks connection…");const r=await request("POST",{action:"complete",code:params.get("code"),state:params.get("state"),realmId:params.get("realmId")});notice("success",`Connected to ${r.companyName||"QuickBooks"}. Next, match your employees.`)}
+  else{notice("info","Finishing the QuickBooks connection…");const r=await request("POST",{action:"complete",code:params.get("code"),state:params.get("state"),realmId:params.get("realmId")});notice("success",`Connected to ${r.companyName||"QuickBooks"}. Next, answer the payroll question below.`)}
  }else $("notice").className="notice";
  await load();$("app").hidden=false;
 }catch(error){notice("error",error.message);if(data)$("app").hidden=false}
