@@ -25,6 +25,7 @@
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
 import {createClient} from "/supabase-js.bundle.js";
+import {needsCompanyChoice,showCompanyPicker} from "./company-picker.js";
 const $=id=>document.getElementById(id);
 const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
 const selectedCompanyId=sessionStorage.getItem("tymrak-company-id");
@@ -86,8 +87,7 @@ $("next").addEventListener("click",()=>load(report.period.nextKey).catch(e=>noti
 try{
  const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
  const session=await (await fetch("/api/manager-session",{headers:await authHeaders()})).json();
- if(!session.authorized||!session.organizationId)throw new Error("Choose your business in the Manager Portal first.");
- if(session.role!=="admin")throw new Error("Only this business's admins can see the payroll report.");
+ if(needsCompanyChoice(session)){if(showCompanyPicker(session,{what:"the payroll report"}))throw Object.assign(new Error(""),{picker:true});throw new Error(session.authorized?"Only this business's admins can see the payroll report.":"You aren't an admin of any business yet.")}
  companyName=(session.availableOrganizations||[]).find(o=>o.organizationId===session.organizationId)?.name||"";
  if(companyName)$("companyName").textContent=companyName;
  // Opens on the last finished pay period: that's the one payroll is usually run for.
@@ -95,5 +95,5 @@ try{
  await load(params.get("period"));
  if(!params.get("period")&&report.period.current&&report.period.previousKey)await load(report.period.previousKey);
  $("app").hidden=false;
-}catch(error){notice("error",error.message)}
+}catch(error){if(!error.picker)notice("error",error.message)}
 </script></body></html>

@@ -240,6 +240,7 @@ test("the Team page is published and checks for admin access", () => {
   assert.ok(publicAssets.includes("team.html"));
   const html = page("team.html");
   assert.match(html, /\/api\/company-team/);
-  assert.match(html, /session\.role!=="admin"/);
+  assert.match(html, /needsCompanyChoice\(session\)/);
+  assert.match(fs.readFileSync(new URL("../company-picker.js", import.meta.url), "utf8"), /session\.role !== "admin"/);
   assert.doesNotMatch(html, /innerHTML/, "names and emails are written as text, never as HTML");
 });

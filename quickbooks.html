@@ -17,6 +17,7 @@
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
 import {createClient} from "/supabase-js.bundle.js";
+import {needsCompanyChoice,showCompanyPicker} from "./company-picker.js";
 const $=id=>document.getElementById(id);
 const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
 const selectedCompanyId=sessionStorage.getItem("tymrak-company-id");
@@ -67,7 +68,9 @@ function renderMatches(){
  }
  const unmatched=data.employees.filter(e=>!e.link).length;
  $("autoMatch").disabled=!data.suggestions.length;
- $("autoMatch").textContent=data.suggestions.length?`Match ${data.suggestions.length} by email and name`:(unmatched?"No automatic matches found":"Everyone is matched");
+ $("autoMatch").textContent=data.suggestions.length?`Match ${data.suggestions.length} by email and name`:(!data.employees.length?"No employees to match yet":unmatched?"No automatic matches found":"Everyone is matched");
+ if(!data.employees.length)rows.append(el("tr",{},el("td",{colSpan:2,className:"muted",textContent:"Add employees in the Manager Portal first."})));
+ else if(!data.quickBooksEmployees.length)rows.prepend(el("tr",{},el("td",{colSpan:2,className:"muted",textContent:"Your QuickBooks company has no active employees. Add them in QuickBooks, then refresh this page."})));
 }
 function renderTimecards(){
  const p=data.period;periodKey=p.key;
@@ -89,7 +92,7 @@ function renderTimecards(){
  }
  const waiting=data.timecards.filter(c=>c.status!=="synced").length;
  $("send").disabled=!waiting||!data.connection||Boolean(data.connection?.problem);
- $("send").textContent=waiting?`Send ${waiting} approved ${waiting===1?"timecard":"timecards"}`:"Everything here is sent";
+ $("send").textContent=waiting?`Send ${waiting} approved ${waiting===1?"timecard":"timecards"}`:(data.timecards.length?"Everything here is sent":"Nothing to send");
 }
 function renderPayroll(){
  const box=$("payroll"),answer=data.connection.runsPayroll;box.replaceChildren();
@@ -127,8 +130,7 @@ $("send").addEventListener("click",async()=>{
 try{
  const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
  const session=await (async()=>{const {data:{session:s}}=await client.auth.getSession();if(!s)throw new Error("Sign in to the Manager Portal first.");const r=await fetch("/api/manager-session",{headers:{Authorization:`Bearer ${s.access_token}`,...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})}});return r.json()})();
- if(!session.authorized||!session.organizationId)throw new Error("Choose your business in the Manager Portal first.");
- if(session.role!=="admin")throw new Error("Only this business's admins can manage QuickBooks.");
+ if(needsCompanyChoice(session)){if(showCompanyPicker(session,{what:"QuickBooks"}))throw Object.assign(new Error(""),{picker:true});throw new Error(session.authorized?"Only this business's admins can manage QuickBooks.":"You aren't an admin of any business yet.")}
  const company=(session.availableOrganizations||[]).find(o=>o.organizationId===session.organizationId);
  if(company?.name)$("companyName").textContent=company.name;
  // Returning from Intuit: finish connecting, then remove the code from the address bar.
@@ -139,5 +141,5 @@ try{
   else{notice("info","Finishing the QuickBooks connection…");const r=await request("POST",{action:"complete",code:params.get("code"),state:params.get("state"),realmId:params.get("realmId")});notice("success",`Connected to ${r.companyName||"QuickBooks"}. Next, answer the payroll question below.`)}
  }else $("notice").className="notice";
  await load();$("app").hidden=false;
-}catch(error){notice("error",error.message);if(data)$("app").hidden=false}
+}catch(error){if(!error.picker)notice("error",error.message);if(data)$("app").hidden=false}
 </script></body></html>
