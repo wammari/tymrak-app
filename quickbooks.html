@@ -1,0 +1,143 @@
+<!doctype html><html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>QuickBooks | TYMRAK</title>
+<style>body{font:16px system-ui;background:#fbf8f3;color:#35271e;margin:0}main{max-width:980px;margin:32px auto;padding:24px}a{color:#70400e}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}h2{margin-top:0}select{box-sizing:border-box;width:100%;padding:9px;font:inherit;border:1px solid #cbbca9;border-radius:6px;background:white}button{font:inherit;padding:10px 18px;background:#8d5316;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:8px 14px}.danger{background:white;color:#9b1c1c;border:1px solid #9b1c1c;padding:8px 14px}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:11px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}.muted,.hint{color:#716254;font-size:14px}.badge{display:inline-block;padding:3px 9px;border-radius:99px;font-size:12px;font-weight:700}.badge.synced{background:#e8f7ef;color:#176b36}.badge.failed{background:#fdeaea;color:#a32020}.badge.sending{background:#fff4df;color:#9a6700}.badge.not_sent{background:#f1f3f6;color:#5e6674}.badge.sandbox{background:#fff4df;color:#9a6700}.row{display:flex;gap:12px;flex-wrap:wrap;align-items:center}.period{display:flex;gap:12px;align-items:center;flex-wrap:wrap;margin-bottom:14px}.period strong{min-width:220px;text-align:center}.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.success{display:block;background:#e8f7ee;color:#176b36}.notice.error{display:block;background:#fdeaea;color:#a32020}.notice.info{display:block;background:#fff4df;color:#70400e}.choices{display:flex;gap:10px;flex-wrap:wrap;margin:14px 0 4px}.manual{margin-top:6px;font-size:14px;color:#70400e}[hidden]{display:none!important}@media(max-width:640px){main{padding:16px}}</style>
+<meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css"></head>
+<body class="workspace-page"><main><a class="brand-home" href="/manager.html" aria-label="TYMRAK manager portal"><span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span></a><a href="/manager.html">← Manager portal</a>
+<h1>QuickBooks</h1><p>Send approved timecards to QuickBooks Online as time entries for <strong id="companyName">this business</strong>. QuickBooks Online Payroll adds time entries in a pay period to each employee's regular pay hours when you run payroll.</p>
+<div id="notice" class="notice" role="status">Loading…</div>
+<div id="app" hidden>
+<section><h2>Connection</h2><div id="connection"></div></section>
+<section id="payrollSection" hidden><h2>Payroll</h2><div id="payroll"></div></section>
+<section id="matchSection" hidden><h2>Match employees</h2><p class="hint">Tell Tymrak which QuickBooks employee each person is. Unmatched employees' hours aren't sent.</p><p><button id="autoMatch" type="button" class="secondary">Match by email and name</button></p><table><thead><tr><th>Tymrak employee</th><th>QuickBooks employee</th></tr></thead><tbody id="matches"></tbody></table></section>
+<section id="sendSection" hidden><h2>Send approved timecards</h2>
+ <div class="period"><button id="previous" type="button" class="secondary">← Previous</button><strong id="periodLabel"></strong><button id="next" type="button" class="secondary">Next →</button></div>
+ <p class="hint">Regular hours are sent, one time entry per day. <strong>Overtime and double time are not sent yet</strong>: they're listed below each person to add in QuickBooks payroll. Once sent, a timecard is locked and can't be reopened.</p>
+ <table><thead><tr><th>Employee</th><th>Status</th></tr></thead><tbody id="timecards"></tbody></table>
+ <p><button id="send" type="button">Send approved timecards</button></p></section>
+</div></main>
+<script type="module">
+import {loadSupabaseConfiguration} from "./supabase-config.js";
+import {createClient} from "/supabase-js.bundle.js";
+const $=id=>document.getElementById(id);
+const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
+const selectedCompanyId=sessionStorage.getItem("tymrak-company-id");
+let client,data=null,periodKey=null;
+function notice(type,text){const n=$("notice");n.className="notice "+type;n.textContent=text}
+async function request(method="GET",body,query=""){
+ const {data:{session}}=await client.auth.getSession();if(!session)throw new Error("Sign in to the Manager Portal first.");
+ const response=await fetch("/api/quickbooks"+query,{method,headers:{Authorization:`Bearer ${session.access_token}`,"Content-Type":"application/json",...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})},...(body?{body:JSON.stringify(body)}:{})});
+ const result=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(result.error||"QuickBooks is unavailable right now. Please try again.");
+ return result;
+}
+const shortDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"});
+const hours=minutes=>{const h=Number((minutes/60).toFixed(2));return `${h} ${h===1?"hour":"hours"}`};
+const statusText={synced:"Sent",failed:"Not sent",sending:"Sending…",not_sent:"Not sent yet"};
+function renderConnection(){
+ const box=$("connection");box.replaceChildren();
+ if(!data.configured){box.append(el("p",{textContent:"QuickBooks isn't set up for Tymrak yet. Once Tymrak's Intuit app keys are added, you can connect here."}));return}
+ if(!data.connection){
+  const connect=el("button",{type:"button",textContent:"Connect QuickBooks"});
+  connect.addEventListener("click",async()=>{connect.disabled=true;try{const {url}=await request("POST",{action:"connect"});location.assign(url)}catch(error){notice("error",error.message);connect.disabled=false}});
+  box.append(el("p",{textContent:"You'll sign in to Intuit and choose this business's QuickBooks company. Tymrak only adds time entries; it doesn't change anything else."}),connect);
+  if(data.environment==="sandbox")box.append(el("p",{className:"hint",textContent:"Test mode: this connects to QuickBooks sandbox (test) companies only."}));
+  return;
+ }
+ const c=data.connection;
+ const disconnect=el("button",{type:"button",className:"danger",textContent:"Disconnect"});
+ disconnect.addEventListener("click",async()=>{if(!confirm("Disconnect QuickBooks? Time entries already sent stay in QuickBooks."))return;disconnect.disabled=true;try{await request("POST",{action:"disconnect"});notice("success","QuickBooks was disconnected.");await load()}catch(error){notice("error",error.message);disconnect.disabled=false}});
+ const label=el("div",{},el("strong",{textContent:c.companyName||"QuickBooks company"}),c.environment==="sandbox"?el("span",{className:"badge sandbox",textContent:" Test company "}):"",el("div",{className:"muted",textContent:"Connected "+new Date(c.connectedAt).toLocaleDateString()}));
+ box.append(el("div",{className:"row"},label,disconnect));
+ if(c.problem){
+  const reconnect=el("button",{type:"button",textContent:"Reconnect QuickBooks"});
+  reconnect.addEventListener("click",async()=>{try{const {url}=await request("POST",{action:"connect"});location.assign(url)}catch(error){notice("error",error.message)}});
+  box.append(el("p",{className:"notice error",textContent:c.problem}),reconnect);
+ }
+}
+function renderMatches(){
+ const rows=$("matches");rows.replaceChildren();
+ for(const employee of data.employees){
+  const select=el("select",{ariaLabel:`QuickBooks employee for ${employee.name}`});
+  select.append(el("option",{value:"",textContent:"Not matched"}));
+  for(const person of data.quickBooksEmployees)select.append(el("option",{value:person.id,textContent:person.email?`${person.name} (${person.email})`:person.name}));
+  select.value=employee.link?.externalId||"";
+  if(employee.link&&!data.quickBooksEmployees.some(p=>p.id===employee.link.externalId))select.append(el("option",{value:employee.link.externalId,textContent:employee.link.externalName||"Matched employee",selected:true}));
+  select.addEventListener("change",async()=>{select.disabled=true;try{await request("POST",{action:"match",employeeId:employee.id,externalId:select.value||null});notice("success",`Saved the match for ${employee.name}.`);await load()}catch(error){notice("error",error.message);select.disabled=false}});
+  const how=employee.link?` · matched by ${employee.link.matchedBy==="manual"?"you":employee.link.matchedBy}`:"";
+  rows.append(el("tr",{},el("td",{},el("div",{textContent:employee.name}),el("div",{className:"muted",textContent:(employee.email||"")+how})),el("td",{},select)));
+ }
+ const unmatched=data.employees.filter(e=>!e.link).length;
+ $("autoMatch").disabled=!data.suggestions.length;
+ $("autoMatch").textContent=data.suggestions.length?`Match ${data.suggestions.length} by email and name`:(unmatched?"No automatic matches found":"Everyone is matched");
+}
+function renderTimecards(){
+ const p=data.period;periodKey=p.key;
+ $("periodLabel").textContent=`${shortDate(p.startDate)} – ${shortDate(p.endDate)}`;
+ $("previous").disabled=!p.previousKey;$("next").disabled=!p.nextKey;
+ const rows=$("timecards");rows.replaceChildren();
+ if(!data.timecards.length)rows.append(el("tr",{},el("td",{colSpan:2,className:"muted",textContent:"No approved timecards in this pay period. Approve timecards in the Manager Portal first."})));
+ for(const card of data.timecards){
+  const status=el("td",{},el("span",{className:"badge "+card.status,textContent:statusText[card.status]||card.status}));
+  if(card.status==="synced")status.append(el("div",{className:"muted",textContent:`${card.entriesSent} time ${card.entriesSent===1?"entry":"entries"} sent`}));
+  if(card.error)status.append(el("div",{className:"muted",textContent:card.error}));
+  else if(!card.matched&&card.status!=="synced")status.append(el("div",{className:"muted",textContent:"Not matched to a QuickBooks employee yet."}));
+  if(card.manualHours.length){
+   const total=kind=>card.manualHours.filter(h=>h.kind===kind).reduce((s,h)=>s+h.minutes,0);
+   const parts=[total("overtime")?`${hours(total("overtime"))} overtime`:"",total("double_time")?`${hours(total("double_time"))} double time`:""].filter(Boolean).join(" and ");
+   status.append(el("div",{className:"manual",textContent:`Add ${parts} in QuickBooks payroll (not sent).`}));
+  }
+  rows.append(el("tr",{},el("td",{textContent:card.employeeName}),status));
+ }
+ const waiting=data.timecards.filter(c=>c.status!=="synced").length;
+ $("send").disabled=!waiting||!data.connection||Boolean(data.connection?.problem);
+ $("send").textContent=waiting?`Send ${waiting} approved ${waiting===1?"timecard":"timecards"}`:"Everything here is sent";
+}
+function renderPayroll(){
+ const box=$("payroll"),answer=data.connection.runsPayroll;box.replaceChildren();
+ const choose=async value=>{try{await request("POST",{action:"set_payroll",runsPayroll:value});notice("success",value?"Saved. Next, match your employees.":"Saved. Tymrak won't send hours to QuickBooks.");await load()}catch(error){notice("error",error.message)}};
+ const button=(text,value,cls="")=>{const b=el("button",{type:"button",className:cls,textContent:text});b.addEventListener("click",()=>{b.disabled=true;choose(value)});return b};
+ if(answer===null){
+  box.append(el("p",{},el("strong",{textContent:"Do you run payroll in QuickBooks Online?"})),
+   el("p",{className:"hint",textContent:"Choose yes if you pay employees with QuickBooks Online Payroll. Choose no if your accountant, another payroll service (such as Wagepoint or ADP) or you pay them some other way."}),
+   el("div",{className:"choices"},button("Yes, we run payroll in QuickBooks",true),button("No, or not sure",false,"secondary")));
+  return;
+ }
+ const change=button("Change answer",!answer,"secondary");change.textContent="Change answer";
+ if(answer)box.append(el("p",{textContent:"You run payroll in QuickBooks Online. Approved regular hours are sent as time entries, and QuickBooks adds them to each paycheque in the pay period."}),change);
+ else box.append(el("p",{textContent:"You don't run payroll in QuickBooks Online, so Tymrak doesn't send hours there. For payroll, give your accountant or payroll service the payroll report: approved regular, overtime and double time hours for each pay period."}),
+  el("p",{},el("a",{href:"/payroll-report.html",textContent:"Open the payroll report →"})),change);
+}
+async function load(key=periodKey){
+ data=await request("GET",undefined,key?`?period=${encodeURIComponent(key)}`:"");
+ renderConnection();
+ const connected=Boolean(data.connection)&&!data.connection.problem;
+ const ready=connected&&data.connection.runsPayroll===true;
+ $("payrollSection").hidden=!connected;$("matchSection").hidden=!ready;$("sendSection").hidden=!ready;
+ if(connected)renderPayroll();
+ if(ready){renderMatches();renderTimecards()}
+}
+$("previous").addEventListener("click",()=>load(data.period.previousKey).catch(e=>notice("error",e.message)));
+$("next").addEventListener("click",()=>load(data.period.nextKey).catch(e=>notice("error",e.message)));
+$("autoMatch").addEventListener("click",async()=>{$("autoMatch").disabled=true;try{const r=await request("POST",{action:"auto_match"});notice("success",`Matched ${r.matched} ${r.matched===1?"employee":"employees"}. Check the list below.`);await load()}catch(error){notice("error",error.message)}});
+$("send").addEventListener("click",async()=>{
+ if(!confirm("Send these approved timecards to QuickBooks? Once sent, they're locked and can't be reopened."))return;
+ $("send").disabled=true;$("send").textContent="Sending…";
+ try{const r=await request("POST",{action:"sync",period:periodKey});const failed=r.results.filter(x=>x.status==="failed").length;notice(failed?"error":"success",failed?`${r.results.length-failed} sent, ${failed} not sent. See the reasons below.`:"Sent to QuickBooks.");await load()}
+ catch(error){notice("error",error.message);await load().catch(()=>{})}
+});
+try{
+ const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
+ const session=await (async()=>{const {data:{session:s}}=await client.auth.getSession();if(!s)throw new Error("Sign in to the Manager Portal first.");const r=await fetch("/api/manager-session",{headers:{Authorization:`Bearer ${s.access_token}`,...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})}});return r.json()})();
+ if(!session.authorized||!session.organizationId)throw new Error("Choose your business in the Manager Portal first.");
+ if(session.role!=="admin")throw new Error("Only this business's admins can manage QuickBooks.");
+ const company=(session.availableOrganizations||[]).find(o=>o.organizationId===session.organizationId);
+ if(company?.name)$("companyName").textContent=company.name;
+ // Returning from Intuit: finish connecting, then remove the code from the address bar.
+ const params=new URLSearchParams(location.search);
+ if(params.has("code")||params.has("error")){
+  history.replaceState(null,"",location.pathname);
+  if(params.get("error"))notice("error","QuickBooks wasn't connected"+(params.get("error")==="access_denied"?": access was declined.":"."));
+  else{notice("info","Finishing the QuickBooks connection…");const r=await request("POST",{action:"complete",code:params.get("code"),state:params.get("state"),realmId:params.get("realmId")});notice("success",`Connected to ${r.companyName||"QuickBooks"}. Next, answer the payroll question below.`)}
+ }else $("notice").className="notice";
+ await load();$("app").hidden=false;
+}catch(error){notice("error",error.message);if(data)$("app").hidden=false}
+</script></body></html>
