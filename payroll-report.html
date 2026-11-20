@@ -1,0 +1,99 @@
+<!doctype html><html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payroll Report | TYMRAK</title>
+<style>body{font:16px system-ui;background:#fbf8f3;color:#35271e;margin:0}main{max-width:1040px;margin:32px auto;padding:24px}a{color:#70400e}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}button{font:inherit;padding:10px 18px;background:#8d5316;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:8px 14px}.period{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.period strong{min-width:220px;text-align:center;font-size:18px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:18px}.total{background:#fbf8f3;border-radius:8px;padding:12px 14px}.total span{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}.total strong{font-size:22px}.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:640px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.excluded td{color:#8a7d70}tfoot td{font-weight:700;border-top:2px solid #e4d7c7}.muted,.hint{color:#716254;font-size:14px}.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700}.badge.ok{background:#e8f7ef;color:#176b36}.badge.no{background:#fff4df;color:#9a6700}.badge.bad{background:#fdeaea;color:#a32020}.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.error{display:block;background:#fdeaea;color:#a32020}.notice.warn{display:block;background:#fff4df;color:#70400e}[hidden]{display:none!important}.print-only{display:none}
+@media(max-width:640px){main{padding:16px}.actions{margin-left:0}}
+@media print{body{background:white}main{margin:0;max-width:none;padding:0}.brand-home,.back,.actions,.period button,#notice{display:none!important}section{border:0;padding:0;margin:12px 0}.print-only{display:block}table{min-width:0}}</style>
+<meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css"></head>
+<body class="workspace-page"><main><a class="brand-home" href="/manager.html" aria-label="TYMRAK manager portal"><span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span></a><a class="back" href="/manager.html">← Manager portal</a>
+<h1>Payroll report</h1><p class="hint">Approved hours for <strong id="companyName">this business</strong>, worked out with your province's overtime rules. Give this to your accountant or payroll service.</p>
+<div id="notice" class="notice" role="status">Loading…</div>
+<div id="app" hidden>
+<section>
+ <div class="period"><button id="previous" type="button" class="secondary">← Previous</button><strong id="periodLabel"></strong><button id="next" type="button" class="secondary">Next →</button>
+  <div class="actions"><button id="download" type="button">Download CSV</button><button id="print" type="button" class="secondary">Print or save as PDF</button></div></div>
+ <p class="print-only muted" id="printedOn"></p>
+ <div class="totals">
+  <div class="total"><span>Employees</span><strong id="tEmployees"></strong></div>
+  <div class="total"><span>Regular hours</span><strong id="tRegular"></strong></div>
+  <div class="total"><span>Overtime hours</span><strong id="tOvertime"></strong></div>
+  <div class="total"><span>Double time hours</span><strong id="tDouble"></strong></div>
+ </div>
+ <div id="warning" class="notice warn" hidden></div>
+</section>
+<section><div class="scroll"><table><thead><tr><th>Employee</th><th>Status</th><th class="n">Regular</th><th class="n">Overtime</th><th class="n">Double time</th><th class="n">Total</th></tr></thead><tbody id="rows"></tbody><tfoot id="foot"></tfoot></table></div>
+<p class="hint">Only approved timecards count toward the totals and go into the CSV. Hours are decimal (7.5 = 7 hours 30 minutes). Overtime and double time are hours, not pay: your payroll applies the rate.</p></section>
+</div></main>
+<script type="module">
+import {loadSupabaseConfiguration} from "./supabase-config.js";
+import {createClient} from "/supabase-js.bundle.js";
+const $=id=>document.getElementById(id);
+const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
+const selectedCompanyId=sessionStorage.getItem("tymrak-company-id");
+let client,report=null,companyName="";
+function notice(type,text){const n=$("notice");n.className="notice "+type;n.textContent=text}
+async function authHeaders(){const {data:{session}}=await client.auth.getSession();if(!session)throw new Error("Sign in to the Manager Portal first.");return {Authorization:`Bearer ${session.access_token}`,...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})}}
+const shortDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"});
+const fmt=h=>h===null||h===undefined?"—":h.toFixed(2);
+function render(){
+ const p=report.period,t=report.approvedTotals;
+ $("periodLabel").textContent=`${shortDate(p.startDate)} – ${shortDate(p.endDate)}`;
+ $("previous").disabled=!p.previousKey;$("next").disabled=!p.nextKey;
+ $("tEmployees").textContent=t.employees;$("tRegular").textContent=fmt(t.regularHours);$("tOvertime").textContent=fmt(t.overtimeHours);$("tDouble").textContent=fmt(t.doubleTimeHours);
+ const warnings=[];
+ if(p.current)warnings.push("This pay period isn't over yet, so hours may still change.");
+ if(report.notApproved)warnings.push(`${report.notApproved} ${report.notApproved===1?"timecard has":"timecards have"} hours but ${report.notApproved===1?"isn't":"aren't"} approved, so ${report.notApproved===1?"it's":"they're"} left out. Approve ${report.notApproved===1?"it":"them"} in Timecards first.`);
+ const missing=report.rows.filter(r=>r.approved&&r.missingPunches).length;
+ if(missing)warnings.push(`${missing} approved ${missing===1?"timecard has":"timecards have"} a missing punch. Check ${missing===1?"it":"them"} before running payroll.`);
+ const blocked=report.rows.filter(r=>r.problem&&r.approved).length;
+ if(blocked)warnings.push(`${blocked} approved ${blocked===1?"timecard":"timecards"} can't be calculated and ${blocked===1?"is":"are"} left out. Contact Tymrak support.`);
+ $("warning").hidden=!warnings.length;$("warning").replaceChildren(...warnings.map(w=>el("div",{textContent:w})));
+ const rows=$("rows");rows.replaceChildren();
+ if(!report.rows.length)rows.append(el("tr",{},el("td",{colSpan:6,className:"muted",textContent:"No employees in this pay period."})));
+ for(const r of report.rows){
+  const status=r.problem?el("span",{className:"badge bad",textContent:"Can't calculate"}):r.approved?el("span",{className:"badge ok",textContent:"Approved"}):el("span",{className:"badge no",textContent:"Not approved"});
+  const who=el("td",{},el("div",{textContent:r.name}),el("div",{className:"muted",textContent:[r.province,r.leftCompany?"Left the company":"",r.missingPunches?`${r.missingPunches} missing ${r.missingPunches===1?"punch":"punches"}`:""].filter(Boolean).join(" · ")}));
+  const statusCell=el("td",{},status);if(r.problem)statusCell.append(el("div",{className:"muted",textContent:r.problem}));
+  rows.append(el("tr",{className:r.approved&&!r.problem?"":"excluded"},who,statusCell,
+   el("td",{className:"n",textContent:fmt(r.regularHours)}),el("td",{className:"n",textContent:fmt(r.overtimeHours)}),el("td",{className:"n",textContent:fmt(r.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(r.totalHours)})));
+ }
+ $("foot").replaceChildren(el("tr",{},el("td",{textContent:"Approved total"}),el("td",{}),el("td",{className:"n",textContent:fmt(t.regularHours)}),el("td",{className:"n",textContent:fmt(t.overtimeHours)}),el("td",{className:"n",textContent:fmt(t.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(t.totalHours)})));
+ $("download").disabled=!t.employees;
+ $("printedOn").textContent=`${companyName} · Pay period ${p.startDate} to ${p.endDate} · Printed ${new Date().toLocaleString()}`;
+}
+// Spreadsheet-safe CSV: quote every cell and neutralise anything a spreadsheet would run as a formula.
+const cell=v=>{let s=v===null||v===undefined?"":String(v);if(/^[=+\-@\t\r]/.test(s))s="'"+s;return `"${s.replaceAll('"','""')}"`};
+function csv(){
+ const p=report.period,t=report.approvedTotals;
+ const lines=[["Company","Pay period start","Pay period end","Employee","Email","Province","Regular hours","Overtime hours","Double time hours","Total hours","Approved on","Notes"]];
+ for(const r of report.rows.filter(r=>r.approved&&!r.problem))lines.push([companyName,p.startDate,p.endDate,r.name,r.email,r.province,r.regularHours.toFixed(2),r.overtimeHours.toFixed(2),r.doubleTimeHours.toFixed(2),r.totalHours.toFixed(2),r.approvedAt?r.approvedAt.slice(0,10):"",[r.leftCompany?"Left the company":"",r.missingPunches?"Missing punch":""].filter(Boolean).join("; ")]);
+ lines.push([companyName,p.startDate,p.endDate,"TOTAL","","",t.regularHours.toFixed(2),t.overtimeHours.toFixed(2),t.doubleTimeHours.toFixed(2),t.totalHours.toFixed(2),"",""]);
+ return "﻿"+lines.map(l=>l.map(cell).join(",")).join("\r\n")+"\r\n";
+}
+$("download").addEventListener("click",()=>{
+ const blob=new Blob([csv()],{type:"text/csv;charset=utf-8"});
+ const safe=(companyName||"tymrak").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"tymrak";
+ const a=el("a",{href:URL.createObjectURL(blob),download:`payroll-${safe}-${report.period.startDate}-to-${report.period.endDate}.csv`});
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+$("print").addEventListener("click",()=>print());
+async function load(key){
+ const response=await fetch("/api/payroll-report"+(key?`?period=${encodeURIComponent(key)}`:""),{headers:await authHeaders()});
+ const body=await response.json().catch(()=>({}));
+ if(!response.ok)throw new Error(body.error||"The payroll report is unavailable right now. Please try again.");
+ report=body;render();$("notice").className="notice";
+}
+$("previous").addEventListener("click",()=>load(report.period.previousKey).catch(e=>notice("error",e.message)));
+$("next").addEventListener("click",()=>load(report.period.nextKey).catch(e=>notice("error",e.message)));
+try{
+ const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
+ const session=await (await fetch("/api/manager-session",{headers:await authHeaders()})).json();
+ if(!session.authorized||!session.organizationId)throw new Error("Choose your business in the Manager Portal first.");
+ if(session.role!=="admin")throw new Error("Only this business's admins can see the payroll report.");
+ companyName=(session.availableOrganizations||[]).find(o=>o.organizationId===session.organizationId)?.name||"";
+ if(companyName)$("companyName").textContent=companyName;
+ // Opens on the last finished pay period: that's the one payroll is usually run for.
+ const params=new URLSearchParams(location.search);
+ await load(params.get("period"));
+ if(!params.get("period")&&report.period.current&&report.period.previousKey)await load(report.period.previousKey);
+ $("app").hidden=false;
+}catch(error){notice("error",error.message)}
+</script></body></html>
