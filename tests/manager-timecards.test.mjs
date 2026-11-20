@@ -1,3 +1,4 @@
+import fs from "node:fs";
 import "./_test-environment.mjs";
 import assert from "node:assert/strict";
 import test from "node:test";
@@ -236,3 +237,43 @@ test("overnight punches are paired before grouping on the clock-in date", () => 
   assert.equal(shift.missingPunch, false);
 });
 import {PostgrestResponse as Response} from "./_postgrest-response.mjs";
+
+test("timecards sent to QuickBooks are marked so the page shows them as locked", async () => {
+  const originalFetch = global.fetch;
+  const originalEnv = { ...process.env };
+  process.env.SUPABASE_URL = "https://example.supabase.co";
+  process.env.SUPABASE_SECRET_KEY = "server-only-secret";
+  const seen = [];
+  global.fetch = async url => {
+    seen.push(decodeURIComponent(url));
+    if (url.endsWith("/auth/v1/user")) return new Response(JSON.stringify({ id: "manager-1" }));
+    if (url.includes("/user_roles?")) return new Response(JSON.stringify([{ role: "admin", organization_id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", organization: { is_active: true } }]));
+    if (url.includes("/organizations?id=")) return new Response(JSON.stringify([{ pay_frequency: "semi_monthly", pay_period_anchor: null }]));
+    if (url.includes("/employees?")) return new Response(JSON.stringify(["sent", "partly", "failed", "plain", "open"].map(id => ({ id, first_name: id, last_name: "X", province: "YT" }))));
+    if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
+    if (url.includes("/punches?")) return new Response(JSON.stringify([]));
+    if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify([
+      { id: "a1", employee_id: "sent", status: "approved", accounting_timecard_syncs: { status: "synced", entries: [{ date: "2026-11-02" }] } },
+      { id: "a2", employee_id: "partly", status: "approved", accounting_timecard_syncs: [{ status: "failed", entries: [{ date: "2026-11-02" }] }] },
+      { id: "a3", employee_id: "failed", status: "approved", accounting_timecard_syncs: { status: "failed", entries: [] } },
+      { id: "a4", employee_id: "plain", status: "approved", accounting_timecard_syncs: null }
+    ]));
+    throw new Error(`Unexpected URL: ${url}`);
+  };
+  try {
+    const res = response();
+    await handler({ method: "GET", headers: { authorization: "Bearer manager" }, query: {} }, res);
+    assert.equal(res.statusCode, 200);
+    const sent = Object.fromEntries(res.payload.timecards.map(card => [card.employee.id ?? card.employee.first_name, card.sentToAccounting]));
+    assert.deepEqual(sent, { sent: true, partly: true, failed: false, plain: false, open: false });
+    assert.ok(seen.some(url => url.includes("accounting_timecard_syncs(status,entries)")));
+  } finally {
+    global.fetch = originalFetch;
+    process.env = originalEnv;
+  }
+});
+
+test("a locked timecard shows 'Sent to QuickBooks' instead of a Reopen button", () => {
+  const html = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
+  assert.match(html, /card\.approvalStatus==="Approved"&&card\.sentToAccounting\)\{[^}]*Sent to QuickBooks · locked/);
+});

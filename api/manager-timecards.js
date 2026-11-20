@@ -84,7 +84,7 @@ export default async function handler(req, res) {
         queryName: "employee_period_punches"
       });
       approvals = await query({
-        url: `${supabaseUrl}/rest/v1/timecard_approvals?employee_id=in.${encodeURIComponent(ids)}&period_start=eq.${startKey}&period_end=eq.${endKey}&select=id,employee_id,status,approved_by,approved_at,period_start,period_end,work_timezone`,
+        url: `${supabaseUrl}/rest/v1/timecard_approvals?employee_id=in.${encodeURIComponent(ids)}&period_start=eq.${startKey}&period_end=eq.${endKey}&select=id,employee_id,status,approved_by,approved_at,period_start,period_end,work_timezone,accounting_timecard_syncs(status,entries)`,
         secretKey, stage: "approvals_query", resource: "timecard_approvals",
         queryName: "employee_period_approvals"
       });
@@ -96,9 +96,12 @@ export default async function handler(req, res) {
       // Previously, such an employee could make the entire manager list fail merely
       // because their jurisdiction did not yet have a configured overtime rule.
       const approval = approvals.find(record => record.employee_id === employee.id && record.status === "approved");
+      // Sent (or being sent, or partly sent) to QuickBooks: locked, so the page shows that instead of "Reopen".
+      const sync = [approval?.accounting_timecard_syncs].flat().find(Boolean);
+      const sentToAccounting = Boolean(sync && (sync.status === "sending" || sync.status === "synced" || (sync.entries || []).length > 0));
       if (employeePunches.length === 0) {
         return { ...summarizeEmployee(employee, [], null, period),
-          approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null,
+          approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null, sentToAccounting,
           // The signed-in person's own timecard: someone else must approve or reopen it.
           isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id };
       }
@@ -117,7 +120,7 @@ export default async function handler(req, res) {
         throw error;
       }
       return { ...summarizeEmployee(employee, employeePunches, applicable[0], period),
-        approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null,
+        approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null, sentToAccounting,
           // The signed-in person's own timecard: someone else must approve or reopen it.
           isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id };
     });
