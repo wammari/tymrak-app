@@ -4,6 +4,7 @@ import accountDeletion from '../api/account-deletion.js';
 import completeActivation from '../api/complete-activation.js';
 import companyTeam from '../api/company-team.js';
 import payrollReport from '../api/payroll-report.js';
+import hoursReport from '../api/hours-report.js';
 import quickbooks from '../api/quickbooks.js';
 import employeePunch from '../api/employee-punch.js';
 import employees from '../api/employees.js';
@@ -24,6 +25,7 @@ export const routes = {
   '/api/complete-activation': completeActivation,
   '/api/company-team': companyTeam,
   '/api/payroll-report': payrollReport,
+  '/api/hours-report': hoursReport,
   '/api/quickbooks': quickbooks,
   '/api/employee-punch': employeePunch,
   '/api/employees': employees,
