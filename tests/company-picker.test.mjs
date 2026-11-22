@@ -14,3 +14,16 @@ test("the picker only lists businesses the person is an admin of, as text", asyn
   assert.match(src, /filter\(company => !adminOnly \|\| company\.role === "admin"\)/);
   assert.doesNotMatch(src, /innerHTML/);
 });
+
+test("every page shows the support email from one shared script", async () => {
+  const fs = await import("node:fs");
+  const root = new URL("../", import.meta.url);
+  const pages = fs.readdirSync(root).filter(name => name.endsWith(".html"));
+  assert.ok(pages.length >= 14);
+  for (const page of pages) assert.match(fs.readFileSync(new URL(page, root), "utf8"), /<script src="\/support\.js" defer><\/script><\/head>/, page);
+  const script = fs.readFileSync(new URL("support.js", root), "utf8");
+  assert.match(script, /SUPPORT_EMAIL = "tymrak@outlook\.com"/);
+  assert.doesNotMatch(script, /innerHTML/);
+  const { publicAssets } = await import("../cloudflare/public-assets.mjs");
+  assert.ok(publicAssets.includes("support.js"));
+});
