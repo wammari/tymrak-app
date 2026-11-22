@@ -157,6 +157,7 @@ test("API does not require an overtime rule for an employee with no punches", as
     ]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));
+    if (url.includes("/employee_pay_rates?")) return new Response("[]");
     if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify([]));
     throw new Error(`Unexpected URL: ${url}`);
   };
@@ -252,6 +253,7 @@ test("timecards sent to QuickBooks are marked so the page shows them as locked",
     if (url.includes("/employees?")) return new Response(JSON.stringify(["sent", "partly", "failed", "plain", "open"].map(id => ({ id, first_name: id, last_name: "X", province: "YT" }))));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));
+    if (url.includes("/employee_pay_rates?")) return new Response("[]");
     if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify([
       { id: "a1", employee_id: "sent", status: "approved", accounting_timecard_syncs: { status: "synced", entries: [{ date: "2026-11-02" }] } },
       { id: "a2", employee_id: "partly", status: "approved", accounting_timecard_syncs: [{ status: "failed", entries: [{ date: "2026-11-02" }] }] },

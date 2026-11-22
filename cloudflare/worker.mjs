@@ -13,6 +13,7 @@ import managerTimeOff from '../api/manager-time-off.js';
 import managerSession from '../api/manager-session.js';
 import managerWorkplaces from '../api/manager-workplaces.js';
 import managerTimecards from '../api/manager-timecards.js';
+import managerPayRates from '../api/manager-pay-rates.js';
 import managerApprovals from '../api/manager-timecard-approvals.js';
 import managerReopen from '../api/manager-timecard-reopen.js';
 import sendInvitation from '../api/send-invitation.js';
@@ -34,6 +35,7 @@ export const routes = {
   '/api/manager-session': managerSession,
   '/api/manager-workplaces': managerWorkplaces,
   '/api/manager-timecards': managerTimecards,
+  '/api/manager-pay-rates': managerPayRates,
   '/api/manager-timecard-approvals': managerApprovals,
   '/api/manager-timecard-reopen': managerReopen,
   '/api/send-invitation': sendInvitation,

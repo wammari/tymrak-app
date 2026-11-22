@@ -37,6 +37,7 @@ function install(scheduleRow, { scheduleStatus = 200 } = {}) {
       { employee_id: "employee-1", punch_type: "clock_out", punched_at: "2026-11-16T20:00:00Z" }
     ]));
     if (url.includes("/timecard_approvals") && options.method === "POST") { approvals.push(...JSON.parse(options.body)); return new PostgrestResponse(null, { status: 201 }); }
+    if (url.includes("/employee_pay_rates?")) return new PostgrestResponse("[]");
     if (url.includes("/timecard_approvals?")) return new PostgrestResponse(JSON.stringify(url.includes("select=id,employee_id,status,approved_by") ? approvals.map((record, index) => ({ id: `approval-${index + 1}`, ...record })) : []));
     throw new Error(`Unexpected URL: ${url}`);
   };

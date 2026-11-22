@@ -16,6 +16,7 @@ Facts the draft relies on, so they can be checked:
 - There is **no automatic deletion**. Records stay until the employer decides otherwise. The in-app deletion text promises
   a manager will process a request within 30 days (a UI promise, not an automatic timer).
 - Time Off (vacation requests, notes, balances and decisions) was added in November 2026 and is covered below.
+- **Hourly pay rates** (added November 2026). An employer's admins can record each employee's hourly rate with its start date, to see an estimated gross pay per pay period. Rates are stored apart from employee profiles and only the server can read them; employees and managers never see them. Reviewer: confirm the wording on estimates versus actual pay.
 - **QuickBooks Online** (added November 2026, section 7). Only a company admin can connect it. Tymrak reads the QuickBooks
   company name and its active employees (name and email) to match people, and writes one time entry per employee per day
   (date and regular hours, not billable). It never reads bank, invoice, customer or pay information. The Intuit sign-in
@@ -64,6 +65,7 @@ For questions about how TYMRAK handles information, contact us using the details
 | Workplace details | Workplace name, address, map position and the allowed distance (geofence) | Your employer's managers |
 | Time off | Vacation request dates (full or half days), any note you write, the status, the manager's decision and note, and your balance | You and your manager |
 | Timecard approvals | Pay period, approval status, who approved or reopened it and when, and any reason given | Your managers |
+| Hourly pay rate (only if your employer's admin enters it) | Your hourly rate and the date each rate started, used to show your employer an estimate of gross pay for each pay period. You and managers don't see it; only your employer's admins do | Your employer's admins |
 | Accounting connection (only if your employer connects QuickBooks Online) | Which QuickBooks company is connected, which QuickBooks employee you were matched to, and which of your approved hours were sent there | Your employer's admin and QuickBooks |
 | Account deletion requests | That you asked for deletion, when, and when it was processed | You and your manager |
 | Technical records | Basic server logs such as IP address, device and browser type, and error records | Automatically |
