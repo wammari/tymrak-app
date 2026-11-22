@@ -1,0 +1,200 @@
+<!doctype html><html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Hours Report | TYMRAK</title>
+<style>
+:root{--ink:#35271e;--muted:#716254;--line:#e4d7c7;--grid:#eee6db;--brand:#8d5316;--now:#8d5316;--before:#c98a2e;--up:#35271e;--down:#35271e}
+body{font:16px system-ui;background:#fbf8f3;color:var(--ink);margin:0}main{max-width:1080px;margin:32px auto;padding:24px}a{color:#70400e}
+section{background:white;border:1px solid var(--line);border-radius:12px;padding:24px;margin:20px 0}h2{margin:0 0 14px;font-size:20px}
+button{font:inherit;padding:10px 18px;background:var(--brand);color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:var(--brand);border:1px solid var(--brand);padding:8px 14px}
+.controls{display:flex;gap:12px;flex-wrap:wrap;align-items:end}.controls label{display:flex;flex-direction:column;gap:4px;font-size:13px;color:var(--muted)}
+select,input[type=date]{font:inherit;padding:8px;border:1px solid #cbbca9;border-radius:6px;background:white;color:var(--ink)}.check{flex-direction:row!important;align-items:center;gap:8px!important;font-size:15px!important;color:var(--ink)!important;padding-bottom:10px}
+.actions{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}
+.tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px}.tile{background:#fbf8f3;border-radius:8px;padding:14px}.tile span{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}.tile strong{display:block;font-size:26px;margin:4px 0;font-variant-numeric:tabular-nums}.tile small{color:var(--muted);font-size:13px}
+.up{color:var(--up)}.down{color:var(--down)}
+.legend{display:flex;gap:18px;font-size:14px;color:var(--muted);margin-bottom:8px}.legend i{display:inline-block;width:12px;height:12px;border-radius:3px;margin-right:6px;vertical-align:-1px}
+.chart{position:relative}.chart svg{display:block;width:100%;height:auto}.tip{position:absolute;pointer-events:none;background:#2b1d14;color:white;font-size:13px;padding:6px 9px;border-radius:6px;white-space:nowrap;transform:translate(-50%,-110%);display:none}
+.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:620px}th,td{text-align:left;padding:9px 8px;border-bottom:1px solid #eee;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:var(--muted)}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tfoot td{font-weight:700;border-top:2px solid var(--line)}
+details summary{cursor:pointer;color:#70400e;margin-top:12px}.muted,.hint{color:var(--muted);font-size:14px}
+.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.error{display:block;background:#fdeaea;color:#a32020}.notice.warn{display:block;background:#fff4df;color:#70400e}
+[hidden]{display:none!important}.print-only{display:none}
+@media(max-width:640px){main{padding:16px}.actions{margin-left:0}}
+@media print{body{background:white}main{margin:0;max-width:none;padding:0}.brand-home,.back,.controls,.actions,#notice,details summary,.tymrak-support{display:none!important}details{display:block}details>*{display:block}section{border:0;padding:0;margin:14px 0}.print-only{display:block}table{min-width:0}}
+</style>
+<meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css"><script src="/support.js" defer></script></head>
+<body class="workspace-page"><main><a class="brand-home" href="/manager.html" aria-label="TYMRAK manager portal"><span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span></a><a class="back" href="/manager.html">← Manager portal</a>
+<h1>Hours report</h1><p class="hint">Approved hours for <strong id="companyName">this business</strong> over any dates you choose, compared with the same dates a year earlier.</p>
+<div id="notice" class="notice" role="status">Loading…</div>
+<div id="app" hidden>
+<section>
+ <div class="controls">
+  <label>Dates<select id="preset">
+   <option value="this_year">This year</option><option value="last_year">Last year</option><option value="last_12">Last 12 months</option>
+   <option value="this_quarter">This quarter</option><option value="last_quarter">Last quarter</option>
+   <option value="this_month">This month</option><option value="last_month">Last month</option><option value="custom">Custom dates</option></select></label>
+  <label>From<input type="date" id="from"></label><label>To<input type="date" id="to"></label>
+  <label class="check"><input type="checkbox" id="compare" checked> Compare with the year before</label>
+  <button id="show" type="button">Show</button>
+  <div class="actions"><button id="download" type="button" class="secondary">Download CSV</button><button id="print" type="button" class="secondary">Print or save as PDF</button></div>
+ </div>
+ <p class="print-only muted" id="printedOn"></p>
+ <div id="warnings"></div>
+</section>
+<section><h2 id="rangeTitle"></h2><div class="tiles" id="tiles"></div></section>
+<section><h2>Hours by month</h2><div class="legend" id="legend"></div><div class="chart" id="chart"><div class="tip" id="tip"></div></div>
+ <details><summary>Show as a table</summary><div class="scroll"><table><thead id="monthHead"></thead><tbody id="monthRows"></tbody></table></div></details></section>
+<section><h2>By employee</h2><div class="scroll"><table><thead id="empHead"></thead><tbody id="empRows"></tbody><tfoot id="empFoot"></tfoot></table></div>
+ <p class="hint">Approved timecards only, calculated with each province's overtime rules exactly like payroll. Hours are decimal (7.5 = 7 hours 30 minutes).</p></section>
+</div></main>
+<script type="module">
+import {loadSupabaseConfiguration} from "./supabase-config.js";
+import {createClient} from "/supabase-js.bundle.js";
+import {needsCompanyChoice,showCompanyPicker} from "./company-picker.js";
+const $=id=>document.getElementById(id);
+const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
+const SVG="http://www.w3.org/2000/svg";
+const svg=(tag,attrs={})=>{const node=document.createElementNS(SVG,tag);for(const [k,v] of Object.entries(attrs))node.setAttribute(k,v);return node};
+const selectedCompanyId=sessionStorage.getItem("tymrak-company-id");
+let client,report=null,companyName="";
+function notice(type,text){const n=$("notice");n.className="notice "+type;n.textContent=text}
+async function authHeaders(){const {data:{session}}=await client.auth.getSession();if(!session)throw new Error("Sign in to the Manager Portal first.");return {Authorization:`Bearer ${session.access_token}`,...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})}}
+const fmt=h=>Number(h||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+const fmtShort=h=>Number(h||0).toLocaleString(undefined,{maximumFractionDigits:1});
+const longDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"});
+const monthName=(m,withYear=true)=>new Date(m+"-15T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",...(withYear?{year:"numeric"}:{})});
+// ---- Date presets (Toronto calendar) ----
+const today=new Intl.DateTimeFormat("en-CA",{timeZone:"America/Toronto"}).format(new Date());
+const key=(y,m,d)=>`${y}-${String(m).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+const lastDay=(y,m)=>new Date(Date.UTC(y,m,0)).getUTCDate();
+function presetRange(name){
+ const y=Number(today.slice(0,4)),m=Number(today.slice(5,7)),q=Math.floor((m-1)/3);
+ switch(name){
+  case "this_year":return [key(y,1,1),today];
+  case "last_year":return [key(y-1,1,1),key(y-1,12,31)];
+  case "last_12":{const sy=m===12?y:y-1,sm=m===12?1:m+1;return [key(sy,sm,1),today]}
+  case "this_quarter":return [key(y,q*3+1,1),today];
+  case "last_quarter":{const qy=q?y:y-1,qs=q?(q-1)*3+1:10;return [key(qy,qs,1),key(qy,qs+2,lastDay(qy,qs+2))]}
+  case "this_month":return [key(y,m,1),today];
+  case "last_month":{const ly=m===1?y-1:y,lm=m===1?12:m-1;return [key(ly,lm,1),key(ly,lm,lastDay(ly,lm))]}
+ }
+ return [$("from").value,$("to").value];
+}
+$("preset").addEventListener("change",()=>{if($("preset").value!=="custom"){const [f,t]=presetRange($("preset").value);$("from").value=f;$("to").value=t;run()}});
+for(const id of ["from","to"])$(id).addEventListener("change",()=>{$("preset").value="custom"});
+$("compare").addEventListener("change",run);$("show").addEventListener("click",run);
+$("from").max=today;
+// ---- Rendering ----
+function change(now,before){
+ if(before===null||before===undefined)return null;
+ const diff=Math.round((now-before)*100)/100;
+ if(!before&&!now)return {text:"No change",cls:""};
+ if(!before)return {text:`+${fmtShort(diff)} h (no hours the year before)`,cls:"up"};
+ const pct=Math.round(diff/before*100);
+ return {text:`${diff>=0?"+":"−"}${fmtShort(Math.abs(diff))} h (${diff>=0?"+":"−"}${Math.abs(pct)}%) vs ${fmtShort(before)} h`,cls:diff>0?"up":diff<0?"down":""};
+}
+function renderTiles(){
+ const t=report.totals,p=report.previousTotals,tiles=$("tiles");tiles.replaceChildren();
+ for(const [label,field,isCount] of [["Total hours","totalHours"],["Regular","regularHours"],["Overtime","overtimeHours"],["Double time","doubleTimeHours"],["Employees with hours","employees",true]]){
+  const c=p?change(t[field],p[field]):null;
+  tiles.append(el("div",{className:"tile"},el("span",{textContent:label}),el("strong",{textContent:isCount?String(t[field]):fmt(t[field])}),
+   c?el("small",{className:c.cls,textContent:isCount?`${p[field]} the year before`:c.text}):el("small",{textContent:" "})));
+ }
+}
+function renderWarnings(){
+ const w=[],r=report;
+ if(r.range.trimmed)w.push(`Dates after today aren't counted yet, so this shows up to ${longDate(r.range.to)}.`);
+ if(r.previous&&r.firstRecord&&r.firstRecord>r.previous.to)w.push(`Tymrak has records from ${longDate(r.firstRecord)}, so there are no hours to compare for ${longDate(r.previous.from)} – ${longDate(r.previous.to)}.`);
+ else if(r.previous&&r.firstRecord&&r.firstRecord>r.previous.from)w.push(`Tymrak has records from ${longDate(r.firstRecord)}, so the year before is only partly covered.`);
+ if(r.unapprovedHours)w.push(`${fmt(r.unapprovedHours)} hours in these dates aren't approved yet and aren't counted. Approve them in Timecards.`);
+ if(r.problems.length)w.push(`Hours for ${r.problems.join(", ")} can't be calculated because no overtime rule is set up for their province. Contact Tymrak support.`);
+ $("warnings").replaceChildren(...w.map(text=>el("div",{className:"notice warn",textContent:text})));
+}
+function renderChart(){
+ const months=report.months,compare=Boolean(report.previous),box=$("chart"),tip=$("tip");
+ box.querySelector("svg")?.remove();
+ $("legend").replaceChildren(...(compare?[el("span",{},el("i",{style:"background:var(--now)"}),`${longDate(report.range.from)} – ${longDate(report.range.to)}`),el("span",{},el("i",{style:"background:var(--before)"}),"Year before")]:[]));
+ const W=Math.max(320,Math.round(box.clientWidth||640)),H=260,L=48,R=12,T=14,B=34,plotH=H-T-B,plotW=W-L-R;
+ const max=Math.max(1,...months.flatMap(m=>[m.current.totalHours,m.previous?.totalHours||0]));
+ const step=[1,2,5,10,20,25,50,100,200,250,500,1000,2000,5000].find(s=>max/s<=5)||Math.ceil(max/5);
+ const top=Math.ceil(max/step)*step,y=v=>T+plotH-(v/top)*plotH;
+ const chart=svg("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Approved hours by month"});
+ for(let v=0;v<=top;v+=step){chart.append(svg("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:v?"var(--grid)":"#cbbca9","stroke-width":1}));const t=svg("text",{x:L-8,y:y(v)+4,"text-anchor":"end","font-size":11,fill:"#716254"});t.textContent=v.toLocaleString();chart.append(t)}
+ const slot=plotW/months.length,barW=Math.min(compare?20:28,(slot-10)/(compare?2:1));
+ const bar=(x,v,color,label)=>{
+  const h=Math.max(0,T+plotH-y(v)),r=Math.min(4,h/2,barW/2),bx=x,by=y(v);
+  const d=h<=0?"":`M${bx},${by+h}V${by+r}Q${bx},${by} ${bx+r},${by}H${bx+barW-r}Q${bx+barW},${by} ${bx+barW},${by+r}V${by+h}Z`;
+  const g=svg("g",{});if(d)g.append(svg("path",{d,fill:color}));
+  const hit=svg("rect",{x:bx-3,y:T,width:barW+6,height:plotH,fill:"transparent",tabindex:0,"aria-label":label});
+  const show=()=>{const rect=box.getBoundingClientRect(),s=rect.width/W;tip.textContent=label;tip.style.left=(bx+barW/2)*s+"px";tip.style.top=Math.min(by,T+plotH-4)*s+"px";tip.style.display="block"};
+  hit.addEventListener("mouseenter",show);hit.addEventListener("focus",show);hit.addEventListener("mouseleave",()=>tip.style.display="none");hit.addEventListener("blur",()=>tip.style.display="none");
+  g.append(hit);return g;
+ };
+ months.forEach((m,i)=>{
+  const cx=L+slot*i+slot/2,x0=compare?cx-barW-1:cx-barW/2;
+  chart.append(bar(x0,m.current.totalHours,"var(--now)",`${monthName(m.month)}: ${fmt(m.current.totalHours)} h`));
+  if(compare)chart.append(bar(cx+1,m.previous.totalHours,"var(--before)",`${monthName(`${Number(m.month.slice(0,4))-1}${m.month.slice(4)}`)}: ${fmt(m.previous.totalHours)} h`));
+  const t=svg("text",{x:cx,y:H-12,"text-anchor":"middle","font-size":11,fill:"#716254"});t.textContent=(i===0||m.month.endsWith("-01"))?monthName(m.month):monthName(m.month,false);if(slot<34&&i%2&&!m.month.endsWith("-01"))t.textContent="";chart.append(t);
+ });
+ box.prepend(chart);
+ $("monthHead").replaceChildren(el("tr",{},el("th",{textContent:"Month"}),el("th",{className:"n",textContent:"Regular"}),el("th",{className:"n",textContent:"Overtime"}),el("th",{className:"n",textContent:"Double time"}),el("th",{className:"n",textContent:"Total"}),...(compare?[el("th",{className:"n",textContent:"Year before"}),el("th",{className:"n",textContent:"Change"})]:[])));
+ $("monthRows").replaceChildren(...months.map(m=>{const c=compare?change(m.current.totalHours,m.previous.totalHours):null;return el("tr",{},el("td",{textContent:monthName(m.month)}),el("td",{className:"n",textContent:fmt(m.current.regularHours)}),el("td",{className:"n",textContent:fmt(m.current.overtimeHours)}),el("td",{className:"n",textContent:fmt(m.current.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(m.current.totalHours)}),...(compare?[el("td",{className:"n",textContent:fmt(m.previous.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[]))}));
+}
+function renderEmployees(){
+ const compare=Boolean(report.previous),rows=report.employees;
+ $("empHead").replaceChildren(el("tr",{},el("th",{textContent:"Employee"}),el("th",{className:"n",textContent:"Regular"}),el("th",{className:"n",textContent:"Overtime"}),el("th",{className:"n",textContent:"Double time"}),el("th",{className:"n",textContent:"Total"}),...(compare?[el("th",{className:"n",textContent:"Year before"}),el("th",{className:"n",textContent:"Change"})]:[])));
+ const body=$("empRows");body.replaceChildren();
+ if(!rows.length)body.append(el("tr",{},el("td",{colSpan:compare?7:5,className:"muted",textContent:"No approved hours in these dates."})));
+ for(const r of rows){const c=compare?change(r.current.totalHours,r.previous.totalHours):null;
+  body.append(el("tr",{},el("td",{},el("div",{textContent:r.name}),el("div",{className:"muted",textContent:[r.province,r.leftCompany?"Left the company":""].filter(Boolean).join(" · ")})),
+   el("td",{className:"n",textContent:fmt(r.current.regularHours)}),el("td",{className:"n",textContent:fmt(r.current.overtimeHours)}),el("td",{className:"n",textContent:fmt(r.current.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(r.current.totalHours)}),
+   ...(compare?[el("td",{className:"n",textContent:fmt(r.previous.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[])))}
+ const t=report.totals,p=report.previousTotals,c=compare?change(t.totalHours,p.totalHours):null;
+ $("empFoot").replaceChildren(el("tr",{},el("td",{textContent:"Total"}),el("td",{className:"n",textContent:fmt(t.regularHours)}),el("td",{className:"n",textContent:fmt(t.overtimeHours)}),el("td",{className:"n",textContent:fmt(t.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(t.totalHours)}),...(compare?[el("td",{className:"n",textContent:fmt(p.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[])));
+}
+function render(){
+ const r=report;
+ $("rangeTitle").textContent=`${longDate(r.range.from)} – ${longDate(r.range.to)}`+(r.previous?` compared with ${longDate(r.previous.from)} – ${longDate(r.previous.to)}`:"");
+ renderWarnings();renderTiles();renderChart();renderEmployees();
+ $("printedOn").textContent=`${companyName} · Hours report · Printed ${new Date().toLocaleString()}`;
+}
+// ---- Loading ----
+async function run(){
+ const from=$("from").value,to=$("to").value,compare=$("compare").checked;
+ if(!from||!to){notice("error","Choose a start and end date.");return}
+ $("show").disabled=true;
+ try{
+  const params=new URLSearchParams({from,to,compare:String(compare)});
+  const response=await fetch("/api/hours-report?"+params,{headers:await authHeaders()});
+  const body=await response.json().catch(()=>({}));
+  if(!response.ok)throw new Error(body.error||"The hours report is unavailable right now. Please try again.");
+  report=body;render();$("notice").className="notice";$("app").hidden=false;
+  history.replaceState(null,"",`${location.pathname}?${new URLSearchParams({from,to,compare:String(compare),preset:$("preset").value})}`);
+ }catch(error){notice("error",error.message)}finally{$("show").disabled=false}
+}
+// Spreadsheet-safe CSV.
+const cell=v=>{let s=v===null||v===undefined?"":String(v);if(/^[=+\-@\t\r]/.test(s)&&!/^-?\d+(\.\d+)?$/.test(s))s="'"+s;return `"${s.replaceAll('"','""')}"`};
+$("download").addEventListener("click",()=>{
+ if(!report)return;const r=report,compare=Boolean(r.previous),n=h=>Number(h||0).toFixed(2);
+ const lines=[["Company","From","To","Employee","Province","Regular hours","Overtime hours","Double time hours","Total hours",...(compare?["Year before: total hours","Change in hours"]:[])]];
+ for(const e of r.employees)lines.push([companyName,r.range.from,r.range.to,e.name,e.province,n(e.current.regularHours),n(e.current.overtimeHours),n(e.current.doubleTimeHours),n(e.current.totalHours),...(compare?[n(e.previous.totalHours),n(e.current.totalHours-e.previous.totalHours)]:[])]);
+ lines.push([companyName,r.range.from,r.range.to,"TOTAL","",n(r.totals.regularHours),n(r.totals.overtimeHours),n(r.totals.doubleTimeHours),n(r.totals.totalHours),...(compare?[n(r.previousTotals.totalHours),n(r.totals.totalHours-r.previousTotals.totalHours)]:[])]);
+ lines.push([]);lines.push(["Month","Regular hours","Overtime hours","Double time hours","Total hours",...(compare?["Year before: total hours"]:[])]);
+ for(const m of r.months)lines.push([m.month,n(m.current.regularHours),n(m.current.overtimeHours),n(m.current.doubleTimeHours),n(m.current.totalHours),...(compare?[n(m.previous.totalHours)]:[])]);
+ const blob=new Blob(["﻿"+lines.map(l=>l.map(cell).join(",")).join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"});
+ const safe=(companyName||"tymrak").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"tymrak";
+ const a=el("a",{href:URL.createObjectURL(blob),download:`hours-${safe}-${r.range.from}-to-${r.range.to}.csv`});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+});
+$("print").addEventListener("click",()=>print());
+let resizeTimer;addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(report)renderChart()},150)});addEventListener("beforeprint",()=>{if(report)renderChart()});
+try{
+ const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
+ const session=await (await fetch("/api/manager-session",{headers:await authHeaders()})).json();
+ if(needsCompanyChoice(session)){if(showCompanyPicker(session,{what:"the hours report"}))throw Object.assign(new Error(""),{picker:true});throw new Error(session.authorized?"Only this business's admins can see the hours report.":"You aren't an admin of any business yet.")}
+ companyName=(session.availableOrganizations||[]).find(o=>o.organizationId===session.organizationId)?.name||"";
+ if(companyName)$("companyName").textContent=companyName;
+ const params=new URLSearchParams(location.search);
+ const preset=params.get("preset")||(params.get("from")?"custom":"this_year");
+ $("preset").value=preset;
+ const [f,t]=preset==="custom"?[params.get("from"),params.get("to")]:presetRange(preset);
+ $("from").value=f||presetRange("this_year")[0];$("to").value=t||today;
+ $("compare").checked=params.get("compare")!=="false";
+ await run();
+}catch(error){if(!error.picker)notice("error",error.message)}
+</script></body></html>

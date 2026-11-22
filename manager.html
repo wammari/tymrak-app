@@ -20,7 +20,7 @@
   <nav aria-label="Manager navigation">
     <button class="nav-item active" type="button" data-view="dashboard">Dashboard</button>
     <button class="nav-item" type="button" data-view="employees">Employees</button><a class="nav-item" id="mainAdminCompaniesLink" href="/company-management.html" hidden>Company Management</a>
-    <button class="nav-item" type="button" data-view="timecards">Timecards</button><button class="nav-item" type="button" data-view="timeoff">Time Off</button><a class="nav-item" href="/workplaces.html">Locations</a><a class="nav-item" id="teamLink" href="/team.html" hidden>Team</a><a class="nav-item" id="payrollLink" href="/payroll-report.html" hidden>Payroll report</a><a class="nav-item" id="quickbooksLink" href="/quickbooks.html" hidden>QuickBooks</a><button class="nav-item" type="button" aria-disabled="true">Settings</button>
+    <button class="nav-item" type="button" data-view="timecards">Timecards</button><button class="nav-item" type="button" data-view="timeoff">Time Off</button><a class="nav-item" href="/workplaces.html">Locations</a><a class="nav-item" id="teamLink" href="/team.html" hidden>Team</a><a class="nav-item" id="payrollLink" href="/payroll-report.html" hidden>Payroll report</a><a class="nav-item" id="hoursLink" href="/hours-report.html" hidden>Hours report</a><a class="nav-item" id="quickbooksLink" href="/quickbooks.html" hidden>QuickBooks</a><button class="nav-item" type="button" aria-disabled="true">Settings</button>
   </nav>
   <div class="user"><div class="user-email" id="managerEmail"></div><div class="user-role" id="managerRole"></div><button class="signout" id="signOut" type="button">Sign out</button></div>
 </aside>
@@ -166,7 +166,7 @@ async function initialize(){try{
   if(!data.authorized||data.organizationId!==selectedCompanyId)throw new Error("Company access not authorized");
   const mainAdminCheck=await managerRequest("/api/main-admin-companies").catch(()=>null);
   $("mainAdminCompaniesLink").hidden=!mainAdminCheck?.ok;
-  $("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("addEmployee").hidden=data.role!=="admin";$("teamLink").hidden=data.role!=="admin";$("payrollLink").hidden=data.role!=="admin";$("quickbooksLink").hidden=data.role!=="admin";$("loading").style.display="none";$("app").style.display="grid"
+  $("managerEmail").textContent=data.user.email;$("managerRole").textContent=data.role;$("addEmployee").hidden=data.role!=="admin";$("teamLink").hidden=data.role!=="admin";$("payrollLink").hidden=data.role!=="admin";$("hoursLink").hidden=data.role!=="admin";$("quickbooksLink").hidden=data.role!=="admin";$("loading").style.display="none";$("app").style.display="grid"
 }catch(_){$("loading").textContent="Unable to verify company access. Please sign in again."}}
 $("signOut").addEventListener("click",async()=>{await supabase.auth.signOut();window.location.replace("/manager-login.html")});supabase.auth.onAuthStateChange(event=>{if(event==="SIGNED_OUT"&&currentSession)window.location.replace("/manager-login.html")});initialize();
 </script>
