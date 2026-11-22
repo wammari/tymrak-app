@@ -35,6 +35,7 @@ function installEnvironment(role = "admin") {
       }
       return new Response(null, { status: 201 });
     }
+    if (url.includes("/employee_pay_rates?")) return new Response("[]");
     if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify(approvals));
     throw new Error(`Unexpected URL: ${url}`);
   };
@@ -91,6 +92,7 @@ test("manager timecards return a persisted approval as Approved", async () => {
     if (url.includes("/employees?")) return new Response(JSON.stringify([{ id: "employee-1", first_name: "Ada", last_name: "Lovelace", province: "AB" }]));
     if (url.includes("/overtime_rules?")) return new Response(JSON.stringify([]));
     if (url.includes("/punches?")) return new Response(JSON.stringify([]));
+    if (url.includes("/employee_pay_rates?")) return new Response("[]");
     if (url.includes("/timecard_approvals?")) return new Response(JSON.stringify([{ id: "approval-1", employee_id: "employee-1", status: "approved", approved_by: "manager-id", approved_at: "2026-10-15T20:00:00Z", period_start: "2026-10-01", period_end: "2026-10-15" }]));
     throw new Error(`Unexpected URL: ${url}`);
   };

@@ -4,6 +4,7 @@ import {employeeScopeFilter} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES, calculationStart, periodInstants, summarizeEmployee } from "./_manager-timecards.js";
 import { loadPaySchedule, requestedPayPeriod, todayKey } from "./_pay-schedule.js";
+import { estimatePay } from "./_pay-rates.js";
 import { nextPayPeriod, payTimelineSummary, previousPayPeriod } from "../pay-periods.js";
 
 async function safeSupabaseError(response) {
@@ -89,6 +90,20 @@ export default async function handler(req, res) {
         queryName: "employee_period_approvals"
       });
     }
+    // Pay rates: admins only. Managers' responses never include rates or pay.
+    const isAdmin = authorization.role === "admin";
+    let payRates = [];
+    if (isAdmin && employeeIds.length) {
+      const ids = `(${employeeIds.map(id => `"${String(id).replaceAll('"', '')}"`).join(",")})`;
+      payRates = await query({
+        url: `${supabaseUrl}/rest/v1/employee_pay_rates?employee_id=in.${encodeURIComponent(ids)}&organization_id=eq.${authorization.organizationId}&effective_from=lte.${endKey}&select=employee_id,hourly_rate,effective_from&order=effective_from.asc`,
+        secretKey, stage: "pay_rates_query", resource: "employee_pay_rates",
+        queryName: "employee_pay_rates_for_period"
+      });
+    }
+    const withPay = (card, rule) => isAdmin
+      ? { ...card, pay: estimatePay(card.days, payRates.filter(rate => rate.employee_id === card.employee.id), rule, period) }
+      : card;
     const cards = employees.map(employee => {
       const employeePunches = punches.filter(punch => punch.employee_id === employee.id);
       const applicable = rules.filter(rule => rule.province_code === employee.province && rule.effective_from <= endKey && (!rule.effective_to || rule.effective_to >= startKey));
@@ -100,10 +115,10 @@ export default async function handler(req, res) {
       const sync = [approval?.accounting_timecard_syncs].flat().find(Boolean);
       const sentToAccounting = Boolean(sync && (sync.status === "sending" || sync.status === "synced" || (sync.entries || []).length > 0));
       if (employeePunches.length === 0) {
-        return { ...summarizeEmployee(employee, [], null, period),
+        return withPay({ ...summarizeEmployee(employee, [], null, period),
           approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null, sentToAccounting,
           // The signed-in person's own timecard: someone else must approve or reopen it.
-          isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id };
+          isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id }, null);
       }
       if (applicable.length !== 1) {
         console.error("Manager timecard overtime rule resolution failed", {
@@ -119,10 +134,10 @@ export default async function handler(req, res) {
         error.diagnosticLogged = true;
         throw error;
       }
-      return { ...summarizeEmployee(employee, employeePunches, applicable[0], period),
+      return withPay({ ...summarizeEmployee(employee, employeePunches, applicable[0], period),
         approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null, sentToAccounting,
           // The signed-in person's own timecard: someone else must approve or reopen it.
-          isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id };
+          isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id }, applicable[0]);
     });
     return res.status(200).json({
       period: {
@@ -139,6 +154,7 @@ export default async function handler(req, res) {
       },
       paySchedule: payTimelineSummary(schedule, todayKey(now)),
       timecards: cards,
+      showPay: isAdmin,
       approvalPersistence: false
     });
   } catch (error) {
