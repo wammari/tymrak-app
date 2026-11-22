@@ -19,6 +19,7 @@
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
 import {createClient} from "/supabase-js.bundle.js";
+import {needsCompanyChoice,showCompanyPicker} from "./company-picker.js";
 const $=id=>document.getElementById(id);
 const el=(tag,props={},...children)=>{const node=Object.assign(document.createElement(tag),props);node.append(...children);return node};
 const selectedCompanyId=sessionStorage.getItem("tymrak-company-id");
@@ -89,10 +90,9 @@ $("add").addEventListener("submit",async event=>{
 try{
  const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
  const session=await request("/api/manager-session");
- if(!session.authorized||!session.organizationId)throw new Error("Choose your business in the Manager Portal first.");
- if(session.role!=="admin")throw new Error("Only this business's admins can manage team access.");
+ if(needsCompanyChoice(session)){if(showCompanyPicker(session,{what:"team access"}))throw Object.assign(new Error(""),{picker:true});throw new Error(session.authorized?"Only this business's admins can manage team access.":"You aren't an admin of any business yet.")}
  const company=(session.availableOrganizations||[]).find(o=>o.organizationId===session.organizationId);
  if(company?.name)$("companyName").textContent=company.name;
  await load();$("notice").className="notice";$("app").hidden=false;
-}catch(error){notice("error",error.message)}
+}catch(error){if(!error.picker)notice("error",error.message)}
 </script></body></html>
