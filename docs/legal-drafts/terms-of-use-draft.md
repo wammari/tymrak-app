@@ -12,9 +12,10 @@
   exists or these terms are the whole agreement.
 - TYMRAK applies provincial overtime rules, but the **employer stays responsible** for paying people correctly. Section 6
   says so; confirm the wording and the liability cap (section 10).
+- The provider is an Ontario corporation, 1001822269 Ontario Corporation, operating as TYMRAK. Confirm the exact name as written in the Articles of Incorporation, and that "TYMRAK" is registered as its operating name.
 - Governing law is assumed to be **Ontario**. Quebec customers may need French versions (Charter of the French Language).
 
-Open items: legal company name and address, support email, liability cap amount, notice period for changes, plan and
+Open items: liability cap amount, notice period for changes, plan and
 billing terms, effective date.
 
 ---
@@ -22,7 +23,7 @@ billing terms, effective date.
 # Terms of Use
 
 **Effective date:** [DATE]
-**Provider:** [LEGAL COMPANY NAME] ("TYMRAK", "we", "us"), [MAILING ADDRESS], [SUPPORT EMAIL]
+**Provider:** 1001822269 Ontario Corporation, operating as TYMRAK ("TYMRAK", "we", "us"), 2 Sparrow Court, Hamilton, ON L9A 4Z7, tymrak@outlook.com
 
 ## 1. What these terms cover
 
@@ -110,6 +111,6 @@ and Quebec language requirements.]
 
 ## 13. Contact
 
-[LEGAL COMPANY NAME]
-[MAILING ADDRESS]
-[SUPPORT EMAIL]
+1001822269 Ontario Corporation, operating as TYMRAK
+2 Sparrow Court, Hamilton, ON L9A 4Z7
+tymrak@outlook.com
