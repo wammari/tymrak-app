@@ -25,7 +25,7 @@ Facts the draft relies on, so they can be checked:
 
 Open items for the owner and lawyer:
 
-1. Legal company name, mailing address, support email, and the named person responsible for privacy.
+1. Mailing address and the named person responsible for privacy. (Legal name: 1001822269 Ontario Corporation, operating as TYMRAK. Support email for now: tymrak@outlook.com.)
 2. Whether TYMRAK is a service provider to each employer (assumed below) and what the customer agreement says about it.
 3. Retention periods that fit employment-records rules in each province (hours, time off, termination).
 4. Quebec requirements (Law 25): privacy officer contact, transparency about location data, and consent wording.
@@ -38,9 +38,9 @@ Open items for the owner and lawyer:
 # Privacy Policy
 
 **Effective date:** [DATE]
-**Operator:** [LEGAL COMPANY NAME] ("TYMRAK", "we", "us")
+**Operator:** 1001822269 Ontario Corporation, operating as TYMRAK ("TYMRAK", "we", "us")
 **Address:** [MAILING ADDRESS]
-**Privacy contact:** [NAME / TITLE], [SUPPORT EMAIL]
+**Privacy contact:** [NAME / TITLE], tymrak@outlook.com
 
 ## 1. What this policy covers
 
@@ -173,6 +173,6 @@ If we make a material change, we will update the effective date and tell account
 
 ## 14. Contact
 
-[LEGAL COMPANY NAME]
+1001822269 Ontario Corporation, operating as TYMRAK
 [MAILING ADDRESS]
-[SUPPORT EMAIL]
+tymrak@outlook.com
