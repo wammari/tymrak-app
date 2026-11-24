@@ -83,6 +83,7 @@ advertising or for any purpose other than verifying clock entries.
 
 - To provide the service: sign-in, clocking, timecards, approvals, time off and balances.
 - To let employers and managers run payroll preparation, scheduling and time off.
+- If your employer's admins enter hourly rates, to show them an estimate of gross pay for each pay period.
 - To send account emails, such as invitations, activation links and password resets.
 - To keep the service secure, prevent misuse and fix problems.
 - To meet legal obligations.
@@ -92,7 +93,8 @@ We do not sell personal information. We do not show advertising. We do not use t
 ## 5. Who can see your information
 
 - **Your employer's managers and administrators**, within the employees and workplaces assigned to them. They can see your time
-  records, clock locations, time-off requests and balances, and employment details.
+  records, clock locations, time-off requests and balances, and employment details. Only administrators see hourly
+  pay rates and estimated pay; managers do not.
 - **You**, for your own records.
 - **Your employer's accounting software**, only if your employer connects it (section 7). Your approved hours are then sent
   to your employer's own QuickBooks Online company.
@@ -123,7 +125,8 @@ permission to work with that one QuickBooks company. Then:
   employer can match each TYMRAK employee to the right QuickBooks employee.
 - **What TYMRAK sends to QuickBooks:** after a manager approves a timecard, one entry per day with the date and your regular
   hours. Overtime and double time are shown to your employer to enter in payroll themselves. Nothing is sent before approval.
-- **What TYMRAK never touches:** bank details, pay rates, paycheques, invoices, customers and any other QuickBooks records.
+- **What TYMRAK never touches in QuickBooks:** bank details, pay rates, paycheques, invoices, customers and any other
+  QuickBooks records.
 - **Security:** the sign-in tokens Intuit gives us are stored encrypted and are only used by our servers. Your employer can
   disconnect at any time from TYMRAK or from QuickBooks; we then stop all access and revoke the tokens.
 - Once your hours are in QuickBooks, your employer and Intuit's own terms and privacy policy govern them there.
