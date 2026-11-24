@@ -3,6 +3,7 @@ import { databaseHeaders } from "./_employee-management.js";
 import { loadPaySchedule, todayKey as torontoToday } from "./_pay-schedule.js";
 import { PROVINCE_TIME_ZONES, periodInstants, summarizeEmployee } from "./_manager-timecards.js";
 import { addDays, isDateKey, payPeriodFor } from "../pay-periods.js";
+import { dayPay } from "./_pay-rates.js";
 
 // Hours report for any date range (company admins only), compared with the same dates a
 // year earlier. Hours come from approved timecards only and are worked out exactly like
@@ -59,17 +60,20 @@ function periodsCovering(from, to, schedule) {
   return periods;
 }
 
-const emptyTotals = () => ({ regularMs: 0, overtimeMs: 0, doubleTimeMs: 0, totalMs: 0 });
-function add(target, day) {
+const emptyTotals = () => ({ regularMs: 0, overtimeMs: 0, doubleTimeMs: 0, totalMs: 0, payCents: 0, unpricedMs: 0 });
+function add(target, day, pay) {
+  target.payCents += pay.cents;
+  target.unpricedMs += pay.unpricedMs;
   target.regularMs += day.regularMilliseconds || 0;
   target.overtimeMs += day.overtimeMilliseconds || 0;
   target.doubleTimeMs += day.doubleTimeMilliseconds || 0;
   target.totalMs += (day.regularMilliseconds || 0) + (day.overtimeMilliseconds || 0) + (day.doubleTimeMilliseconds || 0);
 }
-const asHours = t => ({ regularHours: hours(t.regularMs), overtimeHours: hours(t.overtimeMs), doubleTimeHours: hours(t.doubleTimeMs), totalHours: hours(t.totalMs) });
+const asHours = t => ({ regularHours: hours(t.regularMs), overtimeHours: hours(t.overtimeMs), doubleTimeHours: hours(t.doubleTimeMs), totalHours: hours(t.totalMs),
+  estimatedGross: Math.round(t.payCents) / 100, hoursWithoutRate: hours(t.unpricedMs) });
 
 // Approved hours for one date range, per employee and per month.
-export function rangeHours({ from, to, schedule, employees, punches, rules, approvals }) {
+export function rangeHours({ from, to, schedule, employees, punches, rules, approvals, payRates = [] }) {
   const approved = new Set(approvals.map(a => `${a.employee_id}|${a.period_start}|${a.period_end}`));
   const periods = periodsCovering(from, to, schedule);
   const byEmployee = new Map(), byMonth = new Map(), problems = new Set();
@@ -93,12 +97,14 @@ export function rangeHours({ from, to, schedule, employees, punches, rules, appr
         continue;
       }
       if (!byEmployee.has(person.id)) byEmployee.set(person.id, emptyTotals());
+      const ownRates = payRates.filter(rate => rate.employee_id === person.id);
       for (const day of days) {
-        add(byEmployee.get(person.id), day);
-        add(totals, day);
+        const pay = dayPay(day, ownRates, applicable[0]);
+        add(byEmployee.get(person.id), day, pay);
+        add(totals, day, pay);
         const month = day.date.slice(0, 7);
         if (!byMonth.has(month)) byMonth.set(month, emptyTotals());
-        add(byMonth.get(month), day);
+        add(byMonth.get(month), day, pay);
       }
     }
   }
@@ -143,12 +149,13 @@ export async function hoursReport(auth, { from, to, compare = true }, now = new 
   const punchEnd = new Date(Date.parse(`${last.endKey}T00:00:00Z`) + 3 * DAY).toISOString();
   const punches = await readAll(auth, `punches?employee_id=in.${ids}&punched_at=gte.${encodeURIComponent(punchStart)}&punched_at=lte.${encodeURIComponent(punchEnd)}&select=id,employee_id,punch_type,punched_at,location_name&order=punched_at.asc,id.asc`);
   const approvals = await readAll(auth, `timecard_approvals?employee_id=in.${ids}&status=eq.approved&period_end=gte.${first.startKey}&period_start=lte.${last.endKey}&select=employee_id,period_start,period_end&order=period_start.asc,employee_id.asc`);
+  const payRates = await read(auth, `employee_pay_rates?organization_id=eq.${org}&effective_from=lte.${end}&select=employee_id,hourly_rate,effective_from&order=effective_from.asc`);
   const firstPunch = await read(auth, `punches?employee_id=in.${ids}&select=punched_at&order=punched_at.asc&limit=1`);
   result.firstRecord = firstPunch[0]?.punched_at?.slice(0, 10) || null;
 
-  const current = rangeHours({ from, to: end, schedule, employees, punches, rules, approvals });
-  const before = compare ? rangeHours({ from: prevFrom, to: prevTo, schedule, employees, punches, rules, approvals }) : null;
-  const zero = { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0, totalHours: 0 };
+  const current = rangeHours({ from, to: end, schedule, employees, punches, rules, approvals, payRates });
+  const before = compare ? rangeHours({ from: prevFrom, to: prevTo, schedule, employees, punches, rules, approvals, payRates }) : null;
+  const zero = { regularHours: 0, overtimeHours: 0, doubleTimeHours: 0, totalHours: 0, estimatedGross: 0, hoursWithoutRate: 0 };
   const rows = employees
     .filter(person => current.byEmployee.has(person.id) || before?.byEmployee.has(person.id))
     .map(person => ({
@@ -169,7 +176,7 @@ export async function hoursReport(auth, { from, to, compare = true }, now = new 
     problems: [...new Set([...current.problems, ...(before?.problems || [])])]
   };
 }
-const rangeTotalsEmpty = () => ({ employees: 0, regularHours: 0, overtimeHours: 0, doubleTimeHours: 0, totalHours: 0 });
+const rangeTotalsEmpty = () => ({ employees: 0, regularHours: 0, overtimeHours: 0, doubleTimeHours: 0, totalHours: 0, estimatedGross: 0, hoursWithoutRate: 0 });
 
 export default async function handler(req, res) {
   res.setHeader("Cache-Control", "no-store");

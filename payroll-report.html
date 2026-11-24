@@ -16,11 +16,12 @@
   <div class="total"><span>Regular hours</span><strong id="tRegular"></strong></div>
   <div class="total"><span>Overtime hours</span><strong id="tOvertime"></strong></div>
   <div class="total"><span>Double time hours</span><strong id="tDouble"></strong></div>
+  <div class="total"><span>Est. gross pay</span><strong id="tPay"></strong></div>
  </div>
  <div id="warning" class="notice warn" hidden></div>
 </section>
-<section><div class="scroll"><table><thead><tr><th>Employee</th><th>Status</th><th class="n">Regular</th><th class="n">Overtime</th><th class="n">Double time</th><th class="n">Total</th></tr></thead><tbody id="rows"></tbody><tfoot id="foot"></tfoot></table></div>
-<p class="hint">Only approved timecards count toward the totals and go into the CSV. Hours are decimal (7.5 = 7 hours 30 minutes). Overtime and double time are hours, not pay: your payroll applies the rate.</p></section>
+<section><div class="scroll"><table><thead><tr><th>Employee</th><th>Status</th><th class="n">Regular</th><th class="n">Overtime</th><th class="n">Double time</th><th class="n">Total</th><th class="n">Rate</th><th class="n">Est. gross pay</th></tr></thead><tbody id="rows"></tbody><tfoot id="foot"></tfoot></table></div>
+<p class="hint">Only approved timecards count toward the totals and go into the CSV. Hours are decimal (7.5 = 7 hours 30 minutes). Estimated gross pay uses each person's hourly rate (set on their timecard) and the province's overtime multipliers. It's before taxes and deductions, and doesn't include vacation pay, public holiday pay or premiums.</p></section>
 </div></main>
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
@@ -34,16 +35,18 @@ function notice(type,text){const n=$("notice");n.className="notice "+type;n.text
 async function authHeaders(){const {data:{session}}=await client.auth.getSession();if(!session)throw new Error("Sign in to the Manager Portal first.");return {Authorization:`Bearer ${session.access_token}`,...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})}}
 const shortDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"});
 const fmt=h=>h===null||h===undefined?"—":h.toFixed(2);
+const money=v=>v===null||v===undefined?"—":Number(v).toLocaleString("en-CA",{style:"currency",currency:"CAD"});
 function render(){
  const p=report.period,t=report.approvedTotals;
  $("periodLabel").textContent=`${shortDate(p.startDate)} – ${shortDate(p.endDate)}`;
  $("previous").disabled=!p.previousKey;$("next").disabled=!p.nextKey;
- $("tEmployees").textContent=t.employees;$("tRegular").textContent=fmt(t.regularHours);$("tOvertime").textContent=fmt(t.overtimeHours);$("tDouble").textContent=fmt(t.doubleTimeHours);
+ $("tEmployees").textContent=t.employees;$("tRegular").textContent=fmt(t.regularHours);$("tOvertime").textContent=fmt(t.overtimeHours);$("tDouble").textContent=fmt(t.doubleTimeHours);$("tPay").textContent=money(t.estimatedGross);
  const warnings=[];
  if(p.current)warnings.push("This pay period isn't over yet, so hours may still change.");
  if(report.notApproved)warnings.push(`${report.notApproved} ${report.notApproved===1?"timecard has":"timecards have"} hours but ${report.notApproved===1?"isn't":"aren't"} approved, so ${report.notApproved===1?"it's":"they're"} left out. Approve ${report.notApproved===1?"it":"them"} in Timecards first.`);
  const missing=report.rows.filter(r=>r.approved&&r.missingPunches).length;
  if(missing)warnings.push(`${missing} approved ${missing===1?"timecard has":"timecards have"} a missing punch. Check ${missing===1?"it":"them"} before running payroll.`);
+ if(t.withoutRate)warnings.push(`${t.withoutRate} approved ${t.withoutRate===1?"employee has":"employees have"} no hourly rate for some or all of these hours, so the pay total is incomplete. Set rates on their timecards.`);
  const blocked=report.rows.filter(r=>r.problem&&r.approved).length;
  if(blocked)warnings.push(`${blocked} approved ${blocked===1?"timecard":"timecards"} can't be calculated and ${blocked===1?"is":"are"} left out. Contact Tymrak support.`);
  $("warning").hidden=!warnings.length;$("warning").replaceChildren(...warnings.map(w=>el("div",{textContent:w})));
@@ -54,9 +57,10 @@ function render(){
   const who=el("td",{},el("div",{textContent:r.name}),el("div",{className:"muted",textContent:[r.province,r.leftCompany?"Left the company":"",r.missingPunches?`${r.missingPunches} missing ${r.missingPunches===1?"punch":"punches"}`:""].filter(Boolean).join(" · ")}));
   const statusCell=el("td",{},status);if(r.problem)statusCell.append(el("div",{className:"muted",textContent:r.problem}));
   rows.append(el("tr",{className:r.approved&&!r.problem?"":"excluded"},who,statusCell,
-   el("td",{className:"n",textContent:fmt(r.regularHours)}),el("td",{className:"n",textContent:fmt(r.overtimeHours)}),el("td",{className:"n",textContent:fmt(r.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(r.totalHours)})));
+   el("td",{className:"n",textContent:fmt(r.regularHours)}),el("td",{className:"n",textContent:fmt(r.overtimeHours)}),el("td",{className:"n",textContent:fmt(r.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(r.totalHours)}),
+   el("td",{className:"n",textContent:r.pay?.hourlyRate?money(r.pay.hourlyRate):(r.pay?"No rate":"—")}),el("td",{className:"n",textContent:r.pay&&(r.pay.hourlyRate||r.pay.estimatedGross)?money(r.pay.estimatedGross)+(r.pay.hoursWithoutRate?" *":""):"—"})));
  }
- $("foot").replaceChildren(el("tr",{},el("td",{textContent:"Approved total"}),el("td",{}),el("td",{className:"n",textContent:fmt(t.regularHours)}),el("td",{className:"n",textContent:fmt(t.overtimeHours)}),el("td",{className:"n",textContent:fmt(t.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(t.totalHours)})));
+ $("foot").replaceChildren(el("tr",{},el("td",{textContent:"Approved total"}),el("td",{}),el("td",{className:"n",textContent:fmt(t.regularHours)}),el("td",{className:"n",textContent:fmt(t.overtimeHours)}),el("td",{className:"n",textContent:fmt(t.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(t.totalHours)}),el("td",{}),el("td",{className:"n",textContent:money(t.estimatedGross)})));
  $("download").disabled=!t.employees;
  $("printedOn").textContent=`${companyName} · Pay period ${p.startDate} to ${p.endDate} · Printed ${new Date().toLocaleString()}`;
 }
@@ -64,9 +68,9 @@ function render(){
 const cell=v=>{let s=v===null||v===undefined?"":String(v);if(/^[=+\-@\t\r]/.test(s))s="'"+s;return `"${s.replaceAll('"','""')}"`};
 function csv(){
  const p=report.period,t=report.approvedTotals;
- const lines=[["Company","Pay period start","Pay period end","Employee","Email","Province","Regular hours","Overtime hours","Double time hours","Total hours","Approved on","Notes"]];
- for(const r of report.rows.filter(r=>r.approved&&!r.problem))lines.push([companyName,p.startDate,p.endDate,r.name,r.email,r.province,r.regularHours.toFixed(2),r.overtimeHours.toFixed(2),r.doubleTimeHours.toFixed(2),r.totalHours.toFixed(2),r.approvedAt?r.approvedAt.slice(0,10):"",[r.leftCompany?"Left the company":"",r.missingPunches?"Missing punch":""].filter(Boolean).join("; ")]);
- lines.push([companyName,p.startDate,p.endDate,"TOTAL","","",t.regularHours.toFixed(2),t.overtimeHours.toFixed(2),t.doubleTimeHours.toFixed(2),t.totalHours.toFixed(2),"",""]);
+ const lines=[["Company","Pay period start","Pay period end","Employee","Email","Province","Regular hours","Overtime hours","Double time hours","Total hours","Hourly rate","Estimated gross pay","Approved on","Notes"]];
+ for(const r of report.rows.filter(r=>r.approved&&!r.problem))lines.push([companyName,p.startDate,p.endDate,r.name,r.email,r.province,r.regularHours.toFixed(2),r.overtimeHours.toFixed(2),r.doubleTimeHours.toFixed(2),r.totalHours.toFixed(2),r.pay?.hourlyRate?r.pay.hourlyRate.toFixed(2):"",r.pay?r.pay.estimatedGross.toFixed(2):"",r.approvedAt?r.approvedAt.slice(0,10):"",[r.leftCompany?"Left the company":"",r.missingPunches?"Missing punch":"",r.pay?.hoursWithoutRate?`${r.pay.hoursWithoutRate.toFixed(2)} hours without a rate`:""].filter(Boolean).join("; ")]);
+ lines.push([companyName,p.startDate,p.endDate,"TOTAL","","",t.regularHours.toFixed(2),t.overtimeHours.toFixed(2),t.doubleTimeHours.toFixed(2),t.totalHours.toFixed(2),"",t.estimatedGross.toFixed(2),"",""]);
  return "﻿"+lines.map(l=>l.map(cell).join(",")).join("\r\n")+"\r\n";
 }
 $("download").addEventListener("click",()=>{

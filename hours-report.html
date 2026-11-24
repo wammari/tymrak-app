@@ -38,10 +38,10 @@ details summary{cursor:pointer;color:#70400e;margin-top:12px}.muted,.hint{color:
  <div id="warnings"></div>
 </section>
 <section><h2 id="rangeTitle"></h2><div class="tiles" id="tiles"></div></section>
-<section><h2>Hours by month</h2><div class="legend" id="legend"></div><div class="chart" id="chart"><div class="tip" id="tip"></div></div>
+<section><div style="display:flex;gap:12px;align-items:center;justify-content:space-between;flex-wrap:wrap"><h2 id="chartTitle" style="margin:0">Hours by month</h2><label class="hint" style="display:flex;gap:8px;align-items:center">Show<select id="chartMetric"><option value="hours">Hours</option><option value="pay">Estimated pay</option></select></label></div><div class="legend" id="legend" style="margin-top:10px"></div><div class="chart" id="chart"><div class="tip" id="tip"></div></div>
  <details><summary>Show as a table</summary><div class="scroll"><table><thead id="monthHead"></thead><tbody id="monthRows"></tbody></table></div></details></section>
 <section><h2>By employee</h2><div class="scroll"><table><thead id="empHead"></thead><tbody id="empRows"></tbody><tfoot id="empFoot"></tfoot></table></div>
- <p class="hint">Approved timecards only, calculated with each province's overtime rules exactly like payroll. Hours are decimal (7.5 = 7 hours 30 minutes).</p></section>
+ <p class="hint">Approved timecards only, calculated with each province's overtime rules exactly like payroll. Hours are decimal (7.5 = 7 hours 30 minutes). Estimated pay uses each person's hourly rate on each day and the province's overtime multipliers: before taxes and deductions, without vacation pay, public holiday pay or premiums.</p></section>
 </div></main>
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
@@ -57,6 +57,9 @@ function notice(type,text){const n=$("notice");n.className="notice "+type;n.text
 async function authHeaders(){const {data:{session}}=await client.auth.getSession();if(!session)throw new Error("Sign in to the Manager Portal first.");return {Authorization:`Bearer ${session.access_token}`,...(selectedCompanyId?{"x-tymrak-organization-id":selectedCompanyId}:{})}}
 const fmt=h=>Number(h||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
 const fmtShort=h=>Number(h||0).toLocaleString(undefined,{maximumFractionDigits:1});
+const money=v=>Number(v||0).toLocaleString("en-CA",{style:"currency",currency:"CAD"});
+const moneyShort=v=>Number(v||0).toLocaleString("en-CA",{style:"currency",currency:"CAD",maximumFractionDigits:0});
+let chartMetric="hours",chart_aria="";
 const longDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",day:"numeric",year:"numeric"});
 const monthName=(m,withYear=true)=>new Date(m+"-15T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",month:"short",...(withYear?{year:"numeric"}:{})});
 // ---- Date presets (Toronto calendar) ----
@@ -81,19 +84,20 @@ for(const id of ["from","to"])$(id).addEventListener("change",()=>{$("preset").v
 $("compare").addEventListener("change",run);$("show").addEventListener("click",run);
 $("from").max=today;
 // ---- Rendering ----
-function change(now,before){
+function change(now,before,isMoney=false){
  if(before===null||before===undefined)return null;
- const diff=Math.round((now-before)*100)/100;
+ const diff=Math.round((now-before)*100)/100,show=v=>isMoney?moneyShort(v):`${fmtShort(v)} h`;
  if(!before&&!now)return {text:"No change",cls:""};
- if(!before)return {text:`+${fmtShort(diff)} h (no hours the year before)`,cls:"up"};
+ if(!before)return {text:`+${show(diff)} (none the year before)`,cls:"up"};
  const pct=Math.round(diff/before*100);
- return {text:`${diff>=0?"+":"−"}${fmtShort(Math.abs(diff))} h (${diff>=0?"+":"−"}${Math.abs(pct)}%) vs ${fmtShort(before)} h`,cls:diff>0?"up":diff<0?"down":""};
+ return {text:`${diff>=0?"+":"−"}${show(Math.abs(diff))} (${diff>=0?"+":"−"}${Math.abs(pct)}%) vs ${show(before)}`,cls:diff>0?"up":diff<0?"down":""};
 }
 function renderTiles(){
  const t=report.totals,p=report.previousTotals,tiles=$("tiles");tiles.replaceChildren();
- for(const [label,field,isCount] of [["Total hours","totalHours"],["Regular","regularHours"],["Overtime","overtimeHours"],["Double time","doubleTimeHours"],["Employees with hours","employees",true]]){
-  const c=p?change(t[field],p[field]):null;
-  tiles.append(el("div",{className:"tile"},el("span",{textContent:label}),el("strong",{textContent:isCount?String(t[field]):fmt(t[field])}),
+ for(const [label,field,isCount,isMoney] of [["Est. gross pay","estimatedGross",false,true],["Total hours","totalHours"],["Regular","regularHours"],["Overtime","overtimeHours"],["Double time","doubleTimeHours"],["Employees with hours","employees",true]]){
+  const c=p?change(t[field],p[field],isMoney):null;
+  if(c&&isMoney&&(p.hoursWithoutRate||t.hoursWithoutRate))c.text+=" · some hours have no rate";
+  tiles.append(el("div",{className:"tile"},el("span",{textContent:label}),el("strong",{textContent:isCount?String(t[field]):isMoney?money(t[field]):fmt(t[field])}),
    c?el("small",{className:c.cls,textContent:isCount?`${p[field]} the year before`:c.text}):el("small",{textContent:" "})));
  }
 }
@@ -102,6 +106,8 @@ function renderWarnings(){
  if(r.range.trimmed)w.push(`Dates after today aren't counted yet, so this shows up to ${longDate(r.range.to)}.`);
  if(r.previous&&r.firstRecord&&r.firstRecord>r.previous.to)w.push(`Tymrak has records from ${longDate(r.firstRecord)}, so there are no hours to compare for ${longDate(r.previous.from)} – ${longDate(r.previous.to)}.`);
  else if(r.previous&&r.firstRecord&&r.firstRecord>r.previous.from)w.push(`Tymrak has records from ${longDate(r.firstRecord)}, so the year before is only partly covered.`);
+ if(r.totals.hoursWithoutRate)w.push(`${fmt(r.totals.hoursWithoutRate)} approved hours have no hourly rate, so the pay total leaves them out. Set rates on employees' timecards.`);
+ if(r.previousTotals?.hoursWithoutRate)w.push(`In the year before, ${fmt(r.previousTotals.hoursWithoutRate)} approved hours have no hourly rate, so that year's pay is understated and the pay change isn't a fair comparison. Add the rates that applied then (with their start dates) on employees' timecards.`);
  if(r.unapprovedHours)w.push(`${fmt(r.unapprovedHours)} hours in these dates aren't approved yet and aren't counted. Approve them in Timecards.`);
  if(r.problems.length)w.push(`Hours for ${r.problems.join(", ")} can't be calculated because no overtime rule is set up for their province. Contact Tymrak support.`);
  $("warnings").replaceChildren(...w.map(text=>el("div",{className:"notice warn",textContent:text})));
@@ -110,12 +116,14 @@ function renderChart(){
  const months=report.months,compare=Boolean(report.previous),box=$("chart"),tip=$("tip");
  box.querySelector("svg")?.remove();
  $("legend").replaceChildren(...(compare?[el("span",{},el("i",{style:"background:var(--now)"}),`${longDate(report.range.from)} – ${longDate(report.range.to)}`),el("span",{},el("i",{style:"background:var(--before)"}),"Year before")]:[]));
- const W=Math.max(320,Math.round(box.clientWidth||640)),H=260,L=48,R=12,T=14,B=34,plotH=H-T-B,plotW=W-L-R;
- const max=Math.max(1,...months.flatMap(m=>[m.current.totalHours,m.previous?.totalHours||0]));
- const step=[1,2,5,10,20,25,50,100,200,250,500,1000,2000,5000].find(s=>max/s<=5)||Math.ceil(max/5);
+ const W=Math.max(320,Math.round(box.clientWidth||640)),H=260,L=chartMetric==="pay"?72:48,R=12,T=14,B=34,plotH=H-T-B,plotW=W-L-R;
+ const val=x=>x?(chartMetric==="pay"?x.estimatedGross:x.totalHours):0,label=v=>chartMetric==="pay"?money(v):`${fmt(v)} h`;
+ $("chartTitle").textContent=chartMetric==="pay"?"Estimated pay by month":"Hours by month";chart_aria=chartMetric==="pay"?"Estimated pay by month":"Approved hours by month";
+ const max=Math.max(1,...months.flatMap(m=>[val(m.current),val(m.previous)]));
+ const step=[1,2,5,10,20,25,50,100,200,250,500,1000,2000,2500,5000,10000,20000,25000,50000,100000,250000,500000].find(s=>max/s<=5)||Math.ceil(max/5);
  const top=Math.ceil(max/step)*step,y=v=>T+plotH-(v/top)*plotH;
- const chart=svg("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":"Approved hours by month"});
- for(let v=0;v<=top;v+=step){chart.append(svg("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:v?"var(--grid)":"#cbbca9","stroke-width":1}));const t=svg("text",{x:L-8,y:y(v)+4,"text-anchor":"end","font-size":11,fill:"#716254"});t.textContent=v.toLocaleString();chart.append(t)}
+ const chart=svg("svg",{viewBox:`0 0 ${W} ${H}`,role:"img","aria-label":chart_aria});
+ for(let v=0;v<=top;v+=step){chart.append(svg("line",{x1:L,x2:W-R,y1:y(v),y2:y(v),stroke:v?"var(--grid)":"#cbbca9","stroke-width":1}));const t=svg("text",{x:L-8,y:y(v)+4,"text-anchor":"end","font-size":11,fill:"#716254"});t.textContent=chartMetric==="pay"?moneyShort(v):v.toLocaleString();chart.append(t)}
  const slot=plotW/months.length,barW=Math.min(compare?20:28,(slot-10)/(compare?2:1));
  const bar=(x,v,color,label)=>{
   const h=Math.max(0,T+plotH-y(v)),r=Math.min(4,h/2,barW/2),bx=x,by=y(v);
@@ -128,25 +136,27 @@ function renderChart(){
  };
  months.forEach((m,i)=>{
   const cx=L+slot*i+slot/2,x0=compare?cx-barW-1:cx-barW/2;
-  chart.append(bar(x0,m.current.totalHours,"var(--now)",`${monthName(m.month)}: ${fmt(m.current.totalHours)} h`));
-  if(compare)chart.append(bar(cx+1,m.previous.totalHours,"var(--before)",`${monthName(`${Number(m.month.slice(0,4))-1}${m.month.slice(4)}`)}: ${fmt(m.previous.totalHours)} h`));
+  chart.append(bar(x0,val(m.current),"var(--now)",`${monthName(m.month)}: ${label(val(m.current))}`));
+  if(compare)chart.append(bar(cx+1,val(m.previous),"var(--before)",`${monthName(`${Number(m.month.slice(0,4))-1}${m.month.slice(4)}`)}: ${label(val(m.previous))}`));
   const t=svg("text",{x:cx,y:H-12,"text-anchor":"middle","font-size":11,fill:"#716254"});t.textContent=(i===0||m.month.endsWith("-01"))?monthName(m.month):monthName(m.month,false);if(slot<34&&i%2&&!m.month.endsWith("-01"))t.textContent="";chart.append(t);
  });
  box.prepend(chart);
- $("monthHead").replaceChildren(el("tr",{},el("th",{textContent:"Month"}),el("th",{className:"n",textContent:"Regular"}),el("th",{className:"n",textContent:"Overtime"}),el("th",{className:"n",textContent:"Double time"}),el("th",{className:"n",textContent:"Total"}),...(compare?[el("th",{className:"n",textContent:"Year before"}),el("th",{className:"n",textContent:"Change"})]:[])));
- $("monthRows").replaceChildren(...months.map(m=>{const c=compare?change(m.current.totalHours,m.previous.totalHours):null;return el("tr",{},el("td",{textContent:monthName(m.month)}),el("td",{className:"n",textContent:fmt(m.current.regularHours)}),el("td",{className:"n",textContent:fmt(m.current.overtimeHours)}),el("td",{className:"n",textContent:fmt(m.current.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(m.current.totalHours)}),...(compare?[el("td",{className:"n",textContent:fmt(m.previous.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[]))}));
+ $("monthHead").replaceChildren(el("tr",{},el("th",{textContent:"Month"}),el("th",{className:"n",textContent:"Regular"}),el("th",{className:"n",textContent:"Overtime"}),el("th",{className:"n",textContent:"Double time"}),el("th",{className:"n",textContent:"Total"}),el("th",{className:"n",textContent:"Est. pay"}),...(compare?[el("th",{className:"n",textContent:"Year before"}),el("th",{className:"n",textContent:"Change"}),el("th",{className:"n",textContent:"Pay year before"})]:[])));
+ $("monthRows").replaceChildren(...months.map(m=>{const c=compare?change(m.current.totalHours,m.previous.totalHours):null;return el("tr",{},el("td",{textContent:monthName(m.month)}),el("td",{className:"n",textContent:fmt(m.current.regularHours)}),el("td",{className:"n",textContent:fmt(m.current.overtimeHours)}),el("td",{className:"n",textContent:fmt(m.current.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(m.current.totalHours)}),el("td",{className:"n",textContent:money(m.current.estimatedGross)}),...(compare?[el("td",{className:"n",textContent:fmt(m.previous.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]}),el("td",{className:"n",textContent:money(m.previous.estimatedGross)})]:[]))}));
 }
 function renderEmployees(){
  const compare=Boolean(report.previous),rows=report.employees;
- $("empHead").replaceChildren(el("tr",{},el("th",{textContent:"Employee"}),el("th",{className:"n",textContent:"Regular"}),el("th",{className:"n",textContent:"Overtime"}),el("th",{className:"n",textContent:"Double time"}),el("th",{className:"n",textContent:"Total"}),...(compare?[el("th",{className:"n",textContent:"Year before"}),el("th",{className:"n",textContent:"Change"})]:[])));
+ $("empHead").replaceChildren(el("tr",{},el("th",{textContent:"Employee"}),el("th",{className:"n",textContent:"Regular"}),el("th",{className:"n",textContent:"Overtime"}),el("th",{className:"n",textContent:"Double time"}),el("th",{className:"n",textContent:"Total"}),...(compare?[el("th",{className:"n",textContent:"Year before"}),el("th",{className:"n",textContent:"Change"})]:[]),el("th",{className:"n",textContent:"Est. pay"}),...(compare?[el("th",{className:"n",textContent:"Pay change"})]:[])));
  const body=$("empRows");body.replaceChildren();
- if(!rows.length)body.append(el("tr",{},el("td",{colSpan:compare?7:5,className:"muted",textContent:"No approved hours in these dates."})));
+ if(!rows.length)body.append(el("tr",{},el("td",{colSpan:compare?9:6,className:"muted",textContent:"No approved hours in these dates."})));
  for(const r of rows){const c=compare?change(r.current.totalHours,r.previous.totalHours):null;
   body.append(el("tr",{},el("td",{},el("div",{textContent:r.name}),el("div",{className:"muted",textContent:[r.province,r.leftCompany?"Left the company":""].filter(Boolean).join(" · ")})),
    el("td",{className:"n",textContent:fmt(r.current.regularHours)}),el("td",{className:"n",textContent:fmt(r.current.overtimeHours)}),el("td",{className:"n",textContent:fmt(r.current.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(r.current.totalHours)}),
-   ...(compare?[el("td",{className:"n",textContent:fmt(r.previous.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[])))}
+   ...(compare?[el("td",{className:"n",textContent:fmt(r.previous.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[]),
+   el("td",{className:"n",textContent:r.current.estimatedGross||!r.current.hoursWithoutRate?money(r.current.estimatedGross)+(r.current.hoursWithoutRate?" *":""):"No rate",title:r.current.hoursWithoutRate?`${fmt(r.current.hoursWithoutRate)} hours without a rate aren't included`:""}),
+   ...(compare?[el("td",{className:"n",textContent:(r.current.hoursWithoutRate&&!r.current.estimatedGross)||(r.previous.hoursWithoutRate&&!r.previous.estimatedGross)?"No rate":change(r.current.estimatedGross,r.previous.estimatedGross,true).text.split(" vs ")[0]+(r.current.hoursWithoutRate||r.previous.hoursWithoutRate?" *":"")})]:[])))}
  const t=report.totals,p=report.previousTotals,c=compare?change(t.totalHours,p.totalHours):null;
- $("empFoot").replaceChildren(el("tr",{},el("td",{textContent:"Total"}),el("td",{className:"n",textContent:fmt(t.regularHours)}),el("td",{className:"n",textContent:fmt(t.overtimeHours)}),el("td",{className:"n",textContent:fmt(t.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(t.totalHours)}),...(compare?[el("td",{className:"n",textContent:fmt(p.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[])));
+ $("empFoot").replaceChildren(el("tr",{},el("td",{textContent:"Total"}),el("td",{className:"n",textContent:fmt(t.regularHours)}),el("td",{className:"n",textContent:fmt(t.overtimeHours)}),el("td",{className:"n",textContent:fmt(t.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(t.totalHours)}),...(compare?[el("td",{className:"n",textContent:fmt(p.totalHours)}),el("td",{className:"n "+c.cls,textContent:c.text.split(" vs ")[0]})]:[]),el("td",{className:"n",textContent:money(t.estimatedGross)}),...(compare?[el("td",{className:"n",textContent:change(t.estimatedGross,p.estimatedGross,true).text.split(" vs ")[0]})]:[])));
 }
 function render(){
  const r=report;
@@ -172,16 +182,17 @@ async function run(){
 const cell=v=>{let s=v===null||v===undefined?"":String(v);if(/^[=+\-@\t\r]/.test(s)&&!/^-?\d+(\.\d+)?$/.test(s))s="'"+s;return `"${s.replaceAll('"','""')}"`};
 $("download").addEventListener("click",()=>{
  if(!report)return;const r=report,compare=Boolean(r.previous),n=h=>Number(h||0).toFixed(2);
- const lines=[["Company","From","To","Employee","Province","Regular hours","Overtime hours","Double time hours","Total hours",...(compare?["Year before: total hours","Change in hours"]:[])]];
- for(const e of r.employees)lines.push([companyName,r.range.from,r.range.to,e.name,e.province,n(e.current.regularHours),n(e.current.overtimeHours),n(e.current.doubleTimeHours),n(e.current.totalHours),...(compare?[n(e.previous.totalHours),n(e.current.totalHours-e.previous.totalHours)]:[])]);
- lines.push([companyName,r.range.from,r.range.to,"TOTAL","",n(r.totals.regularHours),n(r.totals.overtimeHours),n(r.totals.doubleTimeHours),n(r.totals.totalHours),...(compare?[n(r.previousTotals.totalHours),n(r.totals.totalHours-r.previousTotals.totalHours)]:[])]);
- lines.push([]);lines.push(["Month","Regular hours","Overtime hours","Double time hours","Total hours",...(compare?["Year before: total hours"]:[])]);
- for(const m of r.months)lines.push([m.month,n(m.current.regularHours),n(m.current.overtimeHours),n(m.current.doubleTimeHours),n(m.current.totalHours),...(compare?[n(m.previous.totalHours)]:[])]);
+ const lines=[["Company","From","To","Employee","Province","Regular hours","Overtime hours","Double time hours","Total hours","Estimated gross pay",...(compare?["Year before: total hours","Change in hours","Year before: estimated gross pay","Change in pay"]:[])]];
+ for(const e of r.employees)lines.push([companyName,r.range.from,r.range.to,e.name,e.province,n(e.current.regularHours),n(e.current.overtimeHours),n(e.current.doubleTimeHours),n(e.current.totalHours),n(e.current.estimatedGross),...(compare?[n(e.previous.totalHours),n(e.current.totalHours-e.previous.totalHours),n(e.previous.estimatedGross),n(e.current.estimatedGross-e.previous.estimatedGross)]:[])]);
+ lines.push([companyName,r.range.from,r.range.to,"TOTAL","",n(r.totals.regularHours),n(r.totals.overtimeHours),n(r.totals.doubleTimeHours),n(r.totals.totalHours),n(r.totals.estimatedGross),...(compare?[n(r.previousTotals.totalHours),n(r.totals.totalHours-r.previousTotals.totalHours),n(r.previousTotals.estimatedGross),n(r.totals.estimatedGross-r.previousTotals.estimatedGross)]:[])]);
+ lines.push([]);lines.push(["Month","Regular hours","Overtime hours","Double time hours","Total hours","Estimated gross pay",...(compare?["Year before: total hours","Year before: estimated gross pay"]:[])]);
+ for(const m of r.months)lines.push([m.month,n(m.current.regularHours),n(m.current.overtimeHours),n(m.current.doubleTimeHours),n(m.current.totalHours),n(m.current.estimatedGross),...(compare?[n(m.previous.totalHours),n(m.previous.estimatedGross)]:[])]);
  const blob=new Blob(["﻿"+lines.map(l=>l.map(cell).join(",")).join("\r\n")+"\r\n"],{type:"text/csv;charset=utf-8"});
  const safe=(companyName||"tymrak").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"tymrak";
  const a=el("a",{href:URL.createObjectURL(blob),download:`hours-${safe}-${r.range.from}-to-${r.range.to}.csv`});document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
 });
 $("print").addEventListener("click",()=>print());
+$("chartMetric").addEventListener("change",()=>{chartMetric=$("chartMetric").value;if(report)renderChart()});
 let resizeTimer;addEventListener("resize",()=>{clearTimeout(resizeTimer);resizeTimer=setTimeout(()=>{if(report)renderChart()},150)});addEventListener("beforeprint",()=>{if(report)renderChart()});
 try{
  const config=await loadSupabaseConfiguration();client=createClient(config.supabaseUrl,config.supabasePublishableKey);
