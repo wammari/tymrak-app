@@ -3,6 +3,7 @@ import { databaseHeaders } from "./_employee-management.js";
 import { loadPaySchedule, requestedPayPeriod } from "./_pay-schedule.js";
 import { PROVINCE_TIME_ZONES, calculationStart, periodInstants, summarizeEmployee } from "./_manager-timecards.js";
 import { nextPayPeriod, previousPayPeriod } from "../pay-periods.js";
+import { estimatePay } from "./_pay-rates.js";
 
 // Payroll report for one pay period (company admins only): each person's regular,
 // overtime and double time hours, worked out exactly like the manager timecards, for the
@@ -39,6 +40,8 @@ export async function payrollReport(auth, periodKey, now = new Date()) {
     punches = await read(auth, `punches?employee_id=in.${idList(everyone.map(e => e.id))}&punched_at=gte.${encodeURIComponent(new Date(earliest).toISOString())}&punched_at=lte.${encodeURIComponent(new Date(latest).toISOString())}&select=id,employee_id,punch_type,punched_at,location_name&order=punched_at.asc,id.asc`);
     approvals = await read(auth, `timecard_approvals?employee_id=in.${idList(everyone.map(e => e.id))}&period_start=eq.${period.startKey}&period_end=eq.${period.endKey}&status=eq.approved&select=employee_id,approved_at`);
   }
+  // Hourly rates (admins only, like this whole report): estimated gross pay per person.
+  const payRates = everyone.length ? await read(auth, `employee_pay_rates?organization_id=eq.${org}&effective_from=lte.${period.endKey}&select=employee_id,hourly_rate,effective_from&order=effective_from.asc`) : [];
   const rows = [];
   for (const person of everyone) {
     const own = punches.filter(p => p.employee_id === person.id);
@@ -50,7 +53,7 @@ export async function payrollReport(auth, periodKey, now = new Date()) {
     const base = { employeeId: person.id, name, email: person.email || "", province: person.province || "",
       leftCompany: !person.is_active, approved: Boolean(approval), approvedAt: approval?.approved_at || null };
     if (own.length && applicable.length !== 1) {
-      rows.push({ ...base, regularHours: null, overtimeHours: null, doubleTimeHours: null, totalHours: null, missingPunches: 0,
+      rows.push({ ...base, regularHours: null, overtimeHours: null, doubleTimeHours: null, totalHours: null, missingPunches: 0, pay: null,
         problem: "No overtime rule is set up for this employee's province, so hours can't be worked out." });
       continue;
     }
@@ -58,7 +61,8 @@ export async function payrollReport(auth, periodKey, now = new Date()) {
     rows.push({ ...base,
       regularHours: hours(summary.regularMilliseconds), overtimeHours: hours(summary.overtimeMilliseconds),
       doubleTimeHours: hours(summary.doubleTimeMilliseconds), totalHours: hours(summary.totalMilliseconds),
-      missingPunches: summary.exceptionCount || 0, problem: null });
+      missingPunches: summary.exceptionCount || 0, problem: null,
+      pay: estimatePay(summary.days, payRates.filter(rate => rate.employee_id === person.id), own.length ? applicable[0] : applicable[0] || null, period) });
   }
   const approvedRows = rows.filter(r => r.approved && r.problem === null);
   const sum = field => Math.round(approvedRows.reduce((s, r) => s + r[field], 0) * 100) / 100;
@@ -66,7 +70,9 @@ export async function payrollReport(auth, periodKey, now = new Date()) {
     period: { key: period.key, startDate: period.startKey, endDate: period.endKey, current: period.key === current.key,
       previousKey: previousPayPeriod(period, schedule).key, nextKey: period.key === current.key ? null : nextPayPeriod(period, schedule).key },
     rows,
-    approvedTotals: { employees: approvedRows.length, regularHours: sum("regularHours"), overtimeHours: sum("overtimeHours"), doubleTimeHours: sum("doubleTimeHours"), totalHours: sum("totalHours") },
+    approvedTotals: { employees: approvedRows.length, regularHours: sum("regularHours"), overtimeHours: sum("overtimeHours"), doubleTimeHours: sum("doubleTimeHours"), totalHours: sum("totalHours"),
+      estimatedGross: Math.round(approvedRows.reduce((s, r) => s + Math.round(r.pay.estimatedGross * 100), 0)) / 100,
+      withoutRate: approvedRows.filter(r => r.totalHours > 0 && (r.pay.hoursWithoutRate > 0)).length },
     notApproved: rows.filter(r => !r.approved && (r.totalHours || r.problem)).length
   };
 }

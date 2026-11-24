@@ -53,3 +53,17 @@ export function parseRate(value) {
   const rate = Number(text);
   return rate > 0 && rate < 10000 ? Math.round(rate * 100) / 100 : null;
 }
+
+// One day's estimated gross pay in cents (unrounded), or the hours that have no rate yet.
+export function dayPay(day, rates, rule) {
+  const worked = (day.regularMilliseconds || 0) + (day.overtimeMilliseconds || 0) + (day.doubleTimeMilliseconds || 0);
+  const rate = worked ? rateOn(rates, day.date) : null;
+  if (!rate) return { cents: 0, unpricedMs: worked };
+  const cents = Number(rate.hourly_rate) * 100;
+  return {
+    cents: (day.regularMilliseconds || 0) / HOUR * cents
+      + (day.overtimeMilliseconds || 0) / HOUR * cents * multiplier(rule?.overtime_multiplier, 1.5)
+      + (day.doubleTimeMilliseconds || 0) / HOUR * cents * multiplier(rule?.double_time_multiplier, 2),
+    unpricedMs: 0
+  };
+}

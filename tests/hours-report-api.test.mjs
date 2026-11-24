@@ -54,6 +54,8 @@ function install(role = "admin") {
     if (u.includes("/punches?") && u.includes("select=punched_at&")) return json([{ punched_at: punches[0].punched_at }]);
     if (u.includes("/punches?")) return page(punches);
     if (u.includes("/timecard_approvals?")) return page(approvals);
+    // Ana: $20 an hour, raised to $22 from Mon Nov 9, 2026. Pat never had a rate entered.
+    if (u.includes("/employee_pay_rates?")) return json([{ employee_id: ANA, hourly_rate: "20.00", effective_from: "2025-01-01" }, { employee_id: ANA, hourly_rate: "22.00", effective_from: "2026-11-09" }]);
     throw new Error(`Unexpected URL: ${u}`);
   };
   return { calls, punches, restore() { global.fetch = original; process.env = env; } };
@@ -78,10 +80,12 @@ test("a range is compared with the same dates a year earlier, approved hours onl
     const r = res.payload;
     assert.deepEqual(r.previous, { from: "2025-11-01", to: "2025-11-15" });
     // Ana: two 45-hour weeks = 88 regular + 2 overtime. Sam's hours aren't approved.
-    assert.deepEqual(r.totals, { employees: 1, regularHours: 88, overtimeHours: 2, doubleTimeHours: 0, totalHours: 90 });
+    // Pay: week 1 at $20 (44 × 20 + 1 × 30 = 910), week 2 after the raise at $22 (44 × 22 + 1 × 33 = 1001).
+    assert.deepEqual(r.totals, { employees: 1, regularHours: 88, overtimeHours: 2, doubleTimeHours: 0, totalHours: 90, estimatedGross: 1911, hoursWithoutRate: 0 });
     assert.equal(r.unapprovedHours, 90);
     // The year before: Ana 90 and Pat (who has since left) 90.
-    assert.deepEqual(r.previousTotals, { employees: 2, regularHours: 176, overtimeHours: 4, doubleTimeHours: 0, totalHours: 180 });
+    // Ana at $20 (88 × 20 + 2 × 30 = 1820); Pat's 90 hours have no rate.
+    assert.deepEqual(r.previousTotals, { employees: 2, regularHours: 176, overtimeHours: 4, doubleTimeHours: 0, totalHours: 180, estimatedGross: 1820, hoursWithoutRate: 90 });
     const rows = Object.fromEntries(r.employees.map(e => [e.name, e]));
     assert.equal(rows["Ana Lopez"].current.totalHours, 90);
     assert.equal(rows["Ana Lopez"].previous.totalHours, 90);
@@ -89,7 +93,9 @@ test("a range is compared with the same dates a year earlier, approved hours onl
     assert.equal(rows["Pat Former"].current.totalHours, 0);
     assert.equal(rows["Pat Former"].previous.totalHours, 90);
     assert.equal(rows["Sam Lee"], undefined, "no approved hours in either range");
-    assert.deepEqual(r.months, [{ month: "2026-11", current: { regularHours: 88, overtimeHours: 2, doubleTimeHours: 0, totalHours: 90 }, previous: { regularHours: 176, overtimeHours: 4, doubleTimeHours: 0, totalHours: 180 } }]);
+    assert.deepEqual(r.months, [{ month: "2026-11", current: { regularHours: 88, overtimeHours: 2, doubleTimeHours: 0, totalHours: 90, estimatedGross: 1911, hoursWithoutRate: 0 }, previous: { regularHours: 176, overtimeHours: 4, doubleTimeHours: 0, totalHours: 180, estimatedGross: 1820, hoursWithoutRate: 90 } }]);
+    assert.equal(rows["Ana Lopez"].current.estimatedGross, 1911);
+    assert.equal(rows["Pat Former"].previous.hoursWithoutRate, 90);
     assert.equal(r.firstRecord, "2025-01-01");
     assert.ok(fake.calls.some(u => u.includes("/punches?") && u.includes("offset=1000")), "punches were read in pages");
   } finally { fake.restore(); }
@@ -100,7 +106,8 @@ test("a range that starts or ends mid-week still uses the whole week for overtim
   try {
     // Nov 5 (Thu) to Nov 10 (Tue): Thu 9, Fri 8 + 1 overtime (the 45th hour of the week), Mon 9, Tue 9.
     const r = (await call({ from: "2026-11-05", to: "2026-11-10", compare: "false" })).payload;
-    assert.deepEqual(r.totals, { employees: 1, regularHours: 35, overtimeHours: 1, doubleTimeHours: 0, totalHours: 36 });
+    // Thu 9 × 20, Fri 8 × 20 + 1 × 30, then the raise: Mon and Tue 9 × 22 each.
+    assert.deepEqual(r.totals, { employees: 1, regularHours: 35, overtimeHours: 1, doubleTimeHours: 0, totalHours: 36, estimatedGross: 766, hoursWithoutRate: 0 });
     assert.equal(r.previous, null);
     assert.equal(r.previousTotals, null);
   } finally { fake.restore(); }
@@ -113,6 +120,9 @@ test("a long range adds up month by month across pay periods", async () => {
     assert.equal(r.months.length, 12);
     const sum = r.months.reduce((s, m) => s + m.current.totalHours, 0);
     assert.equal(Math.round(sum * 100) / 100, r.totals.totalHours);
+    const pay = r.months.reduce((s, m) => s + m.current.estimatedGross, 0);
+    assert.ok(Math.abs(pay - r.totals.estimatedGross) < 0.05, "monthly pay adds up to the total");
+    assert.equal(r.totals.hoursWithoutRate, 261 * 9, "Pat had no rate in 2025");
     assert.equal(r.employees.find(e => e.name === "Pat Former").current.totalHours, 261 * 9, "every 2025 weekday at 9 hours");
   } finally { fake.restore(); }
 });

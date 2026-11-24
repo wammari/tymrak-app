@@ -50,6 +50,7 @@ function install(role = "admin") {
     if (u.includes("/overtime_rules?")) return json([{ province_code: "ON", calculation_method: "weekly_only", weekly_overtime_enabled: true, weekly_threshold_hours: "44.00", daily_overtime_enabled: false, week_start_day: 0, effective_from: "2020-01-01", effective_to: null }]);
     if (u.includes("/punches?")) return json(punches);
     if (u.includes("/timecard_approvals?")) return json(approvals);
+    if (u.includes("/employee_pay_rates?")) return json([{ employee_id: "e-ana", hourly_rate: "25.00", effective_from: "2020-01-01" }]);
     throw new Error(`Unexpected URL: ${u}`);
   };
   return { calls, restore() { global.fetch = original; process.env = env; } };
@@ -83,7 +84,12 @@ test("approved hours are split into regular, overtime and double time, company-w
     assert.equal(rows["Ida Idle"].totalHours, 0);
     assert.match(rows["Nu Nunavut"].problem, /No overtime rule/);
     assert.equal(rows["Nu Nunavut"].totalHours, null);
-    assert.deepEqual(res.payload.approvedTotals, { employees: 2, regularHours: 54, overtimeHours: 6, doubleTimeHours: 0, totalHours: 60 });
+    // Ana: 44 × $25 + 6 × $37.50 = $1,325. Pat has no rate yet.
+    assert.deepEqual(res.payload.approvedTotals, { employees: 2, regularHours: 54, overtimeHours: 6, doubleTimeHours: 0, totalHours: 60, estimatedGross: 1325, withoutRate: 1 });
+    assert.equal(rows["Ana Lopez"].pay.hourlyRate, 25);
+    assert.equal(rows["Ana Lopez"].pay.overtimePay, 225);
+    assert.equal(rows["Pat Former"].pay.hourlyRate, null);
+    assert.equal(rows["Nu Nunavut"].pay, null);
     assert.equal(res.payload.notApproved, 1);
     assert.ok(fake.calls.every(c => !c.url.includes("manager_employee_scope")), "admins see the whole company");
   } finally { fake.restore(); }
