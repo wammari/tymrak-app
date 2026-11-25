@@ -1,7 +1,7 @@
 <!doctype html><html lang="en"><head><script src="/api-base.js"></script><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Payroll Report | TYMRAK</title>
-<style>body{font:16px system-ui;background:#fbf8f3;color:#35271e;margin:0}main{max-width:1040px;margin:32px auto;padding:24px}a{color:#70400e}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}button{font:inherit;padding:10px 18px;background:#8d5316;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:8px 14px}.period{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.period strong{min-width:220px;text-align:center;font-size:18px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:18px}.total{background:#fbf8f3;border-radius:8px;padding:12px 14px}.total span{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}.total strong{font-size:22px}.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:640px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.excluded td{color:#8a7d70}tfoot td{font-weight:700;border-top:2px solid #e4d7c7}.muted,.hint{color:#716254;font-size:14px}.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700}.badge.ok{background:#e8f7ef;color:#176b36}.badge.no{background:#fff4df;color:#9a6700}.badge.bad{background:#fdeaea;color:#a32020}.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.error{display:block;background:#fdeaea;color:#a32020}.notice.warn{display:block;background:#fff4df;color:#70400e}[hidden]{display:none!important}.print-only{display:none}
+<style>body{font:16px system-ui;background:#fbf8f3;color:#35271e;margin:0}main{max-width:1040px;margin:32px auto;padding:24px}a{color:#70400e}section{background:white;border:1px solid #e4d7c7;border-radius:12px;padding:24px;margin:20px 0}button{font:inherit;padding:10px 18px;background:#8d5316;color:white;border:0;border-radius:6px;cursor:pointer}button:disabled{opacity:.55;cursor:default}.secondary{background:white;color:#8d5316;border:1px solid #8d5316;padding:8px 14px}.period{display:flex;gap:12px;align-items:center;flex-wrap:wrap}.period strong{min-width:220px;text-align:center;font-size:18px}.actions{display:flex;gap:10px;flex-wrap:wrap;margin-left:auto}.totals{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-top:18px}.total{background:#fbf8f3;border-radius:8px;padding:12px 14px}.total span{display:block;font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}.total strong{font-size:22px}.scroll{overflow-x:auto}table{width:100%;border-collapse:collapse;min-width:640px}th,td{text-align:left;padding:10px 8px;border-bottom:1px solid #eee;vertical-align:top;font-size:15px}th{font-size:12px;text-transform:uppercase;letter-spacing:.04em;color:#716254}td.n,th.n{text-align:right;font-variant-numeric:tabular-nums}tr.excluded td{color:#8a7d70}tfoot td{font-weight:700;border-top:2px solid #e4d7c7}.muted,.hint{color:#716254;font-size:14px}.badge{display:inline-block;padding:2px 8px;border-radius:99px;font-size:12px;font-weight:700}.badge.ok{background:#e8f7ef;color:#176b36}.badge.no{background:#fff4df;color:#9a6700}.badge.bad{background:#fdeaea;color:#a32020}.notice{padding:12px 14px;border-radius:8px;margin:12px 0;display:none}.notice.error{display:block;background:#fdeaea;color:#a32020}.notice.warn{display:block;background:#fff4df;color:#70400e}[hidden]{display:none!important}.print-only{display:none}.sheet-head{display:flex;gap:12px;align-items:flex-start;flex-wrap:wrap}.sheet-head h2{margin:0 0 4px}.sheet-person{margin-top:22px}.sheet-person h3{margin:0 0 6px;font-size:17px}.sheet-person table{min-width:0;max-width:560px}.sheet-person td.tick,.sheet-person th.tick{width:48px;text-align:center}.sheet-person tr.done td{color:#8a7d70;text-decoration:line-through}.sheet-person tr.done td.tick{text-decoration:none}.type-ot{font-weight:700}
 @media(max-width:640px){main{padding:16px}.actions{margin-left:0}}
-@media print{body{background:white}main{margin:0;max-width:none;padding:0}.brand-home,.back,.actions,.period button,#notice{display:none!important}section{border:0;padding:0;margin:12px 0}.print-only{display:block}table{min-width:0}}</style>
+@media print{.tick{display:none}body{background:white}main{margin:0;max-width:none;padding:0}.brand-home,.back,.actions,.period button,#notice{display:none!important}section{border:0;padding:0;margin:12px 0}.print-only{display:block}table{min-width:0}}</style>
 <meta name="theme-color" content="#351b0c"><link rel="stylesheet" href="/tymrak-theme.css"><script src="/support.js" defer></script></head>
 <body class="workspace-page"><main><a class="brand-home" href="/manager.html" aria-label="TYMRAK manager portal"><span class="tymrak-brand-mark"><img src="/tymrak-logo.png" alt="TYMRAK — Time. Tracked Right." width="526" height="396"></span></a><a class="back" href="/manager.html">← Manager portal</a>
 <h1>Payroll report</h1><p class="hint">Approved hours for <strong id="companyName">this business</strong>, worked out with your province's overtime rules. Give this to your accountant or payroll service.</p>
@@ -22,6 +22,11 @@
 </section>
 <section><div class="scroll"><table><thead><tr><th>Employee</th><th>Status</th><th class="n">Regular</th><th class="n">Overtime</th><th class="n">Double time</th><th class="n">Total</th><th class="n">Rate</th><th class="n">Est. gross pay</th></tr></thead><tbody id="rows"></tbody><tfoot id="foot"></tfoot></table></div>
 <p class="hint">Only approved timecards count toward the totals and go into the CSV. Hours are decimal (7.5 = 7 hours 30 minutes). Estimated gross pay uses each person's hourly rate (set on their timecard) and the province's overtime multipliers. It's before taxes and deductions, and doesn't include vacation pay, public holiday pay or premiums.</p></section>
+<section id="sheet"><div class="sheet-head"><div><h2>Entry sheet for Province Payroll</h2><p class="hint" style="margin:0">Each approved employee's hours by day, ready to type into Province Payroll under <strong>Earnings → + Hours</strong>: pick the employee, then enter each line's date, earning type and hours. Tick lines off as you go (the ticks aren't saved).</p></div>
+ <div class="actions"><button id="downloadSheet" type="button" class="secondary">Download entry sheet (CSV)</button></div></div>
+ <div id="sheetWarning" class="notice warn" hidden></div>
+ <div id="sheetPeople"></div>
+ <p class="hint">Each type's daily hours add up exactly to that employee's total above. Don't add statutory holiday pay or vacation pay here: Province Payroll works those out itself. If a name is spelled differently in Province Payroll, pick the same person there.</p></section>
 </div></main>
 <script type="module">
 import {loadSupabaseConfiguration} from "./supabase-config.js";
@@ -62,6 +67,7 @@ function render(){
  }
  $("foot").replaceChildren(el("tr",{},el("td",{textContent:"Approved total"}),el("td",{}),el("td",{className:"n",textContent:fmt(t.regularHours)}),el("td",{className:"n",textContent:fmt(t.overtimeHours)}),el("td",{className:"n",textContent:fmt(t.doubleTimeHours)}),el("td",{className:"n",textContent:fmt(t.totalHours)}),el("td",{}),el("td",{className:"n",textContent:money(t.estimatedGross)})));
  $("download").disabled=!t.employees;
+ renderSheet();
  $("printedOn").textContent=`${companyName} · Pay period ${p.startDate} to ${p.endDate} · Printed ${new Date().toLocaleString()}`;
 }
 // Spreadsheet-safe CSV: quote every cell and neutralise anything a spreadsheet would run as a formula.
@@ -73,6 +79,41 @@ function csv(){
  lines.push([companyName,p.startDate,p.endDate,"TOTAL","","",t.regularHours.toFixed(2),t.overtimeHours.toFixed(2),t.doubleTimeHours.toFixed(2),t.totalHours.toFixed(2),"",t.estimatedGross.toFixed(2),"",""]);
  return "﻿"+lines.map(l=>l.map(cell).join(",")).join("\r\n")+"\r\n";
 }
+const sheetRows=()=>report.rows.filter(r=>r.approved&&!r.problem&&(r.entries||[]).length);
+const entryDate=key=>new Date(key+"T12:00:00Z").toLocaleDateString(undefined,{timeZone:"UTC",weekday:"short",month:"short",day:"numeric"});
+function renderSheet(){
+ const people=sheetRows(),box=$("sheetPeople");box.replaceChildren();
+ const notes=[];
+ if(report.notApproved)notes.push("Timecards that aren't approved yet aren't on this sheet.");
+ if(people.some(r=>r.entries.some(e=>e.type==="Double time")))notes.push("Some hours are double time. Province Payroll has no double-time earning type, so ask them how to enter those hours.");
+ $("sheetWarning").hidden=!notes.length;$("sheetWarning").replaceChildren(...notes.map(n=>el("div",{textContent:n})));
+ $("downloadSheet").disabled=!people.length;
+ if(!people.length){box.append(el("p",{className:"muted",textContent:"No approved hours to enter for this pay period."}));return}
+ for(const r of people){
+  const body=el("tbody");
+  for(const e of r.entries){
+   const tick=el("input",{type:"checkbox",title:"Entered"});tick.setAttribute("aria-label",`${r.name}, ${e.date}, ${e.type}: entered`);
+   const tr=el("tr",{},el("td",{className:"tick"},tick),el("td",{textContent:e.date,title:entryDate(e.date)}),el("td",{className:e.type==="Regular"?"":"type-ot",textContent:e.type}),el("td",{className:"n",textContent:e.hours.toFixed(2)}));
+   tick.addEventListener("change",()=>tr.classList.toggle("done",tick.checked));
+   body.append(tr);
+  }
+  const sums=[["Regular",r.regularHours],["Overtime",r.overtimeHours],["Double time",r.doubleTimeHours]].filter(([,h])=>h>0).map(([n,h])=>`${n} ${h.toFixed(2)}`).join(" · ");
+  box.append(el("div",{className:"sheet-person"},el("h3",{textContent:r.name}),el("div",{className:"muted",textContent:`${r.entries.length} ${r.entries.length===1?"line":"lines"} · ${sums}`}),
+   el("div",{className:"scroll"},el("table",{},el("thead",{},el("tr",{},el("th",{className:"tick",textContent:"Done"}),el("th",{textContent:"Date"}),el("th",{textContent:"Earning type"}),el("th",{className:"n",textContent:"Hours"}))),body))));
+ }
+}
+function sheetCsv(){
+ const lines=[["Employee","Email","Date","Earning type","Hours"]];
+ for(const r of sheetRows())for(const e of r.entries)lines.push([r.name,r.email,e.date,e.type,e.hours.toFixed(2)]);
+ return "\ufeff"+lines.map(l=>l.map(cell).join(",")).join("\r\n")+"\r\n";
+}
+function save(text,name){
+ const blob=new Blob([text],{type:"text/csv;charset=utf-8"});
+ const safe=(companyName||"tymrak").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"tymrak";
+ const a=el("a",{href:URL.createObjectURL(blob),download:`${name}-${safe}-${report.period.startDate}-to-${report.period.endDate}.csv`});
+ document.body.append(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),1000);
+}
+$("downloadSheet").addEventListener("click",()=>save(sheetCsv(),"province-payroll-entries"));
 $("download").addEventListener("click",()=>{
  const blob=new Blob([csv()],{type:"text/csv;charset=utf-8"});
  const safe=(companyName||"tymrak").replace(/[^A-Za-z0-9]+/g,"-").replace(/^-|-$/g,"").toLowerCase()||"tymrak";

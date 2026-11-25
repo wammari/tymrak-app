@@ -2,7 +2,7 @@ import "./_test-environment.mjs";
 import test from "node:test";
 import assert from "node:assert/strict";
 import fs from "node:fs";
-import handler from "../api/payroll-report.js";
+import handler, { dailyEntries } from "../api/payroll-report.js";
 import { normalizePayTimeline, previousPayPeriod } from "../pay-periods.js";
 import { requestedPayPeriod } from "../api/_pay-schedule.js";
 import { PostgrestResponse } from "./_postgrest-response.mjs";
@@ -110,4 +110,43 @@ test("the page keeps CSV cells safe from spreadsheet formulas and only exports a
   assert.doesNotMatch(page, /innerHTML/);
   const manager = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
   assert.match(manager, /\$\("payrollLink"\)\.hidden=data\.role!=="admin"/);
+});
+
+test("the entry sheet lists each day's regular and overtime hours, adding up to the totals", async () => {
+  const fake = install();
+  try {
+    const rows = Object.fromEntries((await call()).payload.rows.map(r => [r.name, r]));
+    const ana = rows["Ana Lopez"].entries;
+    const sum = type => Math.round(ana.filter(e => e.type === type).reduce((s, e) => s + e.hours, 0) * 100) / 100;
+    assert.equal(sum("Regular"), 44);
+    assert.equal(sum("Overtime"), 6);
+    assert.ok(ana.every(e => /^\d{4}-\d{2}-\d{2}$/.test(e.date) && e.hours > 0));
+    assert.deepEqual(ana.map(e => e.date), [...ana.map(e => e.date)].sort(), "in date order");
+    assert.deepEqual(rows["Nu Nunavut"].entries, [], "nothing to enter when hours can't be worked out");
+    assert.deepEqual(rows["Ida Idle"].entries, []);
+  } finally { fake.restore(); }
+});
+
+test("daily lines are rounded so they add up exactly to the period total", () => {
+  const minutes = m => m * 60000;
+  // Three days of 7h20m (7.3333…): rounded each day would give 22.00, but the period is 22.00 exactly.
+  const days = [1, 2, 3].map(d => ({ date: `2026-11-0${d}`, regularMilliseconds: minutes(440), overtimeMilliseconds: 0, doubleTimeMilliseconds: 0 }));
+  const lines = dailyEntries(days);
+  assert.deepEqual(lines.map(l => l.hours), [7.34, 7.33, 7.33]);
+  assert.equal(Math.round(lines.reduce((s, l) => s + l.hours, 0) * 100), 2200);
+  // Three days of 7h10m (7.1666…): total 21.50.
+  const short = dailyEntries([1, 2, 3].map(d => ({ date: `2026-11-0${d}`, regularMilliseconds: minutes(430) })));
+  assert.equal(Math.round(short.reduce((s, l) => s + l.hours, 0) * 100), 2150);
+  // Overtime gets its own line after regular on the same day; empty days are skipped.
+  assert.deepEqual(dailyEntries([
+    { date: "2026-11-05", regularMilliseconds: minutes(480), overtimeMilliseconds: minutes(90) },
+    { date: "2026-11-04", regularMilliseconds: 0, overtimeMilliseconds: 0 }
+  ]), [{ date: "2026-11-05", type: "Regular", hours: 8 }, { date: "2026-11-05", type: "Overtime", hours: 1.5 }]);
+});
+
+test("the entry sheet page only uses approved timecards and keeps CSV cells safe", () => {
+  const page = fs.readFileSync(new URL("../payroll-report.html", import.meta.url), "utf8");
+  assert.match(page, /const sheetRows=\(\)=>report\.rows\.filter\(r=>r\.approved&&!r\.problem/);
+  assert.match(page, /lines\.map\(l=>l\.map\(cell\)/);
+  assert.match(page, /Earnings → \+ Hours/);
 });

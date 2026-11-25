@@ -13,6 +13,27 @@ import { estimatePay } from "./_pay-rates.js";
 const idList = ids => encodeURIComponent(`(${ids.map(id => `"${String(id).replaceAll('"', "")}"`).join(",")})`);
 const hours = milliseconds => Math.round((milliseconds || 0) / 60000) / 60;
 
+// One line per day and earning type (Regular, Overtime, Double time), the way payroll
+// services like Province Payroll take hours. Each type's lines are rounded to hundredths
+// so they add up exactly to that type's period total (largest remainder).
+export function dailyEntries(days) {
+  const entries = [];
+  for (const [type, field] of [["Regular", "regularMilliseconds"], ["Overtime", "overtimeMilliseconds"], ["Double time", "doubleTimeMilliseconds"]]) {
+    const worked = days.filter(day => (day[field] || 0) > 0).map(day => ({ date: day.date, exact: hours(day[field]) * 100 }));
+    if (!worked.length) continue;
+    const target = Math.round(worked.reduce((sum, day) => sum + day.exact, 0));
+    const lines = worked.map(day => ({ ...day, cents: Math.floor(day.exact + 1e-9) }));
+    let left = target - lines.reduce((sum, line) => sum + line.cents, 0);
+    for (const line of [...lines].sort((a, b) => (b.exact - Math.floor(b.exact + 1e-9)) - (a.exact - Math.floor(a.exact + 1e-9)) || a.date.localeCompare(b.date))) {
+      if (left <= 0) break;
+      line.cents += 1; left -= 1;
+    }
+    for (const line of lines) if (line.cents > 0) entries.push({ date: line.date, type, hours: line.cents / 100 });
+  }
+  const order = { Regular: 0, Overtime: 1, "Double time": 2 };
+  return entries.sort((a, b) => a.date.localeCompare(b.date) || order[a.type] - order[b.type]);
+}
+
 async function read(auth, path) {
   const { supabaseUrl, secretKey } = auth.configuration;
   const response = await fetch(`${supabaseUrl}/rest/v1/${path}`, { headers: databaseHeaders(secretKey) });
@@ -53,7 +74,7 @@ export async function payrollReport(auth, periodKey, now = new Date()) {
     const base = { employeeId: person.id, name, email: person.email || "", province: person.province || "",
       leftCompany: !person.is_active, approved: Boolean(approval), approvedAt: approval?.approved_at || null };
     if (own.length && applicable.length !== 1) {
-      rows.push({ ...base, regularHours: null, overtimeHours: null, doubleTimeHours: null, totalHours: null, missingPunches: 0, pay: null,
+      rows.push({ ...base, regularHours: null, overtimeHours: null, doubleTimeHours: null, totalHours: null, missingPunches: 0, pay: null, entries: [],
         problem: "No overtime rule is set up for this employee's province, so hours can't be worked out." });
       continue;
     }
@@ -61,7 +82,7 @@ export async function payrollReport(auth, periodKey, now = new Date()) {
     rows.push({ ...base,
       regularHours: hours(summary.regularMilliseconds), overtimeHours: hours(summary.overtimeMilliseconds),
       doubleTimeHours: hours(summary.doubleTimeMilliseconds), totalHours: hours(summary.totalMilliseconds),
-      missingPunches: summary.exceptionCount || 0, problem: null,
+      missingPunches: summary.exceptionCount || 0, problem: null, entries: dailyEntries(summary.days || []),
       pay: estimatePay(summary.days, payRates.filter(rate => rate.employee_id === person.id), own.length ? applicable[0] : applicable[0] || null, period) });
   }
   const approvedRows = rows.filter(r => r.approved && r.problem === null);
