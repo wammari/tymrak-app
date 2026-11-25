@@ -39,7 +39,7 @@ export default async function handler(req, res) {
   if (!(await activeMembership.json()).length) return res.status(403).json({ error: "Active administrator membership required" });
 
   if (req.method === "GET") {
-    const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,is_active,created_at,${SCHEDULE_FIELDS}&order=name.asc`, { headers });
+    const response = await fetch(`${supabaseUrl}/rest/v1/organizations?select=id,name,company_code,is_active,created_at,${SCHEDULE_FIELDS}&order=name.asc`, { headers });
     if (!response.ok) return res.status(502).json({ error: "Unable to list companies" });
     const today = todayKey();
     const companies = (await response.json()).map(company => {

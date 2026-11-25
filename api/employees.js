@@ -45,7 +45,15 @@ export default async function handler(req, res) {
         employee.deletion_requested_at = request?.requested_at ?? null;
         employee.deletion_status = request?.status ?? null;
       }
-      return res.status(200).json({ employees });
+      // The company code, so the Add Employee form can show the username it will create.
+      let companyCode = null;
+      try {
+        const companies = await databaseRows(`${supabaseUrl}/rest/v1/organizations?id=eq.${authorization.organizationId}&select=company_code`, databaseHeaders(secretKey));
+        companyCode = companies?.[0]?.company_code || null;
+      } catch (error) {
+        console.error("Company code lookup failed", { message: error?.message });
+      }
+      return res.status(200).json({ employees, companyCode });
     }
 
     const id = employeeId(req);
