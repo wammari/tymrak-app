@@ -43,5 +43,11 @@
         }
       ]
     }
+  ],
+  "crons": [
+    {
+      "path": "/api/missed-punch-reminders",
+      "schedule": "0 11 * * *"
+    }
   ]
 }
