@@ -19,13 +19,15 @@ function el(tag, text, style, attributes = {}) {
   return node;
 }
 
+let chosenEmployeeId = null; // the business this page is about, for people who work for several
 async function api(method, token) {
-  const response = await fetch("/api/account-deletion", { method, headers: { Authorization: `Bearer ${token}` } });
+  const response = await fetch("/api/account-deletion", { method, headers: { Authorization: `Bearer ${token}`, ...(chosenEmployeeId ? { "x-tymrak-employee-id": chosenEmployeeId } : {}) } });
   const data = await response.json().catch(() => ({}));
   return { ok: response.ok, status: response.status, data };
 }
 
-export function mountAccountDeletion({ supabase, container = document.body }) {
+export function mountAccountDeletion({ supabase, container = document.body, employeeId = null }) {
+  chosenEmployeeId = employeeId;
   if (document.getElementById("accountDeletionFooter")) return;
   const footer = el("div", "", "text-align:center;margin:28px auto 20px;padding:0 16px;font-family:Arial,Helvetica,sans-serif;font-size:13px;color:#4b3626", { id: "accountDeletionFooter" });
   const status = el("div", "", "margin-bottom:4px", { role: "status" });

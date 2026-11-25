@@ -1,3 +1,4 @@
+import { CHOOSE_BUSINESS_MESSAGE, chosenEmployeeId } from "./_chosen-employee.js";
 import { getBearerToken, getSupabaseConfiguration } from "./_manager-auth.js";
 import { databaseHeaders } from "./_employee-management.js";
 
@@ -42,7 +43,12 @@ export default async function handler(req, res) {
     }
     const employeeResponse = await fetch(`${supabaseUrl}/rest/v1/employees?auth_user_id=eq.${user.id}&select=id,organization_id`, { headers });
     if (!employeeResponse.ok) throw new Error("Employee lookup failed");
-    const employees = await employeeResponse.json();
+    const all = await employeeResponse.json();
+    // People who work for several businesses ask for deletion at the business they chose.
+    const employeeId = chosenEmployeeId(req);
+    if (employeeId === null) return res.status(400).json({ error: "Invalid business choice" });
+    const employees = employeeId ? all.filter(row => row.id === employeeId) : all;
+    if (employees.length > 1) return res.status(409).json({ error: CHOOSE_BUSINESS_MESSAGE, code: "choose_business" });
     if (employees.length !== 1) return res.status(404).json({ error: "Employee account not found" });
     const employee = employees[0];
 

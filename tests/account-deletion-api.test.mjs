@@ -194,7 +194,7 @@ test("the endpoint is registered on Cloudflare, the UI is published, and both em
   assert.match(assets, /account-deletion-ui\.js/);
   for (const page of ["employee.html", "timecard.html"]) {
     const html = fs.readFileSync(new URL("../" + page, import.meta.url), "utf8");
-    assert.match(html, /import \{ mountAccountDeletion \} from "\.\/account-deletion-ui\.js"/); assert.match(html, /mountAccountDeletion\(\{ supabase \}\)/);
+    assert.match(html, /import \{ mountAccountDeletion \} from "\.\/account-deletion-ui\.js"/); assert.match(html, /mountAccountDeletion\(\{ supabase, employeeId: employee(Data)?\.id \}\)/);
   }
   const manager = fs.readFileSync(new URL("../manager.html", import.meta.url), "utf8");
   assert.match(manager, /action:"delete_account",confirm:true/); assert.match(manager, /Delete personal data/); assert.match(manager, /endsWith\("@deleted\.invalid"\)/);

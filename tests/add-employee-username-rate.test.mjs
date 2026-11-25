@@ -8,13 +8,14 @@ import { validateEmployeeInput } from "../api/_employee-management.js";
 
 const COMPANY = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", ADMIN = "99999999-9999-4999-8999-999999999999";
 const INVITED = "33333333-3333-4333-8333-333333333333";
-let calls, role, nextNumber, rateFails, savedEmployee, invited, emailInUse;
+let calls, role, nextNumber, rateFails, savedEmployee, invited, existingAccount, alreadyHere, emails;
 
 test.beforeEach(t => {
   const originalFetch = global.fetch, originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
-  calls = []; role = "admin"; nextNumber = 1004; rateFails = false; savedEmployee = null; invited = null; emailInUse = false;
+  calls = []; role = "admin"; nextNumber = 1004; rateFails = false; savedEmployee = null; invited = null; existingAccount = null; alreadyHere = false; emails = [];
+  process.env.RESEND_API_KEY = "re_test";
   global.fetch = async (raw, options = {}) => {
     const url = new URL(raw), body = options.body ? JSON.parse(options.body) : null;
     calls.push({ path: url.pathname, url, method: options.method || "GET", body });
@@ -22,13 +23,15 @@ test.beforeEach(t => {
     if (url.pathname === "/auth/v1/user") return json({ id: ADMIN });
     if (url.pathname === "/rest/v1/user_roles") return json([{ role, organization_id: COMPANY, organization: { is_active: true } }]);
     if (url.pathname === "/rest/v1/rpc/manager_employee_scope") return json({ employeeIds: [] });
-    if (url.pathname === "/rest/v1/rpc/auth_email_in_use") { assert.deepEqual(body, { p_email: "harleen@example.com" }); return json(emailInUse); }
+    if (url.pathname === "/rest/v1/rpc/auth_account_for_email") { assert.equal(body.p_email.toLowerCase(), "harleen@example.com"); return json(existingAccount ? [existingAccount] : []); }
+    if (url.hostname === "api.resend.com") { emails.push(body); return json({ id: "email-1" }); }
     if (url.pathname === "/rest/v1/rpc/next_employee_username") { assert.deepEqual(body, { p_organization_id: COMPANY }); return json(`ICP-${nextNumber++}`); }
     if (url.pathname === "/rest/v1/organizations") return json([{ id: COMPANY, name: "I Care Pharmacy", company_code: "ICP" }]);
     if (url.pathname === "/auth/v1/invite") { invited = body; return json({ id: INVITED, email: body.email, invited_at: "2026-11-25T12:00:00Z", user_metadata: body.data }); }
     if (url.pathname.startsWith("/auth/v1/admin/users/")) return json({ id: INVITED, email: invited?.email, invited_at: "2026-11-25T12:00:00Z", user_metadata: invited?.data || {} });
     if (url.pathname === "/rest/v1/employees") {
       if (options.method === "POST") { savedEmployee = { id: "55555555-5555-4555-8555-555555555555", ...body }; return json([savedEmployee]); }
+      if (url.searchParams.has("auth_user_id")) return json(alreadyHere ? [{ id: "x" }] : []);
       return json([]);
     }
     if (url.pathname === "/rest/v1/account_deletion_requests") return json([]);
@@ -115,12 +118,59 @@ test("the Add Employee form lets the username be left empty and asks for a rate 
   assert.match(page, /\.\.\.\(editingId\?\{\}:\{hourlyRate:\$\("hourlyRate"\)\.value\.trim\(\)\}\)/);
 });
 
-test("an email that already has a TYMRAK account is refused before anything is sent", async () => {
-  emailInUse = true;
+const EXISTING = "77777777-7777-4777-8777-777777777777";
+const sentAnything = () => calls.some(c => ["/rest/v1/rpc/next_employee_username", "/auth/v1/invite", "/rest/v1/employee_pay_rates"].includes(c.path) || (c.path === "/rest/v1/employees" && c.method === "POST") || c.url.hostname === "api.resend.com");
+
+test("an email that already has a TYMRAK account asks the admin first, and sends nothing", async () => {
+  existingAccount = { auth_user_id: EXISTING, activated: true };
   const res = await run(invitation, "POST", { ...person, email: "Harleen@Example.com", username: "", hourlyRate: "18" });
   assert.equal(res.code, 409);
-  assert.match(res.body.error, /already belongs to a TYMRAK account/);
-  assert.doesNotMatch(res.body.error, /QB|Pharmacy|company named/i, "never says which business");
-  for (const path of ["/rest/v1/rpc/next_employee_username", "/auth/v1/invite", "/rest/v1/employees", "/rest/v1/employee_pay_rates"])
-    assert.equal(calls.some(c => c.path === path && c.method !== "GET"), false, path);
+  assert.equal(res.body.code, "email_in_use");
+  assert.equal(res.body.canAddExisting, true);
+  assert.match(res.body.error, /already has a TYMRAK account/);
+  assert.doesNotMatch(res.body.error, /QB|Pharmacy|Delice/i, "never says which business");
+  assert.equal(sentAnything(), false);
+});
+
+test("once confirmed, the existing account is added to this business: no new invitation", async () => {
+  existingAccount = { auth_user_id: EXISTING, activated: true };
+  const res = await run(invitation, "POST", { ...person, username: "", hourlyRate: "18", addExisting: true });
+  assert.equal(res.code, 201);
+  assert.equal(res.body.linkedExistingAccount, true);
+  assert.equal(calls.some(c => c.path === "/auth/v1/invite"), false, "no new invitation");
+  const saved = calls.find(c => c.path === "/rest/v1/employees" && c.method === "POST").body;
+  assert.equal(saved.auth_user_id, EXISTING);
+  assert.equal(saved.organization_id, COMPANY);
+  assert.equal(saved.invitation_status, "Account Activated", "they already have a working sign-in");
+  assert.equal(saved.username, "ICP-1004");
+  assert.ok(calls.some(c => c.path === "/rest/v1/employee_pay_rates"), "starting rate saved");
+  assert.equal(emails.length, 1);
+  assert.equal(emails[0].to[0], "harleen@example.com");
+  assert.match(emails[0].subject, /added to I Care Pharmacy/);
+  assert.match(res.body.message, /emailed them/);
+});
+
+test("an existing account that never activated is added as waiting for activation", async () => {
+  existingAccount = { auth_user_id: EXISTING, activated: false };
+  const res = await run(invitation, "POST", { ...person, username: "HarleenK", addExisting: true });
+  assert.equal(res.code, 201);
+  assert.equal(calls.find(c => c.path === "/rest/v1/employees" && c.method === "POST").body.invitation_status, "Invitation Sent");
+  assert.match(emails[0].text, /Finish activating/);
+});
+
+test("someone already employed by this business isn't added twice", async () => {
+  existingAccount = { auth_user_id: EXISTING, activated: true };
+  alreadyHere = true;
+  const res = await run(invitation, "POST", { ...person, username: "", addExisting: true });
+  assert.equal(res.code, 409);
+  assert.match(res.body.error, /already an employee of this business/);
+  assert.equal(calls.some(c => c.path === "/rest/v1/employees" && c.method === "POST"), false);
+});
+
+test("if the notice email can't be sent, the admin is asked to tell them", async () => {
+  existingAccount = { auth_user_id: EXISTING, activated: true };
+  delete process.env.RESEND_API_KEY;
+  const res = await run(invitation, "POST", { ...person, username: "", addExisting: true });
+  assert.equal(res.code, 201);
+  assert.match(res.body.message, /Let them know they've been added/);
 });

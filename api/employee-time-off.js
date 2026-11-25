@@ -1,11 +1,13 @@
 import { getBearerToken, getSupabaseConfiguration } from './_manager-auth.js';
 import { activationServerHeaders } from './complete-activation.js';
+import { CHOOSE_BUSINESS_MESSAGE, chosenEmployeeId } from './_chosen-employee.js';
 
 const uuid = value => typeof value === 'string' && /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(value);
 const dateKey = value => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value) && !Number.isNaN(Date.parse(`${value}T00:00:00Z`));
 
 const MESSAGES = {
   employee_unavailable: 'This employee account is unavailable. Please contact your manager.',
+  choose_business: CHOOSE_BUSINESS_MESSAGE,
   invalid_dates: 'Choose a valid start and end date.',
   past_dates: 'Time off cannot start in the past.',
   spans_two_years: 'A request cannot span two calendar years. Submit one request for each year.',
@@ -40,6 +42,9 @@ export default async function handler(req, res) {
   if (!config) return res.status(503).json({ error: 'TYMRAK configuration unavailable' });
 
   // Validate input before any database work.
+  const employeeId = chosenEmployeeId(req);
+  if (employeeId === null) return res.status(400).json({ error: 'Invalid business choice' });
+  const chosen = employeeId ? { p_employee_id: employeeId } : {};
   let requestId = null;
   if (req.method === 'POST') {
     const body = req.body;
@@ -62,11 +67,11 @@ export default async function handler(req, res) {
     if (!uuid(user?.id)) return res.status(401).json({ error: 'Invalid session' });
 
     let result;
-    if (req.method === 'GET') result = await rpc(config, 'employee_time_off', { p_auth_user_id: user.id });
+    if (req.method === 'GET') result = await rpc(config, 'employee_time_off', { p_auth_user_id: user.id, ...chosen });
     else if (req.method === 'POST') {
       result = await rpc(config, 'request_time_off', {
         p_auth_user_id: user.id, p_start: req.body.startDate, p_end: req.body.endDate,
-        p_start_half: req.body.startHalf ?? 'full', p_end_half: req.body.endHalf ?? 'full', p_note: req.body.note ?? null
+        p_start_half: req.body.startHalf ?? 'full', p_end_half: req.body.endHalf ?? 'full', p_note: req.body.note ?? null, ...chosen
       });
     } else result = await rpc(config, 'cancel_time_off', { p_auth_user_id: user.id, p_request_id: requestId });
 

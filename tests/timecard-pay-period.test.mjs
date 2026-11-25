@@ -92,7 +92,7 @@ assert.match(
 
 assert.match(
     source,
-    /supabase\.rpc\(\s*"employee_pay_schedule"\s*\)/,
+    /supabase\.rpc\(\s*"employee_pay_schedule",\s*\{ p_employee_id: employee\.id \}\s*\)/,
     "timecard.html must load the company's own pay schedule"
 );
 
