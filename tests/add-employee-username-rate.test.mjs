@@ -8,13 +8,13 @@ import { validateEmployeeInput } from "../api/_employee-management.js";
 
 const COMPANY = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", ADMIN = "99999999-9999-4999-8999-999999999999";
 const INVITED = "33333333-3333-4333-8333-333333333333";
-let calls, role, nextNumber, rateFails, savedEmployee, invited, existingAccount, alreadyHere, emails;
+let calls, role, nextNumber, rateFails, savedEmployee, invited, existingAccount, alreadyHere, emails, saveClash;
 
 test.beforeEach(t => {
   const originalFetch = global.fetch, originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
-  calls = []; role = "admin"; nextNumber = 1004; rateFails = false; savedEmployee = null; invited = null; existingAccount = null; alreadyHere = false; emails = [];
+  calls = []; role = "admin"; nextNumber = 1004; rateFails = false; savedEmployee = null; invited = null; existingAccount = null; alreadyHere = false; emails = []; saveClash = null;
   process.env.RESEND_API_KEY = "re_test";
   global.fetch = async (raw, options = {}) => {
     const url = new URL(raw), body = options.body ? JSON.parse(options.body) : null;
@@ -30,6 +30,7 @@ test.beforeEach(t => {
     if (url.pathname === "/auth/v1/invite") { invited = body; return json({ id: INVITED, email: body.email, invited_at: "2026-11-25T12:00:00Z", user_metadata: body.data }); }
     if (url.pathname.startsWith("/auth/v1/admin/users/")) return json({ id: INVITED, email: invited?.email, invited_at: "2026-11-25T12:00:00Z", user_metadata: invited?.data || {} });
     if (url.pathname === "/rest/v1/employees") {
+      if (options.method === "POST" && saveClash) return json({ code: "23505", message: `duplicate key value violates unique constraint "${saveClash}"` }, 409);
       if (options.method === "POST") { savedEmployee = { id: "55555555-5555-4555-8555-555555555555", ...body }; return json([savedEmployee]); }
       if (url.searchParams.has("auth_user_id")) return json(alreadyHere ? [{ id: "x" }] : []);
       return json([]);
@@ -173,4 +174,20 @@ test("if the notice email can't be sent, the admin is asked to tell them", async
   const res = await run(invitation, "POST", { ...person, username: "", addExisting: true });
   assert.equal(res.code, 201);
   assert.match(res.body.message, /Let them know they've been added/);
+});
+
+test("a database clash is described honestly, not always as 'already an employee'", async () => {
+  existingAccount = { auth_user_id: EXISTING, activated: false };
+  const cases = {
+    employees_username_key: /username already exists/,
+    employees_company_email_unique: /already an employee of this business/,
+    employees_email_key: /details are already in use/
+  };
+  for (const [constraint, message] of Object.entries(cases)) {
+    saveClash = constraint; emails = [];
+    const res = await run(invitation, "POST", { ...person, username: "", addExisting: true });
+    assert.equal(res.code, 409, constraint);
+    assert.match(res.body.error, message, constraint);
+    assert.equal(emails.length, 0, "nothing is emailed when the save fails");
+  }
 });

@@ -96,7 +96,12 @@ export default async function handler(req, res) {
       });
       if (!saved.ok) {
         const details = await saved.json().catch(() => ({}));
-        if (details?.code === "23505") return res.status(409).json({ error: "This person is already an employee of this business." });
+        if (details?.code === "23505") {
+          const clash = String(details.message || "");
+          if (/username/.test(clash)) return res.status(409).json({ error: "An employee with this username already exists" });
+          if (/company_email|auth_user_company/.test(clash)) return res.status(409).json({ error: "This person is already an employee of this business." });
+          return res.status(409).json({ error: "This employee could not be added because some details are already in use. Please check the email and username." });
+        }
         throw new Error("Linked employee could not be saved");
       }
       const [record] = await saved.json();
