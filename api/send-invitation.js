@@ -25,6 +25,16 @@ export default async function handler(req, res) {
     const hourlyRate = rateText === "" ? null : parseRate(rateText);
     if (rateText !== "" && hourlyRate === null) return res.status(400).json({ error: "Enter an hourly rate between $0.01 and $9,999.99, or leave it empty." });
     const { supabaseUrl, secretKey } = authorization.configuration;
+    // An email can belong to only one sign-in account. If it already has one (in any company,
+    // even if only invited), inviting it again would re-send that account's old invitation,
+    // so stop here, before a username is taken or any email is sent.
+    const inUse = await fetch(`${supabaseUrl}/rest/v1/rpc/auth_email_in_use`, {
+      method: "POST", headers: databaseHeaders(secretKey), body: JSON.stringify({ p_email: validation.input.email })
+    });
+    if (!inUse.ok) throw new Error("Email check failed");
+    if (await inUse.json() === true) {
+      return res.status(409).json({ error: "This email already belongs to a TYMRAK account. Each employee needs their own email address, so use a different one. If this person already works for another business on TYMRAK, contact Tymrak support." });
+    }
     // No username given: take the company's next one (ICP-1001, ICP-1002, ...).
     if (!validation.input.username) {
       const generated = await fetch(`${supabaseUrl}/rest/v1/rpc/next_employee_username`, {

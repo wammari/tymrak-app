@@ -8,13 +8,13 @@ import { validateEmployeeInput } from "../api/_employee-management.js";
 
 const COMPANY = "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa", ADMIN = "99999999-9999-4999-8999-999999999999";
 const INVITED = "33333333-3333-4333-8333-333333333333";
-let calls, role, nextNumber, rateFails, savedEmployee, invited;
+let calls, role, nextNumber, rateFails, savedEmployee, invited, emailInUse;
 
 test.beforeEach(t => {
   const originalFetch = global.fetch, originalEnv = { ...process.env };
   process.env.SUPABASE_URL = "https://example.supabase.co";
   process.env.SUPABASE_SECRET_KEY = "sb_secret_test";
-  calls = []; role = "admin"; nextNumber = 1004; rateFails = false; savedEmployee = null; invited = null;
+  calls = []; role = "admin"; nextNumber = 1004; rateFails = false; savedEmployee = null; invited = null; emailInUse = false;
   global.fetch = async (raw, options = {}) => {
     const url = new URL(raw), body = options.body ? JSON.parse(options.body) : null;
     calls.push({ path: url.pathname, url, method: options.method || "GET", body });
@@ -22,6 +22,7 @@ test.beforeEach(t => {
     if (url.pathname === "/auth/v1/user") return json({ id: ADMIN });
     if (url.pathname === "/rest/v1/user_roles") return json([{ role, organization_id: COMPANY, organization: { is_active: true } }]);
     if (url.pathname === "/rest/v1/rpc/manager_employee_scope") return json({ employeeIds: [] });
+    if (url.pathname === "/rest/v1/rpc/auth_email_in_use") { assert.deepEqual(body, { p_email: "harleen@example.com" }); return json(emailInUse); }
     if (url.pathname === "/rest/v1/rpc/next_employee_username") { assert.deepEqual(body, { p_organization_id: COMPANY }); return json(`ICP-${nextNumber++}`); }
     if (url.pathname === "/rest/v1/organizations") return json([{ id: COMPANY, name: "I Care Pharmacy", company_code: "ICP" }]);
     if (url.pathname === "/auth/v1/invite") { invited = body; return json({ id: INVITED, email: body.email, invited_at: "2026-11-25T12:00:00Z", user_metadata: body.data }); }
@@ -112,4 +113,14 @@ test("the Add Employee form lets the username be left empty and asks for a rate 
   assert.match(page, /\$\("username"\)\.required=!adding/);
   assert.match(page, /\$\("hourlyRateField"\)\.hidden=!adding/);
   assert.match(page, /\.\.\.\(editingId\?\{\}:\{hourlyRate:\$\("hourlyRate"\)\.value\.trim\(\)\}\)/);
+});
+
+test("an email that already has a TYMRAK account is refused before anything is sent", async () => {
+  emailInUse = true;
+  const res = await run(invitation, "POST", { ...person, email: "Harleen@Example.com", username: "", hourlyRate: "18" });
+  assert.equal(res.code, 409);
+  assert.match(res.body.error, /already belongs to a TYMRAK account/);
+  assert.doesNotMatch(res.body.error, /QB|Pharmacy|company named/i, "never says which business");
+  for (const path of ["/rest/v1/rpc/next_employee_username", "/auth/v1/invite", "/rest/v1/employees", "/rest/v1/employee_pay_rates"])
+    assert.equal(calls.some(c => c.path === path && c.method !== "GET"), false, path);
 });

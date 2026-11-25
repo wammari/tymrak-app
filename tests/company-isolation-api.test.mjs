@@ -26,6 +26,7 @@ test.beforeEach(()=>{
   if(url.pathname==='/rest/v1/user_roles')return json([membership]);
   if(url.pathname==='/rest/v1/organizations')return json([{id:companyA,name:'I Care Pharmacy'}]);
   if(url.pathname==='/rest/v1/rpc/manager_employee_scope')return json({employeeIds:[empA]});
+  if(url.pathname==='/rest/v1/rpc/auth_email_in_use')return json(false);
   if(url.pathname==='/auth/v1/invite')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com'});
   if(url.pathname==='/auth/v1/admin/users/33333333-3333-4333-8333-333333333333')return json({id:'33333333-3333-4333-8333-333333333333',email:'a@example.com',invited_at:'2026-11-03T12:00:00Z',user_metadata:{first_name:'A',last_name:'Employee',username:'employeeA',company_name:'I Care Pharmacy'}});
   if(url.pathname==='/rest/v1/employees'){

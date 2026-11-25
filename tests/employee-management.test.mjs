@@ -54,6 +54,8 @@ function installManagerFetch(operation, authIdentity = null) {
     if (String(url).endsWith("/auth/v1/user")) {
       return new Response(JSON.stringify({ id: "manager-id", email: "manager@example.com" }));
     }
+    // The cross-company email check: not in use unless a test says otherwise.
+    if (String(url).endsWith("/rest/v1/rpc/auth_email_in_use")) return new Response("false");
     if (String(url).includes("/auth/v1/admin/users/")) {
       const id = decodeURIComponent(String(url).split("/").pop());
       return new Response(JSON.stringify(authIdentity || {
