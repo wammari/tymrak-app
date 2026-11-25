@@ -6,12 +6,29 @@ connect, payroll question, matching, sending approved regular hours, and locking
 
 ## 1. Before Intuit's checklist (owner)
 
-1. **Publish a privacy policy and terms of use** at public addresses, for example:
-   - `https://tymrak.com/privacy`
-   - `https://tymrak.com/terms`
+1. **Publish the privacy policy and terms of use.** The pages are built and waiting:
+   - `https://app.tymrak.com/privacy`
+   - `https://app.tymrak.com/terms`
 
-   Drafts are in `docs/legal-drafts/` and need the legal company name, address, contact and a lawyer's review first.
-2. Decide which email Intuit and customers use for support, for example `support@tymrak.com`.
+   They're made from `docs/legal-drafts/` with `node scripts/build-legal-pages.mjs`. The script refuses to build final
+   pages while any blank is left: `[DATE]`, `[30]`, `[12]` or `[REVIEWER: ...]`. The lawyer's answers go into the drafts;
+   then rebuild and merge. Until then, `--draft` builds a preview that's marked as a draft and hidden from search engines.
+
+   **For the lawyer to answer (as of 25 November 2026):**
+
+   | Document | Blank | Question |
+   |---|---|---|
+   | Both | `[DATE]` | Effective date. |
+   | Privacy | Cross-border | Vercel (hosting) and Resend (email) may process data outside Canada. Is a cross-border statement needed, including for Quebec (Law 25)? |
+   | Privacy | Retention | How long to keep hours, time off and termination records (employment-records rules by province). |
+   | Privacy | Complaints | Provincial regulator wording, including Quebec. |
+   | Terms | Billing | Plan and billing terms, or a pointer to a separate customer agreement. |
+   | Terms | `[30]` days | Export window after a customer leaves, and notice period for changes to the terms. |
+   | Terms | `[12]` months | Liability cap (fees paid in the last 12 months?) and consumer-law carve-outs. |
+   | Terms | Venue | Courts/venue and Quebec French-language requirements. |
+
+2. Support email for Intuit and customers: `tymrak@outlook.com` for now (shown in every page's footer). Change it in
+   `support.js` when a `support@tymrak.com` mailbox exists.
 
 ## 2. Intuit production checklist (developer.intuit.com, Tymrak app, Keys & credentials, Production)
 
@@ -20,8 +37,8 @@ connect, payroll question, matching, sending approved regular hours, and locking
 | Intuit asks for | Answer |
 |---|---|
 | Verify your developer profile and email | Done in the Intuit account. |
-| End-user license agreement URL | `https://tymrak.com/terms`, once published |
-| Privacy policy URL | `https://tymrak.com/privacy`, once published |
+| End-user license agreement URL | `https://app.tymrak.com/terms`, once published |
+| Privacy policy URL | `https://app.tymrak.com/privacy`, once published |
 | Host domain | `app.tymrak.com` |
 | Launch URL | `https://app.tymrak.com/manager-login.html` |
 | Connect/Reconnect URL | `https://app.tymrak.com/quickbooks.html` |
@@ -40,7 +57,7 @@ connect, payroll question, matching, sending approved regular hours, and locking
   Nothing else.
 - **Scopes:** `com.intuit.quickbooks.accounting` only.
 - **What Tymrak writes:** TimeActivity records (non-billable regular hours), only after a manager approves a timecard.
-- **Where data is stored:** Supabase (Canada, ca-central-1); app served by Vercel.
+- **Where data is stored:** Supabase (Canada, ca-central-1); app served by Vercel. Emails sent with Resend.
 - **Security:**
   - HTTPS only
   - tokens encrypted at rest with a key held only in server settings
