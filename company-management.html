@@ -80,7 +80,7 @@ function companyRow(company){
  // Shortcut to invite this business's admins and managers (the Main Administrator is an admin of every business).
  const teamButton=el("button",{type:"button",className:"secondary",textContent:"Team access",disabled:!company.is_active});
  teamButton.addEventListener("click",()=>{try{sessionStorage.setItem("tymrak-company-id",company.id)}catch{}location.assign("/team.html")});
- const row=el("div",{className:"row"},manage,teamButton,el("span",{className:"schedule",textContent:company.paySchedule.description}));
+ const row=el("div",{className:"row"},manage,teamButton,...(company.company_code?[el("span",{className:"schedule",textContent:`Code ${company.company_code}`,title:"New employees get usernames like "+company.company_code+"-1001"})]:[]),el("span",{className:"schedule",textContent:company.paySchedule.description}));
  if(!company.is_active)row.append(" (Inactive)");
  const li=el("li",{},row);
  const waiting=company.paySchedule.upcomingChange;

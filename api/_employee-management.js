@@ -30,7 +30,7 @@ export function databaseHeaders(secretKey, prefer) {
   };
 }
 
-export function validateEmployeeInput(body) {
+export function validateEmployeeInput(body, { allowAutoUsername = false } = {}) {
   const input = {
     firstName: cleanString(body?.firstName),
     lastName: cleanString(body?.lastName),
@@ -44,14 +44,15 @@ export function validateEmployeeInput(body) {
     isActive: body?.isActive === undefined ? true : body.isActive
   };
 
+  // When adding someone, an empty username means "create one" (see next_employee_username).
   if (!input.firstName || !input.lastName || !input.email ||
-      !input.username || !input.province) {
+      (!input.username && !allowAutoUsername) || !input.province) {
     return { error: "First name, last name, email, username, and province are required" };
   }
   if (!EMAIL_PATTERN.test(input.email) || input.email.length > 254) {
     return { error: "Enter a valid email address" };
   }
-  if (!USERNAME_PATTERN.test(input.username) || input.username.length > 64) {
+  if (input.username && (!USERNAME_PATTERN.test(input.username) || input.username.length > 64)) {
     return { error: "Username may contain only letters, numbers, periods, underscores, and hyphens" };
   }
   if (input.firstName.length > 100 || input.lastName.length > 100 ||
