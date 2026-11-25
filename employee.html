@@ -480,6 +480,7 @@ h2 {
 <script type="module">
 import { createPunchClient } from "./punch-client.js";
 import { mountAccountDeletion } from "./account-deletion-ui.js";
+import { businessHeaders, businessSwitcher, chosenBusiness, loadMyBusinesses, showBusinessPicker } from "./employee-business.js";
 import { capturePunchLocation } from "./geolocation.js";
 import { loadSupabaseConfiguration } from "./supabase-config.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
@@ -549,7 +550,7 @@ async function punchRequest(method, body) {
     const {data,error} = await supabase.auth.getSession();
     if(error || !data.session) throw new Error("Session expired. Please sign in again.");
     const response = await fetch("/api/employee-punch", {
-        method, cache:"no-store", headers:{Authorization:`Bearer ${data.session.access_token}`,
+        method, cache:"no-store", headers:{Authorization:`Bearer ${data.session.access_token}`,...businessHeaders(employee?.id),
         ...(body?{"Content-Type":"application/json"}:{})}, ...(body?{body:JSON.stringify(body)}:{})
     });
     const result = await response.json();
@@ -1018,12 +1019,17 @@ async function loadEmployee() {
         const user =
             sessionData.session.user;
 
+        // People who work for several businesses choose which one they're working for.
+        const businesses = await loadMyBusinesses(supabase);
+        const business = chosenBusiness(businesses, user.id);
+        if (businesses && businesses.length > 1 && !business) {
+            welcome.textContent = "Choose your business";
+            showBusinessPicker(document.querySelector(".clock-area"), businesses, user.id);
+            return;
+        }
 
-        const {
-            data: employeeData,
-            error: employeeError
-        } =
-            await supabase
+        let employeeQuery =
+            supabase
                 .from("employees")
                 .select(
                     "id,first_name,last_name,email,username,position,department,employment_status,invitation_status,is_active,termination_date"
@@ -1031,8 +1037,12 @@ async function loadEmployee() {
                 .eq(
                     "auth_user_id",
                     user.id
-                )
-                .single();
+                );
+        if (business) employeeQuery = employeeQuery.eq("id", business.employee_id);
+        const {
+            data: employeeData,
+            error: employeeError
+        } = await employeeQuery.single();
 
 
         if (employeeError) {
@@ -1054,6 +1064,7 @@ async function loadEmployee() {
 
         employee =
             employeeData;
+        timeOffReady();
 
 
         const fullName =
@@ -1084,13 +1095,16 @@ async function loadEmployee() {
         }
 
 
+        if (businesses && businesses.length > 1 && business) details.unshift(business.company_name);
         employeeInfo.textContent =
             details.length
                 ? details.join(" • ")
                 : employee.username;
+        const switcher = businessSwitcher(businesses, business, user.id);
+        if (switcher) employeeInfo.after(switcher);
 
 
-        mountAccountDeletion({ supabase });
+        mountAccountDeletion({ supabase, employeeId: employee.id });
 
         if (employee.termination_date) {
             // Terminated: no clocking, read-only access to past timecards.
@@ -1195,7 +1209,7 @@ function toDate(value){const [y,m,d]=value.split("-").map(Number);return new Dat
 async function timeOffRequest(method,query,body){
     const {data,error}=await supabase.auth.getSession();
     if(error||!data.session) throw new Error("Session expired. Please sign in again.");
-    const response=await fetch("/api/employee-time-off"+(query||""),{method,cache:"no-store",headers:{Authorization:`Bearer ${data.session.access_token}`,...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})});
+    const response=await fetch("/api/employee-time-off"+(query||""),{method,cache:"no-store",headers:{Authorization:`Bearer ${data.session.access_token}`,...businessHeaders(employee?.id),...(body?{"Content-Type":"application/json"}:{})},...(body?{body:JSON.stringify(body)}:{})});
     const result=await response.json().catch(()=>({}));
     if(!response.ok) throw new Error(result.error||"Time off is unavailable right now.");
     return result;
@@ -1224,6 +1238,7 @@ function renderTimeOff(data){
         list.append(li);
     }
 }
+function timeOffReady(){loadTimeOff()}
 async function loadTimeOff(){
     try{renderTimeOff(await timeOffRequest("GET"))}catch(error){toSay("bad",error.message)}
 }
@@ -1234,7 +1249,7 @@ document.getElementById("timeOffForm").addEventListener("submit",async event=>{
         document.getElementById("timeOffForm").reset();await loadTimeOff();toSay("ok",`Request sent for ${toDays(result.days)} day${Number(result.days)===1?"":"s"}. Your manager will review it.`);
     }catch(error){toSay("bad",error.message)}finally{button.disabled=false}
 });
-loadTimeOff();
+// Time off loads once the business is known (see "timeOffReady" in the page start-up).
 
 </script>
 

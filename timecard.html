@@ -394,6 +394,7 @@ tbody tr:last-child td {
 <script type="module">
 import { loadSupabaseConfiguration } from "./supabase-config.js";
 import { mountAccountDeletion } from "./account-deletion-ui.js";
+import { businessSwitcher, chosenBusiness, loadMyBusinesses, showBusinessPicker } from "./employee-business.js";
 import {
     applyOvertime,
     buildDailyRecords,
@@ -1166,12 +1167,17 @@ async function loadTimecard() {
         const user =
             sessionData.session.user;
 
+        // People who work for several businesses see one business at a time.
+        const businesses = await loadMyBusinesses(supabase);
+        const business = chosenBusiness(businesses, user.id);
+        if (businesses && businesses.length > 1 && !business) {
+            employeeInfo.textContent = "Choose your business";
+            showBusinessPicker(document.querySelector(".card"), businesses, user.id);
+            return;
+        }
 
-        const {
-            data: employeeData,
-            error: employeeError
-        } =
-            await supabase
+        let employeeQuery =
+            supabase
                 .from("employees")
                .select(
     "id,first_name,last_name,username,position,department,province,invitation_status,is_active,termination_date"
@@ -1179,8 +1185,12 @@ async function loadTimecard() {
                 .eq(
                     "auth_user_id",
                     user.id
-                )
-                .single();
+                );
+        if (business) employeeQuery = employeeQuery.eq("id", business.employee_id);
+        const {
+            data: employeeData,
+            error: employeeError
+        } = await employeeQuery.single();
 
 
         if (employeeError) {
@@ -1202,7 +1212,7 @@ const provinceTimeZones = {
     YT: "America/Whitehorse"
 };
 
-mountAccountDeletion({ supabase });
+mountAccountDeletion({ supabase, employeeId: employeeData.id });
 employeeTimeZone =
     provinceTimeZones[employeeData.province] ||
     "America/Toronto";
@@ -1250,8 +1260,11 @@ if (!employeeData.province) {
         }
 
 
+        if (businesses && businesses.length > 1 && business) details.unshift(business.company_name);
         employeeInfo.textContent =
             details.join(" • ");
+        const switcher = businessSwitcher(businesses, business, user.id);
+        if (switcher) employeeInfo.after(switcher);
 
 
         /*
@@ -1264,7 +1277,8 @@ if (!employeeData.province) {
             error: scheduleError
         } =
             await supabase.rpc(
-                "employee_pay_schedule"
+                "employee_pay_schedule",
+                { p_employee_id: employee.id }
             );
 
         if (scheduleError) {

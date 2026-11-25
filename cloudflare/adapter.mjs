@@ -119,7 +119,7 @@ export function createWorker(routes, {releaseEnvironment='staging'}={}) {
     if (native && request.method === 'OPTIONS') {
       return new Response(null, {status: 204, headers: {...corsHeaders(origin),
         'Access-Control-Allow-Methods': 'GET, POST, PUT, PATCH, DELETE, OPTIONS',
-        'Access-Control-Allow-Headers': 'Authorization, Content-Type', 'Access-Control-Max-Age': '600'}});
+        'Access-Control-Allow-Headers': 'Authorization, Content-Type, X-Tymrak-Employee-Id', 'Access-Control-Max-Age': '600'}});
     }
     const response = await handle(request, env);
     if (!native) return response;
