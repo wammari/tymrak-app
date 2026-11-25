@@ -3,6 +3,9 @@ import {canManageEmployee} from './_manager-scope.js';
 import { databaseHeaders } from "./_employee-management.js";
 import { PROVINCE_TIME_ZONES } from "./_manager-timecards.js";
 import { loadPaySchedule, requestedPayPeriod } from "./_pay-schedule.js";
+import { sendEmails, timecardApprovedEmail } from "./_email.js";
+import { periodHours } from "./_timecard-hours.js";
+import { getSiteUrl } from "./_deployment-config.js";
 
 const ID_PATTERN = /^[A-Za-z0-9-]{1,128}$/;
 
@@ -33,7 +36,7 @@ export default async function handler(req, res) {
     const { supabaseUrl, secretKey } = authorization.configuration;
     const ids = `(${employeeIds.map(id => `"${id}"`).join(",")})`;
     const employees = await readArray(await fetch(
-      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&organization_id=eq.${authorization.organizationId}&is_active=eq.true&select=id,province,auth_user_id`,
+      `${supabaseUrl}/rest/v1/employees?id=in.${encodeURIComponent(ids)}&organization_id=eq.${authorization.organizationId}&is_active=eq.true&select=id,province,auth_user_id,first_name,email`,
       { headers: databaseHeaders(secretKey) }
     ), "Approval employee validation failed");
     if (employees.length !== employeeIds.length) {
@@ -79,9 +82,34 @@ export default async function handler(req, res) {
     if (approvals.length !== employeeIds.length || approvals.some(approval => approval.status !== "approved")) {
       throw new Error("Not all selected timecards were approved");
     }
-    return res.status(200).json({ message: `${approvals.length} timecard${approvals.length === 1 ? "" : "s"} approved`, approvals });
+    // Tell each employee whose timecard just became approved (not ones that already were).
+    const justApproved = employeeIds.filter(id => existingByEmployee.get(id)?.status !== "approved").map(id => employeesById.get(id));
+    const notice = await notifyApproved(authorization, justApproved, period);
+    const count = `${approvals.length} timecard${approvals.length === 1 ? "" : "s"} approved`;
+    const told = notice.sent ? `. ${notice.sent} ${notice.sent === 1 ? "employee was" : "employees were"} emailed.` : "";
+    return res.status(200).json({ message: count + told, approvals, emailed: notice.sent });
   } catch (error) {
     console.error("Manager timecard approval failed", { errorName: error?.name || "Error", message: error?.message || null });
     return res.status(500).json({ error: "Unable to approve selected timecards" });
+  }
+}
+
+const deliverable = email => typeof email === "string" && /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email) && !email.endsWith("@deleted.invalid");
+
+// Best effort: an email problem never undoes or blocks an approval.
+async function notifyApproved(authorization, employees, period) {
+  try {
+    const people = employees.filter(person => person && deliverable(person.email));
+    if (!people.length) return { sent: 0 };
+    const { supabaseUrl, secretKey } = authorization.configuration;
+    const company = await fetch(`${supabaseUrl}/rest/v1/organizations?id=eq.${authorization.organizationId}&select=name`, { headers: databaseHeaders(secretKey) });
+    const companyName = company.ok ? (await company.json())?.[0]?.name : null;
+    if (!companyName) return { sent: 0 };
+    const hours = await periodHours(authorization.configuration, people, period);
+    const siteUrl = getSiteUrl();
+    return await sendEmails(people.map(person => ({ to: person.email, ...timecardApprovedEmail({
+      firstName: person.first_name, companyName, siteUrl, startDate: period.startKey, endDate: period.endKey, hours: hours.get(person.id) || null }) })));
+  } catch {
+    return { sent: 0 };
   }
 }
