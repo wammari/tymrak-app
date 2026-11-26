@@ -236,6 +236,7 @@ tbody tr:last-child td {
 
 .punch-detail-item {
     display: flex;
+    flex-wrap: wrap;
     justify-content: space-between;
     align-items: center;
     padding: 8px 0;
@@ -244,6 +245,39 @@ tbody tr:last-child td {
 
 .punch-detail-item:last-child {
     border-bottom: none;
+}
+
+.correction-note {
+    display: block;
+    width: 100%;
+    margin-top: 4px;
+    font-size: 13px;
+    color: #9a6700;
+}
+
+.corrections-box {
+    margin-top: 18px;
+    padding: 16px 18px;
+    border-radius: 10px;
+    background: #fff8ec;
+    border: 1px solid #f0dfc0;
+}
+
+.corrections-box h3 {
+    margin: 0 0 4px;
+    font-size: 16px;
+}
+
+.corrections-box p {
+    margin: 0 0 10px;
+    color: #6b5a4b;
+    font-size: 14px;
+}
+
+.corrections-box ul {
+    margin: 0;
+    padding-left: 18px;
+    line-height: 1.6;
 }
 
 .punch-type {
@@ -384,6 +418,12 @@ tbody tr:last-child td {
 
         </table>
 
+    </div>
+
+    <div id="correctionsBox" class="corrections-box" hidden>
+        <h3>Corrections by your manager</h3>
+        <p>Your manager changed some punches in this pay period. If something looks wrong, talk to them.</p>
+        <ul id="correctionsList"></ul>
     </div>
 
 </section>
@@ -711,10 +751,57 @@ function escapeHTML(value) {
         .replaceAll("'", "&#039;");
 }
 
+const CORRECTION_LABELS = {
+    clock_in: "clock in",
+    clock_out: "clock out",
+    break_start: "break start",
+    break_end: "break end"
+};
+
+function correctionMoment(iso) {
+    return formatDate(new Date(iso)) + ", " + formatTime(iso);
+}
+
+function describeCorrection(correction) {
+    const before = CORRECTION_LABELS[correction.before_type] || correction.before_type;
+    const after = CORRECTION_LABELS[correction.after_type] || correction.after_type;
+    if (correction.action === "added") {
+        return "Added a " + after + " at " + correctionMoment(correction.after_at);
+    }
+    if (correction.action === "removed") {
+        return "Removed a " + before + " at " + correctionMoment(correction.before_at);
+    }
+    return "Changed a " + before + " at " + correctionMoment(correction.before_at) +
+        " to " + (after === before ? "" : "a " + after + " at ") + correctionMoment(correction.after_at);
+}
+
+function renderCorrections(corrections) {
+    const box = document.getElementById("correctionsBox");
+    const list = document.getElementById("correctionsList");
+    if (!box || !list) return;
+    list.replaceChildren();
+    for (const correction of corrections) {
+        const item = document.createElement("li");
+        item.textContent = describeCorrection(correction) + ". Reason: " + correction.reason;
+        list.append(item);
+    }
+    box.hidden = corrections.length === 0;
+}
+
 function renderTimecard(
     punches,
-    period
+    period,
+    corrections = []
 ) {
+
+    renderCorrections(corrections);
+
+    const correctedPunches = new Map();
+    for (const correction of corrections) {
+        if (correction.punch_id && correction.action !== "removed") {
+            correctedPunches.set(String(correction.punch_id), correction);
+        }
+    }
 
     if (
         !punches ||
@@ -801,6 +888,14 @@ function renderTimecard(
                                         )
                                     )}
                                 </span>
+                                ${correctedPunches.has(String(punch.id))
+                                    ? `<span class="correction-note">${escapeHTML(
+                                        (correctedPunches.get(String(punch.id)).action === "added"
+                                            ? "Added by your manager"
+                                            : "Corrected by your manager") +
+                                        ": " + correctedPunches.get(String(punch.id)).reason
+                                    )}</span>`
+                                    : ""}
                             </div>
                         `)
                         .join("");
@@ -1120,9 +1215,24 @@ async function loadPayPeriod(period) {
         throw punchesError;
     }
 
+    // Corrections by a manager in this pay period. Best effort: the timecard still
+    // shows if they can't be loaded.
+    let corrections = [];
+    try {
+        const { data, error } = await supabase.rpc("my_punch_corrections", {
+            p_from: dateKey(period.start, employeeTimeZone),
+            p_to: dateKey(period.end, employeeTimeZone),
+            p_employee_id: employee.id
+        });
+        if (!error && Array.isArray(data)) corrections = data;
+    } catch {
+        corrections = [];
+    }
+
     renderTimecard(
         punches || [],
-        period
+        period,
+        corrections
     );
 
     updatePeriodNavigation();
