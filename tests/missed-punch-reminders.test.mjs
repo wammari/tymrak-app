@@ -86,7 +86,7 @@ test("admins get every missed punch, managers only their own people, and quiet c
     const byTo = Object.fromEntries(env.batches[0].map(m => [m.to[0], m]));
     assert.match(byTo["owner@example.com"].subject, /^2 missed punches at I Care Pharmacy$/);
     assert.match(byTo["owner@example.com"].text, /Ana Lopez/);
-    assert.match(byTo["owner@example.com"].text, /ended: review before running payroll/);
+    assert.match(byTo["owner@example.com"].text, /ended: fix before running payroll/);
     assert.match(byTo["shift-lead@example.com"].subject, /^1 missed punch at/);
     assert.doesNotMatch(byTo["shift-lead@example.com"].text, /Ana/, "managers only hear about people they manage");
     assert.ok(env.calls.every(u => !u.includes("org-2") || !u.includes("/punches?")), "no punches loaded for a company without employees");

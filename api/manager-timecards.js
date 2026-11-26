@@ -69,6 +69,7 @@ export default async function handler(req, res) {
     const employeeIds = employees.map(employee => employee.id);
     let punches = [];
     let approvals = [];
+    let corrections = [];
     if (employeeIds.length) {
       const earliest = Math.min(...employees.map(employee => {
         const zone = PROVINCE_TIME_ZONES[employee.province] || "America/Toronto";
@@ -89,6 +90,15 @@ export default async function handler(req, res) {
         secretKey, stage: "approvals_query", resource: "timecard_approvals",
         queryName: "employee_period_approvals"
       });
+      // Punch corrections shown on the timecard. Before this feature's database change is in
+      // place the table doesn't exist yet: the page then simply shows no history.
+      const from = encodeURIComponent(new Date(earliest).toISOString()), to = encodeURIComponent(new Date(latest).toISOString());
+      try {
+        corrections = await databaseRows(`${supabaseUrl}/rest/v1/punch_corrections?employee_id=in.${encodeURIComponent(ids)}&or=(and(after_at.gte.${from},after_at.lte.${to}),and(before_at.gte.${from},before_at.lte.${to}))&select=id,employee_id,punch_id,action,before_type,before_at,after_type,after_at,before_location,reason,corrected_by_label,corrected_at&order=corrected_at.asc`, databaseHeaders(secretKey));
+      } catch {
+        console.error("Manager timecard corrections unavailable", { stage: "corrections_query", resource: "punch_corrections" });
+        corrections = [];
+      }
     }
     // Pay rates: admins only. Managers' responses never include rates or pay.
     const isAdmin = authorization.role === "admin";
@@ -104,6 +114,10 @@ export default async function handler(req, res) {
     const withPay = (card, rule) => isAdmin
       ? { ...card, pay: estimatePay(card.days, payRates.filter(rate => rate.employee_id === card.employee.id), rule, period) }
       : card;
+    const correctionsFor = employee => corrections.filter(c => c.employee_id === employee.id).map(c => ({
+      id: c.id, punchId: c.punch_id === null || c.punch_id === undefined ? null : String(c.punch_id), action: c.action,
+      beforeType: c.before_type, beforeAt: c.before_at, afterType: c.after_type, afterAt: c.after_at,
+      beforeLocation: c.before_location, reason: c.reason, correctedBy: c.corrected_by_label || null, correctedAt: c.corrected_at }));
     const cards = employees.map(employee => {
       const employeePunches = punches.filter(punch => punch.employee_id === employee.id);
       const applicable = rules.filter(rule => rule.province_code === employee.province && rule.effective_from <= endKey && (!rule.effective_to || rule.effective_to >= startKey));
@@ -117,6 +131,7 @@ export default async function handler(req, res) {
       if (employeePunches.length === 0) {
         return withPay({ ...summarizeEmployee(employee, [], null, period),
           approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null, sentToAccounting,
+          corrections: correctionsFor(employee),
           // The signed-in person's own timecard: someone else must approve or reopen it.
           isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id }, null);
       }
@@ -136,6 +151,7 @@ export default async function handler(req, res) {
       }
       return withPay({ ...summarizeEmployee(employee, employeePunches, applicable[0], period),
         approvalStatus: approval ? "Approved" : "Not approved", approval: approval || null, sentToAccounting,
+        corrections: correctionsFor(employee),
           // The signed-in person's own timecard: someone else must approve or reopen it.
           isSelf: Boolean(employee.auth_user_id) && employee.auth_user_id === authorization.user.id }, applicable[0]);
     });

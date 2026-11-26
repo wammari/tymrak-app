@@ -82,18 +82,18 @@ export function missedPunchesEmail({ companyName, siteUrl, issues, currentPeriod
     if (!group) groups.push(group = { start: issue.periodStart, end: issue.periodEnd, items: [] });
     group.items.push(issue);
   }
-  const heading = g => `${longDate(g.start)} to ${longDate(g.end)}` + (g.start === currentPeriodStart ? " (current pay period)" : " (ended: review before running payroll)");
+  const heading = g => `${longDate(g.start)} to ${longDate(g.end)}` + (g.start === currentPeriodStart ? " (current pay period)" : " (ended: fix before running payroll)");
   const shortDay = key => new Date(`${key}T12:00:00Z`).toLocaleDateString("en-CA", { timeZone: "UTC", weekday: "short", month: "short", day: "numeric" });
   const link = `${siteUrl}/manager.html`;
-  const text = `${companyName} has ${count} missed ${count === 1 ? "punch" : "punches"} to review.\n\n` +
+  const text = `${companyName} has ${count} missed ${count === 1 ? "punch" : "punches"} to fix.\n\n` +
     groups.map(g => `${heading(g)}\n` + g.items.map(i => `- ${i.name}, ${shortDay(i.date)}: ${i.problem}`).join("\n")).join("\n\n") +
-    `\n\nReview them in Timecards before you approve: ${link}\n\nTYMRAK checks every morning and only emails when something is missing.\n`;
+    `\n\nFix them in Timecards: open the employee's timecard, click the day and add the missing punch with a reason. ${link}\n\nTYMRAK checks every morning and only emails when something is missing.\n`;
   const cell = "padding:6px 10px 6px 0;border-bottom:1px solid #f0e8de;vertical-align:top";
-  const html = frame(`<p style="margin-top:0"><strong>${escape(companyName)}</strong> has <strong>${count} missed ${count === 1 ? "punch" : "punches"}</strong> to review.</p>
+  const html = frame(`<p style="margin-top:0"><strong>${escape(companyName)}</strong> has <strong>${count} missed ${count === 1 ? "punch" : "punches"}</strong> to fix.</p>
 ${groups.map(g => `<h3 style="font-size:15px;margin:18px 0 6px">${escape(heading(g))}</h3><table style="border-collapse:collapse;width:100%;font-size:14px">${g.items.map(i =>
   `<tr><td style="${cell}"><strong>${escape(i.name)}</strong></td><td style="${cell};white-space:nowrap">${escape(shortDay(i.date))}</td><td style="${cell}">${escape(i.problem)}</td></tr>`).join("")}</table>`).join("")}
-${button(link, "Review in Timecards")}
-<p style="color:#716254;font-size:13px">Hours for a shift with a missing punch are incomplete. Check with the employee before you approve their timecard. TYMRAK checks every morning and only emails when something is missing.</p>`);
+${button(link, "Fix in Timecards")}
+<p style="color:#716254;font-size:13px">In Timecards, open the employee's timecard, click the day and use <strong>+ Add a punch on this day</strong>. Check the time with the employee first; they see your reason on their timecard. TYMRAK checks every morning and only emails when something is missing.</p>`);
   return { subject, html, text };
 }
 
