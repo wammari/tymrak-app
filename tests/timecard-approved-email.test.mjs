@@ -71,6 +71,7 @@ test("approving a timecard emails the employee their hours (and never pay)", asy
     const [mail] = env.batches[0];
     assert.deepEqual(mail.to, ["ana@example.com"]);
     assert.equal(mail.from, "TYMRAK <invite@tymrak.com>");
+    assert.equal(mail.reply_to, "info@tymrak.com", "replies go to the support mailbox");
     assert.match(mail.subject, /approved: November 1, 2026 to November 15, 2026/);
     assert.match(mail.text, /I Care Pharmacy approved your timecard/);
     assert.match(mail.text, /Regular: 44\.00 hours\nOvertime: 6\.00 hours\nTotal: 50\.00 hours/);

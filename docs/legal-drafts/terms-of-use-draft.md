@@ -23,7 +23,7 @@ billing terms, effective date.
 # Terms of Use
 
 **Effective date:** [DATE]
-**Provider:** 1001822269 Ontario Corporation, operating as TYMRAK ("TYMRAK", "we", "us"), 2 Sparrow Court, Hamilton, ON L9A 4Z7, tymrak@outlook.com
+**Provider:** 1001822269 Ontario Corporation, operating as TYMRAK ("TYMRAK", "we", "us"), 2 Sparrow Court, Hamilton, ON L9A 4Z7, info@tymrak.com
 
 ## 1. What these terms cover
 
@@ -113,4 +113,4 @@ and Quebec language requirements.]
 
 1001822269 Ontario Corporation, operating as TYMRAK
 2 Sparrow Court, Hamilton, ON L9A 4Z7
-tymrak@outlook.com
+info@tymrak.com
