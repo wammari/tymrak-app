@@ -27,8 +27,7 @@ connect, payroll question, matching, sending approved regular hours, and locking
    | Terms | `[12]` months | Liability cap (fees paid in the last 12 months?) and consumer-law carve-outs. |
    | Terms | Venue | Courts/venue and Quebec French-language requirements. |
 
-2. Support email for Intuit and customers: `tymrak@outlook.com` for now (shown in every page's footer). Change it in
-   `support.js` when a `support@tymrak.com` mailbox exists.
+2. Support email for Intuit and customers: `info@tymrak.com` (shown in every page's footer and set as the reply-to address on emails).
 
 ## 2. Intuit production checklist (developer.intuit.com, Tymrak app, Keys & credentials, Production)
 

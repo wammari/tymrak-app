@@ -1,6 +1,6 @@
 // Support contact shown at the bottom of every TYMRAK page. Change the address here only.
 (function () {
-  var SUPPORT_EMAIL = "tymrak@outlook.com";
+  var SUPPORT_EMAIL = "info@tymrak.com";
   window.TYMRAK_SUPPORT_EMAIL = SUPPORT_EMAIL;
   function addFooter() {
     if (document.querySelector(".tymrak-support")) return;
