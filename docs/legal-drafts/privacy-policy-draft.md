@@ -25,7 +25,7 @@ Facts the draft relies on, so they can be checked:
 
 Open items for the owner and lawyer:
 
-1. Filled in: legal name (1001822269 Ontario Corporation, operating as TYMRAK), mailing address, privacy officer (Waleed Ammari) and support email (tymrak@outlook.com, for now).
+1. Filled in: legal name (1001822269 Ontario Corporation, operating as TYMRAK), mailing address, privacy officer (Waleed Ammari) and support email (info@tymrak.com, for now).
 2. Whether TYMRAK is a service provider to each employer (assumed below) and what the customer agreement says about it.
 3. Retention periods that fit employment-records rules in each province (hours, time off, termination).
 4. Quebec requirements (Law 25): privacy officer contact, transparency about location data, and consent wording.
@@ -40,7 +40,7 @@ Open items for the owner and lawyer:
 **Effective date:** [DATE]
 **Operator:** 1001822269 Ontario Corporation, operating as TYMRAK ("TYMRAK", "we", "us")
 **Address:** 2 Sparrow Court, Hamilton, ON L9A 4Z7
-**Privacy contact:** Waleed Ammari, Privacy Officer, tymrak@outlook.com
+**Privacy contact:** Waleed Ammari, Privacy Officer, info@tymrak.com
 
 ## 1. What this policy covers
 
@@ -178,4 +178,4 @@ If we make a material change, we will update the effective date and tell account
 
 1001822269 Ontario Corporation, operating as TYMRAK
 2 Sparrow Court, Hamilton, ON L9A 4Z7
-tymrak@outlook.com
+info@tymrak.com

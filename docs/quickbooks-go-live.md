@@ -11,7 +11,7 @@ connect, payroll question, matching, sending approved regular hours, and locking
    - `https://tymrak.com/terms`
 
    Drafts are in `docs/legal-drafts/` and need the legal company name, address, contact and a lawyer's review first.
-2. Decide which email Intuit and customers use for support, for example `support@tymrak.com`.
+2. Support email for Intuit and customers: `info@tymrak.com` (shown in every page's footer and set as the reply-to address on emails).
 
 ## 2. Intuit production checklist (developer.intuit.com, Tymrak app, Keys & credentials, Production)
 
