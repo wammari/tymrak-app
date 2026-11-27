@@ -7,14 +7,14 @@ const FROM = "TYMRAK <invite@tymrak.com>";
 export const REPLY_TO = "info@tymrak.com";
 const escape = value => String(value ?? "").replace(/[&<>"']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[ch]));
 
-export async function sendEmail({ to, subject, html, text }, env = process.env) {
+export async function sendEmail({ to, subject, html, text, replyTo }, env = process.env) {
   const key = env.RESEND_API_KEY;
   if (!key) return { sent: false, reason: "not_configured" };
   try {
     const response = await fetch("https://api.resend.com/emails", {
       method: "POST",
       headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
-      body: JSON.stringify({ from: FROM, reply_to: REPLY_TO, to: [to], subject, html, text })
+      body: JSON.stringify({ from: FROM, reply_to: replyTo || REPLY_TO, to: [to], subject, html, text })
     });
     return response.ok ? { sent: true } : { sent: false, reason: `status_${response.status}` };
   } catch {
@@ -96,6 +96,22 @@ ${groups.map(g => `<h3 style="font-size:15px;margin:18px 0 6px">${escape(heading
   `<tr><td style="${cell}"><strong>${escape(i.name)}</strong></td><td style="${cell};white-space:nowrap">${escape(shortDay(i.date))}</td><td style="${cell}">${escape(i.problem)}</td></tr>`).join("")}</table>`).join("")}
 ${button(link, "Fix in Timecards")}
 <p style="color:#716254;font-size:13px">In Timecards, open the employee's timecard, click the day and use <strong>+ Add a punch on this day</strong>. Check the time with the employee first; they see your reason on their timecard. TYMRAK checks every morning and only emails when something is missing.</p>`);
+  return { subject, html, text };
+}
+
+// A visitor's demo or partnership request from the tymrak.com contact form, sent to the
+// support mailbox. Every value comes from a stranger, so all of it is escaped.
+export function demoRequestEmail({ topic, name, business, email, phone, size, message, page }) {
+  const subject = `${topic}: ${business} (${name})`.replace(/[\r\n]+/g, " ").slice(0, 160);
+  const rows = [["Topic", topic], ["Name", name], ["Business", business], ["Email", email], ["Phone", phone], ["Employees", size], ["Sent from", page]]
+    .filter(([, value]) => value);
+  const text = rows.map(([label, value]) => `${label}: ${value}`).join("\n") + (message ? `\n\nMessage:\n${message}` : "") +
+    "\n\nReply to this email to answer them directly.\n";
+  const html = frame(`<p style="margin-top:0"><strong>New ${escape(topic.toLowerCase())}</strong> from the tymrak.com contact form.</p>
+<table style="border-collapse:collapse;font-size:14px">${rows.map(([label, value]) =>
+  `<tr><td style="padding:5px 16px 5px 0;color:#716254;vertical-align:top">${escape(label)}</td><td style="padding:5px 0"><strong>${escape(value)}</strong></td></tr>`).join("")}</table>
+${message ? `<p style="margin:16px 0 4px;color:#716254">Message</p><div style="white-space:pre-wrap;background:#fbf8f3;border:1px solid #eadfd2;border-radius:8px;padding:12px">${escape(message)}</div>` : ""}
+<p style="color:#716254;font-size:13px">Reply to this email to answer them directly.</p>`);
   return { subject, html, text };
 }
 
