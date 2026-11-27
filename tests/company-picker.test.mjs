@@ -22,7 +22,7 @@ test("every page shows the support email from one shared script", async () => {
   assert.ok(pages.length >= 14);
   for (const page of pages) assert.match(fs.readFileSync(new URL(page, root), "utf8"), /<script src="\/support\.js" defer><\/script><\/head>/, page);
   const script = fs.readFileSync(new URL("support.js", root), "utf8");
-  assert.match(script, /SUPPORT_EMAIL = "tymrak@outlook\.com"/);
+  assert.match(script, /SUPPORT_EMAIL = "info@tymrak\.com"/);
   assert.doesNotMatch(script, /innerHTML/);
   const { publicAssets } = await import("../cloudflare/public-assets.mjs");
   assert.ok(publicAssets.includes("support.js"));
