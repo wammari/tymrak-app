@@ -434,6 +434,7 @@ tbody tr:last-child td {
 <script type="module">
 import { loadSupabaseConfiguration } from "./supabase-config.js";
 import { mountAccountDeletion } from "./account-deletion-ui.js";
+import { clearReminders } from "./native-reminders.js";
 import { businessSwitcher, chosenBusiness, loadMyBusinesses, showBusinessPicker } from "./employee-business.js";
 import {
     applyOvertime,
@@ -1514,6 +1515,8 @@ clockButton.addEventListener(
 logoutButton.addEventListener(
     "click",
     async () => {
+
+        await clearReminders();
 
         await supabase.auth
             .signOut();

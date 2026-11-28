@@ -11,7 +11,7 @@ async function page({lastType='clock_in',postFailure=false,businesses=[{employee
  const memory=new Map();
  const context={document:{getElementById:get,createElement:element,querySelector:()=>element()},createPunchClient,mountAccountDeletion(){},
  loadMyBusinesses:async()=>businesses,chosenBusiness:list=>chosen==='none'?null:list?.[0]||null,businessHeaders,
- showBusinessPicker:(_,list)=>picker.push(list),businessSwitcher:(list)=>{switchers.push(list);return null;},capturePunchLocation:async()=>({latitude:43,longitude:-79,accuracyMetres:5,capturedAt:Date.now()}),
+ clearReminders:async()=>"unsupported",mountReminderSetting:()=>null,remindersPlugin:()=>null,syncReminders:async()=>"unsupported",showBusinessPicker:(_,list)=>picker.push(list),businessSwitcher:(list)=>{switchers.push(list);return null;},capturePunchLocation:async()=>({latitude:43,longitude:-79,accuracyMetres:5,capturedAt:Date.now()}),
  loadSupabaseConfiguration:async()=>({supabaseUrl:'https://example.supabase.co'}),
  localStorage:{getItem:k=>memory.get(k),setItem:(k,v)=>memory.set(k,v),removeItem:k=>memory.delete(k)},
  crypto,console,setInterval(){},window:{location:{}},
