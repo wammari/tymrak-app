@@ -17,7 +17,7 @@ export const PAGES = ["login.html", "password-recovery.html", "reset-password.ht
 export const FILES = [
   "tymrak-theme.css", "api-base.js", "password-toggle.js", "support.js", "supabase-config.js", "supabase-js.bundle.js",
   "account-deletion-ui.js", "employee-business.js", "geolocation.js", "punch-client.js", "pay-periods.js",
-  "timecard-calculation.js", "tymrak-logo.png"
+  "timecard-calculation.js", "native-reminders.js", "tymrak-logo.png"
 ];
 
 export function nativeConfig(base = API_BASE) {

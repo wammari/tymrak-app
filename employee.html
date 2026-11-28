@@ -123,6 +123,32 @@ body {
     color: #8a5a00;
 }
 
+.reminder-row {
+    margin-top: 18px;
+    display: flex;
+    justify-content: center;
+}
+
+.reminder-setting {
+    display: inline-flex;
+    gap: 10px;
+    align-items: flex-start;
+    max-width: 420px;
+    text-align: left;
+    font-size: 14px;
+    line-height: 1.4;
+    color: #6b5a4b;
+    cursor: pointer;
+}
+
+.reminder-setting input {
+    width: 20px;
+    height: 20px;
+    margin: 1px 0 0;
+    flex: 0 0 auto;
+    accent-color: #8d5316;
+}
+
 .button-area {
     display: flex;
     justify-content: center;
@@ -416,12 +442,14 @@ h2 {
 
     <div id="message" class="message"></div>
 
+    <div id="reminderSetting" class="reminder-row" hidden></div>
+
 </div>
 
 </section>
 <section class="card">
 
-<p>Location is checked when you clock in, clock out, or start/end a break. Allow browser location access. Your reported location must be inside an assigned workplace.</p>
+<p id="locationNote">Location is checked when you clock in, clock out, or start/end a break. Allow browser location access. Your reported location must be inside an assigned workplace.</p>
 <h2>Work Summary</h2><p id="summaryScope">Today, including any active overnight shift.</p>
 
 <div class="summary-grid">
@@ -482,6 +510,7 @@ import { createPunchClient } from "./punch-client.js";
 import { mountAccountDeletion } from "./account-deletion-ui.js";
 import { businessHeaders, businessSwitcher, chosenBusiness, loadMyBusinesses, showBusinessPicker } from "./employee-business.js";
 import { capturePunchLocation } from "./geolocation.js";
+import { clearReminders, mountReminderSetting, remindersPlugin, syncReminders } from "./native-reminders.js";
 import { loadSupabaseConfiguration } from "./supabase-config.js";
 const deploymentConfiguration = await loadSupabaseConfiguration();
 const SUPABASE_URL = deploymentConfiguration.supabaseUrl;
@@ -932,6 +961,8 @@ async function loadTodaysPunches() {
     workTimeZone = response.body.timeZone;
     lastPunchId = response.body.lastPunch?.id || null;
     currentStatus = determineStatus(response.body.lastPunch);
+    // Phone app only: plan the clock-out / break reminders for this state.
+    syncReminders({ status: currentStatus, punches: data || [], lastPunch: response.body.lastPunch, timeZone: workTimeZone });
     document.getElementById("summaryScope").textContent =
         `Work date ${response.body.workDate} (${workTimeZone}), including any active overnight shift.`;
 todayPunches = data || [];
@@ -1172,6 +1203,15 @@ async function recordPunch(punchType, button) {
     } finally { punchBusy=false; }
 }
 
+if (remindersPlugin()) {
+    document.getElementById("locationNote").textContent =
+        "Location is checked only when you clock in, clock out, or start/end a break. Allow location for TYMRAK when your phone asks. You must be inside an assigned workplace.";
+}
+mountReminderSetting(document.getElementById("reminderSetting"), on => {
+    if (!on) clearReminders();
+    else if (employee) loadTodaysPunches().catch(() => {});
+});
+
 timecardButton.addEventListener(
     "click",
     () => {
@@ -1182,6 +1222,8 @@ timecardButton.addEventListener(
 logoutButton.addEventListener(
     "click",
     async () => {
+
+        await clearReminders();
 
         await supabase.auth
             .signOut();

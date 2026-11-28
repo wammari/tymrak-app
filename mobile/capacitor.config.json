@@ -6,8 +6,26 @@
     "androidScheme": "https"
   },
   "plugins": {
-    "CapacitorHttp": { "enabled": true },
-    "SplashScreen": { "launchShowDuration": 1200, "backgroundColor": "#fff9f0", "showSpinner": false },
-    "StatusBar": { "style": "DARK", "backgroundColor": "#fff9f0", "overlaysWebView": false }
+    "CapacitorHttp": {
+      "enabled": true
+    },
+    "SplashScreen": {
+      "launchShowDuration": 1200,
+      "backgroundColor": "#fff9f0",
+      "showSpinner": false
+    },
+    "StatusBar": {
+      "style": "LIGHT",
+      "backgroundColor": "#fff9f0",
+      "overlaysWebView": false
+    },
+    "LocalNotifications": {
+      "smallIcon": "ic_stat_tymrak",
+      "iconColor": "#8d5316"
+    }
+  },
+  "backgroundColor": "#fff9f0",
+  "ios": {
+    "contentInset": "always"
   }
 }
