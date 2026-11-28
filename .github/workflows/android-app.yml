@@ -1,0 +1,51 @@
+name: TYMRAK Android test app
+
+# Builds an installable Android test version of the TYMRAK employee app (debug build:
+# not for the Play Store). Download it from the run's "Artifacts" section.
+on:
+  pull_request:
+    paths: ['mobile/**', '*.html', '*.js', 'tymrak-theme.css', '.github/workflows/android-app.yml']
+  push:
+    branches: [main]
+    paths: ['mobile/**', '*.html', '*.js', 'tymrak-theme.css', '.github/workflows/android-app.yml']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  android:
+    name: Build Android test app
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    defaults:
+      run:
+        working-directory: mobile
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+          cache-dependency-path: mobile/package-lock.json
+      - name: Set up Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: gradle
+      - name: Install app tools
+        run: npm ci
+      - name: Package the employee pages and copy them into the Android project
+        run: npm run build && npx cap sync android
+      - name: Build the test app
+        working-directory: mobile/android
+        run: ./gradlew --no-daemon assembleDebug
+      - name: Upload the test app
+        uses: actions/upload-artifact@v4
+        with:
+          name: tymrak-android-test-app
+          path: mobile/android/app/build/outputs/apk/debug/app-debug.apk
+          retention-days: 14

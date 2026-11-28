@@ -1,0 +1,13 @@
+{
+  "appId": "com.tymrak.app",
+  "appName": "TYMRAK",
+  "webDir": "www",
+  "server": {
+    "androidScheme": "https"
+  },
+  "plugins": {
+    "CapacitorHttp": { "enabled": true },
+    "SplashScreen": { "launchShowDuration": 1200, "backgroundColor": "#fff9f0", "showSpinner": false },
+    "StatusBar": { "style": "DARK", "backgroundColor": "#fff9f0", "overlaysWebView": false }
+  }
+}
